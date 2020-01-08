@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"sort"
-	"strings"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -34,11 +33,9 @@ func NewInMemoryFileSystem() *InMemoryFileSystem {
 	return &InMemoryFileSystem{fileSystem: make(map[string]*file)}
 }
 
-func (this *InMemoryFileSystem) Listing(root string) (files []contracts.FileInfo) {
-	for path, file := range this.fileSystem {
-		if strings.Contains(path, root) {
-			files = append(files, file)
-		}
+func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+	for _, file := range this.fileSystem {
+		files = append(files, file)
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Path() < files[j].Path() })

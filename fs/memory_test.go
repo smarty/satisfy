@@ -45,18 +45,17 @@ func (this *MemoryFixture) TestCreate() {
 }
 
 func (this *MemoryFixture) TestListing() {
-	this.fileSystem.WriteFile("yes/file0.txt", []byte(""))
-	this.fileSystem.WriteFile("yes/file1.txt", []byte("1"))
-	this.fileSystem.WriteFile("yes/sub/file0.txt", []byte("12"))
-	this.fileSystem.WriteFile("no/file1.txt", []byte("123"))
+	this.fileSystem.WriteFile("file0.txt", []byte(""))
+	this.fileSystem.WriteFile("file1.txt", []byte("1"))
+	this.fileSystem.WriteFile("sub/file0.txt", []byte("12"))
 
-	fileInfo := this.fileSystem.Listing("yes")
+	fileInfo := this.fileSystem.Listing()
 
 	this.So(fileInfo, should.HaveLength, 3)
-	this.So(fileInfo[0].Path(), should.Equal, "yes/file0.txt")
+	this.So(fileInfo[0].Path(), should.Equal, "file0.txt")
 	this.So(fileInfo[0].Size(), should.Equal, 0)
-	this.So(fileInfo[1].Path(), should.Equal, "yes/file1.txt")
+	this.So(fileInfo[1].Path(), should.Equal, "file1.txt")
 	this.So(fileInfo[1].Size(), should.Equal, 1)
-	this.So(fileInfo[2].Path(), should.Equal, "yes/sub/file0.txt")
+	this.So(fileInfo[2].Path(), should.Equal, "sub/file0.txt")
 	this.So(fileInfo[2].Size(), should.Equal, 2)
 }
