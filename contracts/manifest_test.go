@@ -3,7 +3,6 @@ package contracts
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
@@ -18,17 +17,18 @@ type ManifestFixture struct {
 }
 
 func (this *ManifestFixture) TestMarshalManifest() {
-    created, _ := time.Parse(time.RFC3339, "2020-01-07T23:12:02Z")
-    original :=  Manifest{
-        Name: "package-name",
-        Version: "1.2.3",
-        Created: created,
-        Contents: []FileInfo{
-            {Path: "a", Size: 1, MD5Checksum: []byte{11}, Permissions: 111},
-            {Path: "b", Size: 2, MD5Checksum: []byte{22}, Permissions: 222},
-            {Path: "c", Size: 3, MD5Checksum: []byte{33}, Permissions: 333},
-        },
-    }
+	original := Manifest{
+		Name:            "package-name",
+		Version:              "1.2.3",
+		CompressionAlgorithm: "zstd",
+		ArchiveMD5Checksum:   []byte("dfsdwersdfwer"),
+		ArchiveAddress:       "",
+		Contents: []FileInfo{
+			{Path: "a", Size: 1, MD5Checksum: []byte{11}},
+			{Path: "b", Size: 2, MD5Checksum: []byte{22}},
+			{Path: "c", Size: 3, MD5Checksum: []byte{33}},
+		},
+	}
 	clone := this.unmarshal(this.marshal(original))
 	this.So(clone, should.Resemble, original)
 }

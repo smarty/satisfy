@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+
 	err := filepath.Walk("/Users/Gordon/src/bitbucket.org", walker)
 	if err != nil {
 		log.Fatal(err)

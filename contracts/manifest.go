@@ -1,17 +1,20 @@
 package contracts
 
-import "time"
-
 type Manifest struct {
-	Name     string     `json:"name"`
-	Version  string     `json:"version"`
-	Created  time.Time  `json:"created"`
-	Contents []FileInfo `json:"contents"`
+	Name    string `json:"short_name"` //a-z 0-9 _-/
+	Version string `json:"version"`
+	Archive Archive
+}
+
+type Archive struct { // TODO add json tags
+	Filename    string
+	Size        uint64
+	MD5Checksum []byte
+	Contents    []FileInfo
 }
 
 type FileInfo struct {
 	Path        string `json:"path"`
-	Size        int    `json:"size"`
+	Size        int64  `json:"size"`
 	MD5Checksum []byte `json:"md5_checksum"`
-	Permissions int    `json:"permissions"`
 }
