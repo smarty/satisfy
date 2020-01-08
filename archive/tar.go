@@ -15,7 +15,7 @@ func NewTarArchiveWriter(writer io.Writer) *TarArchiveWriter {
 }
 
 func (this *TarArchiveWriter) WriteHeader(name string, size, mode int64) {
-	err := this.writer.WriteHeader(&tar.Header{Name:name, Size: size, Mode: mode})
+	err := this.writer.WriteHeader(&tar.Header{Name:name, Size: size, Mode: 0644})
 	if err != nil {
 		log.Panic(err)
 	}
@@ -26,9 +26,5 @@ func (this *TarArchiveWriter) Write(p []byte) (n int, err error) {
 }
 
 func (this *TarArchiveWriter) Close() error {
-	err := this.writer.Flush()
-	if err != nil {
-		return err
-	}
 	return this.writer.Close()
 }

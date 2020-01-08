@@ -3,7 +3,7 @@ package contracts
 import "io"
 
 type FileSystem interface {
-	Listing(root string) []FileInfo        //filepath.Walk
+	Listing(root string) []FileInfo        //filepath.Walk // TODO: no longer needs a root
 	Open(path string) io.ReadCloser        //os.Open
 	Create(path string) io.WriteCloser     //os.Create
 	ReadFile(path string) []byte           //ioutil.ReadFile

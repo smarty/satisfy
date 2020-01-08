@@ -1,10 +1,7 @@
 package contracts
 
-import (
-	"io"
-)
-
 type ArchiveWriter interface {
-	io.WriteCloser
+	Write([]byte) (int, error)
+	Close() error
 	WriteHeader(name string, size, mode int64)
 }
