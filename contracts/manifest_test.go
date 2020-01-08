@@ -23,7 +23,7 @@ func (this *ManifestFixture) TestMarshalManifest() {
 		CompressionAlgorithm: "zstd",
 		ArchiveMD5Checksum:   []byte("dfsdwersdfwer"),
 		ArchiveAddress:       "",
-		Contents: []FileInfo{
+		Contents: []ArchiveItem{
 			{Path: "a", Size: 1, MD5Checksum: []byte{11}},
 			{Path: "b", Size: 2, MD5Checksum: []byte{22}},
 			{Path: "c", Size: 3, MD5Checksum: []byte{33}},

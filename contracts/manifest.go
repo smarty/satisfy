@@ -10,10 +10,10 @@ type Archive struct { // TODO add json tags
 	Filename    string
 	Size        uint64
 	MD5Checksum []byte
-	Contents    []FileInfo
+	Contents    []ArchiveItem
 }
 
-type FileInfo struct {
+type ArchiveItem struct {
 	Path        string `json:"path"`
 	Size        int64  `json:"size"`
 	MD5Checksum []byte `json:"md5_checksum"`
