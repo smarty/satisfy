@@ -35,7 +35,6 @@ func (this *FakeArchiveWriter) Close() error {
 	panic("implement me")
 }
 
-func (this *FakeArchiveWriter) WriteHeader(name string, size, mode int64) {
-	// TODO: remove mode
+func (this *FakeArchiveWriter) WriteHeader(name string, size int64) {
 	panic("implement me")
 }
