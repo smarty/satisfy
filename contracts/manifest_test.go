@@ -18,15 +18,16 @@ type ManifestFixture struct {
 
 func (this *ManifestFixture) TestMarshalManifest() {
 	original := Manifest{
-		Name:            "package-name",
-		Version:              "1.2.3",
-		CompressionAlgorithm: "zstd",
-		ArchiveMD5Checksum:   []byte("dfsdwersdfwer"),
-		ArchiveAddress:       "",
-		Contents: []ArchiveItem{
-			{Path: "a", Size: 1, MD5Checksum: []byte{11}},
-			{Path: "b", Size: 2, MD5Checksum: []byte{22}},
-			{Path: "c", Size: 3, MD5Checksum: []byte{33}},
+		Name:    "package-name",
+		Version: "1.2.3",
+		Archive: Archive{
+			Filename:    "filename",
+			Size:        1,
+			MD5Checksum: []byte("checksum"),
+			Contents: []ArchiveItem{
+				{Path: "item1", Size: 1, MD5Checksum: []byte("item1")},
+				{Path: "item2", Size: 2, MD5Checksum: []byte("item2")},
+			},
 		},
 	}
 	clone := this.unmarshal(this.marshal(original))
