@@ -5,3 +5,8 @@ __MACOSX
 /workspace/
 /coverage.out
 config.json
+*.tar
+*.tar.*
+
+
+
