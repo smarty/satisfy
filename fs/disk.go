@@ -9,22 +9,16 @@ import (
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
+
 type FileInfo struct {
 	path string
 	size int64
 }
 
-func (this FileInfo) Path() string {
-	return this.path
-}
+func (this FileInfo) Path() string {return this.path}
+func (this FileInfo) Size() int64 {return this.size}
 
-func (this FileInfo) Size() int64 {
-	return this.size
-}
-
-type DiskFileSystem struct {
-	root string
-}
+type DiskFileSystem struct {root string}
 
 func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: root}
@@ -58,10 +52,6 @@ func (this *DiskFileSystem) Open(path string) io.ReadCloser {
 	return reader
 }
 
-func (this *DiskFileSystem) absolute(path string) string {
-	return filepath.Join(this.root, path)
-}
-
 func (this *DiskFileSystem) Create(path string) io.WriteCloser {
 	writer, err := os.Create(this.absolute(path))
 	if err != nil {
@@ -83,4 +73,8 @@ func (this *DiskFileSystem) WriteFile(path string, content []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
+}
+
+func (this *DiskFileSystem) absolute(path string) string {
+	return filepath.Join(this.root, path)
 }
