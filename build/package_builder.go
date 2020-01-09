@@ -25,6 +25,7 @@ func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWr
 
 func (this *PackageBuilder) Build() error {
 	for _, file := range this.storage.Listing() {
+		this.hasher.Reset()
 		reader := this.storage.Open(file.Path())
 		_, _ = io.Copy(this.hasher, reader)
 		this.contents = append(this.contents, contracts.ArchiveItem{
