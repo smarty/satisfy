@@ -24,17 +24,21 @@ func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWr
 
 func (this *PackageBuilder) Build() error {
 	for _, file := range this.storage.Listing() {
-		this.add(file)
+		err := this.add(file)
+		if err != nil {
+			return err
+		}
 	}
 	return this.archive.Close()
 }
 
-func (this *PackageBuilder) add(file contracts.FileInfo) {
+func (this *PackageBuilder) add(file contracts.FileInfo) error {
 	this.archive.WriteHeader(file.Path(), file.Size())
 	reader := this.storage.Open(file.Path())
 	writer := io.MultiWriter(this.hasher, this.archive)
-	_, _ = io.Copy(writer, reader)
+	_, err := io.Copy(writer, reader)
 	this.contents = append(this.contents, this.buildArchiveEntry(file))
+	return err
 }
 
 func (this *PackageBuilder) buildArchiveEntry(file contracts.FileInfo) contracts.ArchiveItem {

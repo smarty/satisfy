@@ -1,6 +1,7 @@
 package build
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/smartystreets/assertions/should"
@@ -27,49 +28,48 @@ func (this *PackageBuilderFixture) Setup() {
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
+	this.fileSystem.WriteFile("file0.txt", []byte("a"))
+	this.fileSystem.WriteFile("file1.txt", []byte("bb"))
+	this.fileSystem.WriteFile("sub/file0.txt", []byte("ccc"))
 }
 
 func (this *PackageBuilderFixture) TestContentsAreInventoried() {
-	this.fileSystem.WriteFile("file0.txt", []byte("a"))
-	this.fileSystem.WriteFile("file1.txt", []byte("b"))
-	this.fileSystem.WriteFile("sub/file0.txt", []byte("c"))
-
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
 		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
-		{Path: "file1.txt", Size: 1, MD5Checksum: []byte("b [HASHED]")},
-		{Path: "sub/file0.txt", Size: 1, MD5Checksum: []byte("c [HASHED]")},
+		{Path: "file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
+		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
 
 func (this *PackageBuilderFixture) TestContentsAreArchived() {
-	this.fileSystem.WriteFile("file0.txt", []byte("a"))
-	this.fileSystem.WriteFile("file1.txt", []byte("bb"))
-	this.fileSystem.WriteFile("sub/file0.txt", []byte("ccc"))
-
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{
-			path:     "file0.txt",
-			size:     1,
-			contents: []byte("a"),
-		},
-		{
-			path:     "file1.txt",
-			size:     2,
-			contents: []byte("bb"),
-		},
-		{
-			path:     "sub/file0.txt",
-			size:     3,
-			contents: []byte("ccc"),
-		},
+		{path: "file0.txt", size: 1, contents: []byte("a")},
+		{path: "file1.txt", size: 2, contents: []byte("bb")},
+		{path: "sub/file0.txt", size: 3, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
+}
+
+func (this *PackageBuilderFixture) TestSimulatedArchiveWriteError() {
+	this.archive.writeError = writeErr
+
+	err := this.builder.Build()
+
+	this.So(err, should.Equal, writeErr)
+}
+
+func (this *PackageBuilderFixture) TestSimulatedArchiveCloseError() {
+	this.archive.closedError = closeErr
+
+	err := this.builder.Build()
+
+	this.So(err, should.Equal, closeErr)
 }
 
 /////////////////////////
@@ -90,15 +90,17 @@ func (this *FakeHasher) Size() int           { panic("implement me") }
 /////////////////////////
 
 type ArchiveItem struct {
-	path string
-	size int64
+	path     string
+	size     int64
 	contents []byte
 }
 
 type FakeArchiveWriter struct {
-	items []*ArchiveItem
-	current *ArchiveItem
-	closed bool
+	items       []*ArchiveItem
+	current     *ArchiveItem
+	closed      bool
+	writeError  error
+	closedError error
 }
 
 func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
@@ -107,16 +109,22 @@ func (this *FakeArchiveWriter) WriteHeader(path string, size int64) {
 		return
 	}
 	this.current = &ArchiveItem{
-		path:     path,
-		size:     size,
+		path: path,
+		size: size,
 	}
 	this.items = append(this.items, this.current)
 }
 func (this *FakeArchiveWriter) Write(p []byte) (int, error) {
 	this.current.contents = append(this.current.contents, p...)
-	return len(p), nil
+	return len(p), this.writeError
+
 }
 func (this *FakeArchiveWriter) Close() error {
 	this.closed = true
-	return nil
+	return this.closedError
 }
+
+var (
+	writeErr = errors.New("write error")
+	closeErr = errors.New("close error")
+)
