@@ -32,8 +32,12 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		if info.IsDir() {
 			return nil
 		}
+		relative, err := filepath.Rel(this.root, path)
+		if err != nil {
+			return err
+		}
 		listing = append(listing, FileInfo{
-			path: path[len(this.root)+1:],
+			path: relative,
 			size: info.Size(),
 		})
 		return nil
