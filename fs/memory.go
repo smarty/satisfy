@@ -3,6 +3,7 @@ package fs
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"sort"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -10,7 +11,12 @@ import (
 
 type file struct {
 	path string
-	*bytes.Buffer
+	contents []byte
+}
+
+func (this *file) Write(p []byte) (n int, err error) {
+	this.contents = append(this.contents, p...)
+	return len(p), nil
 }
 
 func (this *file) Close() error {
@@ -22,7 +28,7 @@ func (this *file) Path() string {
 }
 
 func (this *file) Size() int64 {
-	return int64(this.Len())
+	return int64(len(this.contents))
 }
 
 type InMemoryFileSystem struct {
@@ -43,7 +49,7 @@ func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 }
 
 func (this *InMemoryFileSystem) Open(path string) io.ReadCloser {
-	return this.fileSystem[path]
+	return ioutil.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
 }
 
 func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
@@ -52,9 +58,12 @@ func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
 }
 
 func (this *InMemoryFileSystem) ReadFile(path string) []byte {
-	return this.fileSystem[path].Bytes()
+	return this.fileSystem[path].contents
 }
 
 func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
-	this.fileSystem[path] = &file{path: path, Buffer: bytes.NewBuffer(content)}
+	this.fileSystem[path] = &file{
+		path:     path,
+		contents: content,
+	}
 }

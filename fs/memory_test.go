@@ -1,6 +1,8 @@
 package fs
 
 import (
+	"bytes"
+	"io"
 	"io/ioutil"
 	"testing"
 
@@ -24,6 +26,14 @@ func (this *MemoryFixture) Setup() {
 func (this *MemoryFixture) TestWriteFileReadFile() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
 	this.So(this.fileSystem.ReadFile("/file.txt"), should.Resemble, []byte("Hello World"))
+}
+
+func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
+	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
+	buffer := &bytes.Buffer{}
+	reader := this.fileSystem.Open("/file.txt")
+	io.Copy(buffer, reader)
+	this.So(this.fileSystem.Listing()[0].Size(), should.Equal, len([]byte("Hello World")))
 }
 
 func (this *MemoryFixture) TestReadFileNonExistingFile() {
