@@ -18,7 +18,7 @@ type PackageBuilderFixture struct {
 	*gunit.Fixture
 	builder    *PackageBuilder
 	fileSystem contracts.FileSystem
-	archive    contracts.ArchiveWriter
+	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
 }
 
@@ -29,7 +29,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
 }
 
-func (this *PackageBuilderFixture) TestArchiveContentsAreInventoried() {
+func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 	this.fileSystem.WriteFile("file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("file1.txt", []byte("b"))
 	this.fileSystem.WriteFile("sub/file0.txt", []byte("c"))
@@ -42,6 +42,34 @@ func (this *PackageBuilderFixture) TestArchiveContentsAreInventoried() {
 		{Path: "file1.txt", Size: 1, MD5Checksum: []byte("b [HASHED]")},
 		{Path: "sub/file0.txt", Size: 1, MD5Checksum: []byte("c [HASHED]")},
 	})
+}
+
+func (this *PackageBuilderFixture) TestContentsAreArchived() {
+	this.fileSystem.WriteFile("file0.txt", []byte("a"))
+	this.fileSystem.WriteFile("file1.txt", []byte("bb"))
+	this.fileSystem.WriteFile("sub/file0.txt", []byte("ccc"))
+
+	err := this.builder.Build()
+
+	this.So(err, should.BeNil)
+	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
+		{
+			path:     "file0.txt",
+			size:     1,
+			contents: []byte("a"),
+		},
+		{
+			path:     "file1.txt",
+			size:     2,
+			contents: []byte("bb"),
+		},
+		{
+			path:     "sub/file0.txt",
+			size:     3,
+			contents: []byte("ccc"),
+		},
+	})
+	this.So(this.archive.closed, should.BeTrue)
 }
 
 /////////////////////////
@@ -59,9 +87,36 @@ func (this *FakeHasher) Sum(b []byte) []byte { return this.sum }
 func (this *FakeHasher) BlockSize() int      { panic("implement me") }
 func (this *FakeHasher) Size() int           { panic("implement me") }
 
-type FakeArchiveWriter struct{}
+/////////////////////////
 
-func NewFakeArchiveWriter() *FakeArchiveWriter                      { return &FakeArchiveWriter{} }
-func (this *FakeArchiveWriter) Write([]byte) (int, error)           { panic("implement me") }
-func (this *FakeArchiveWriter) Close() error                        { panic("implement me") }
-func (this *FakeArchiveWriter) WriteHeader(name string, size int64) { panic("implement me") }
+type ArchiveItem struct {
+	path string
+	size int64
+	contents []byte
+}
+
+type FakeArchiveWriter struct {
+	items []*ArchiveItem
+	current *ArchiveItem
+	closed bool
+}
+
+func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
+func (this *FakeArchiveWriter) WriteHeader(path string, size int64) {
+	if this.closed {
+		return
+	}
+	this.current = &ArchiveItem{
+		path:     path,
+		size:     size,
+	}
+	this.items = append(this.items, this.current)
+}
+func (this *FakeArchiveWriter) Write(p []byte) (int, error) {
+	this.current.contents = append(this.current.contents, p...)
+	return len(p), nil
+}
+func (this *FakeArchiveWriter) Close() error {
+	this.closed = true
+	return nil
+}
