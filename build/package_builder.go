@@ -1,7 +1,6 @@
 package build
 
 import (
-	"crypto/md5"
 	"hash"
 	"io"
 
@@ -15,11 +14,11 @@ type PackageBuilder struct {
 	hasher   hash.Hash
 }
 
-func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWriter) *PackageBuilder {
+func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) *PackageBuilder {
 	return &PackageBuilder{
 		storage: storage,
 		archive: archive,
-		hasher:  md5.New(),
+		hasher:  hasher,
 	}
 }
 
