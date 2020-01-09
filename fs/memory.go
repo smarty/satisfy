@@ -5,13 +5,21 @@ import (
 	"io"
 	"io/ioutil"
 	"sort"
+	"time"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type file struct {
-	path string
+	path     string
 	contents []byte
+	mod      time.Time
+}
+
+var InMemoryModTime = time.Now()
+
+func (this *file) ModTime() time.Time {
+	return this.mod
 }
 
 func (this *file) Write(p []byte) (n int, err error) {
@@ -65,5 +73,6 @@ func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
 	this.fileSystem[path] = &file{
 		path:     path,
 		contents: content,
+		mod:      InMemoryModTime,
 	}
 }

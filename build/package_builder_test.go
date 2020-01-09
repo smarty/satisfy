@@ -49,9 +49,9 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{path: "file0.txt", size: 1, contents: []byte("a")},
-		{path: "file1.txt", size: 2, contents: []byte("bb")},
-		{path: "sub/file0.txt", size: 3, contents: []byte("ccc")},
+		{ArchiveHeader:contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: fs.InMemoryModTime}, contents: []byte("a")},
+		{ArchiveHeader:contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: fs.InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader:contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: fs.InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -90,8 +90,7 @@ func (this *FakeHasher) Size() int           { panic("implement me") }
 /////////////////////////
 
 type ArchiveItem struct {
-	path     string
-	size     int64
+	contracts.ArchiveHeader
 	contents []byte
 }
 
@@ -104,14 +103,11 @@ type FakeArchiveWriter struct {
 }
 
 func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
-func (this *FakeArchiveWriter) WriteHeader(path string, size int64) {
+func (this *FakeArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
 	if this.closed {
 		return
 	}
-	this.current = &ArchiveItem{
-		path: path,
-		size: size,
-	}
+	this.current = &ArchiveItem{ArchiveHeader: header}
 	this.items = append(this.items, this.current)
 }
 func (this *FakeArchiveWriter) Write(p []byte) (int, error) {

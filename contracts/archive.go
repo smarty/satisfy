@@ -1,7 +1,15 @@
 package contracts
 
+import "time"
+
 type ArchiveWriter interface {
 	Write([]byte) (int, error)
 	Close() error
-	WriteHeader(name string, size int64)
+	WriteHeader(ArchiveHeader)
+}
+
+type ArchiveHeader struct {
+	Name string
+	Size int64
+	ModTime time.Time
 }

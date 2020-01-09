@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -13,12 +14,14 @@ import (
 type FileInfo struct {
 	path string
 	size int64
+	mod  time.Time
 }
 
-func (this FileInfo) Path() string {return this.path}
-func (this FileInfo) Size() int64 {return this.size}
+func (this FileInfo) Path() string       { return this.path }
+func (this FileInfo) Size() int64        { return this.size }
+func (this FileInfo) ModTime() time.Time { return this.mod }
 
-type DiskFileSystem struct {root string}
+type DiskFileSystem struct{ root string }
 
 func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: root}
@@ -39,6 +42,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		listing = append(listing, FileInfo{
 			path: relative,
 			size: info.Size(),
+			mod:  info.ModTime(),
 		})
 		return nil
 	})

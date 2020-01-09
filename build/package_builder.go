@@ -33,7 +33,11 @@ func (this *PackageBuilder) Build() error {
 }
 
 func (this *PackageBuilder) add(file contracts.FileInfo) error {
-	this.archive.WriteHeader(file.Path(), file.Size())
+	this.archive.WriteHeader(contracts.ArchiveHeader{
+		Name:    file.Path(),
+		Size:    file.Size(),
+		ModTime: file.ModTime(),
+	})
 	reader := this.storage.Open(file.Path())
 	writer := io.MultiWriter(this.hasher, this.archive)
 	_, err := io.Copy(writer, reader)
