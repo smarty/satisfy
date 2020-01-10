@@ -5,11 +5,13 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
+	"flag"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/smartystreets/gcs"
 
@@ -20,7 +22,23 @@ import (
 	"bitbucket.org/smartystreets/satisfy/remote"
 )
 
+type Config struct {
+	sourceDirectory  string
+	packageName      string
+	packageVersion   string
+	remoteBucket     string
+	remotePathPrefix string
+}
+
 func main() {
+	config := Config{}
+	flag.StringVar(&config.sourceDirectory, "local", "", "The directory containing package data.")
+	flag.StringVar(&config.packageName, "name", "", "The name of the package.")
+	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
+	flag.StringVar(&config.remoteBucket, "remote-bucket", "", "The remote bucket name.")
+	flag.StringVar(&config.remotePathPrefix, "remote-prefix", "", "The remote path prefix.")
+	flag.Parse()
+
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		log.Fatal(err)
@@ -32,7 +50,7 @@ func main() {
 	compressor := gzip.NewWriter(writer)
 
 	builder := build.NewPackageBuilder(
-		fs.NewDiskFileSystem("/Users/Mike/src/github.com/smartystreets/gunit/advanced_examples"), // TODO: CLI
+		fs.NewDiskFileSystem(config.sourceDirectory),
 		archive.NewTarArchiveWriter(writer),
 		md5.New(),
 	)
@@ -58,16 +76,15 @@ func main() {
 	}
 
 	manifest := contracts.Manifest{
-		Name:    "bowling-game",
-		Version: "1.2.3",
+		Name:    config.packageName,
+		Version: config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:    file.Name(),
+			Filename:    file.Name(), // TODO: this is wrong
 			Size:        uint64(fileInfo.Size()),
 			MD5Checksum: hasher.Sum(nil),
 			Contents:    builder.Contents(),
 		},
 	}
-
 
 	raw, err := ioutil.ReadFile("gcs-credentials.json") // TODO: ENV?
 	if err != nil {
@@ -85,11 +102,11 @@ func main() {
 	}
 	defer body.Close()
 
-	uploader := remote.NewGoogleCloudStorageUploader(http.DefaultClient, credentials, "api-gateway-whitelist-downloader") // TODO: CLI
+	uploader := remote.NewGoogleCloudStorageUploader(http.DefaultClient, credentials, config.remoteBucket)
 	// TODO: wrap uploader in retry-uploader
 
 	archiveRequest := contracts.UploadRequest{
-		Path:        "bowling-game/bowling-game_1.2.3.tar.gz", // TODO: derive
+		Path:        path.Join(config.remotePathPrefix, "bowling-game_1.2.3.tar.gz"), // TODO: derive
 		Body:        body,
 		Size:        int64(manifest.Archive.Size),
 		ContentType: "application/gzip",
@@ -107,7 +124,7 @@ func main() {
 	encoder.SetIndent("", "  ")
 	_ = encoder.Encode(manifest)
 	manifestRequest := contracts.UploadRequest{
-		Path:        "bowling-game/bowling-game_1.2.3.json", // TODO: derive
+		Path:        path.Join(config.remotePathPrefix ,"bowling-game_1.2.3.json"), // TODO: derive
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
 		ContentType: "application/json",
