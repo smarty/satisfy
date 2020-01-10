@@ -10,8 +10,8 @@ import (
 type PackageBuilder struct {
 	storage  contracts.FileSystem
 	archive  contracts.ArchiveWriter
-	contents []contracts.ArchiveItem
 	hasher   hash.Hash
+	contents []contracts.ArchiveItem
 }
 
 func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) *PackageBuilder {

@@ -12,12 +12,12 @@ import (
 )
 
 type GoogleCloudStorageUploader struct {
-	client      http.Client
+	client      *http.Client
 	credentials gcs.Credentials
 	bucket      string
 }
 
-func NewGoogleCloudStorageUploader(client http.Client, credentials gcs.Credentials, bucket string) *GoogleCloudStorageUploader {
+func NewGoogleCloudStorageUploader(client *http.Client, credentials gcs.Credentials, bucket string) *GoogleCloudStorageUploader {
 	return &GoogleCloudStorageUploader{client: client, credentials: credentials, bucket: bucket}
 }
 
@@ -28,8 +28,9 @@ func (this *GoogleCloudStorageUploader) Upload(request contracts.UploadRequest) 
 		gcs.WithBucket(this.bucket),
 		gcs.WithResource(request.Path),
 		gcs.PutWithContent(request.Body),
+		gcs.PutWithContentLength(request.Size),
+		//gcs.PutWithContentMD5(request.Checksum), // TODO: get this working...
 		gcs.PutWithContentType(request.ContentType),
-		gcs.PutWithContentMD5(request.Checksum),
 	)
 	if err != nil {
 		return err
