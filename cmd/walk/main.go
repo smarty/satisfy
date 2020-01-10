@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -28,6 +29,10 @@ type Config struct {
 	packageVersion   string
 	remoteBucket     string
 	remotePathPrefix string
+}
+
+func (this Config) composeRemotePath(extension string) string {
+	return path.Join(this.remotePathPrefix, fmt.Sprintf("%s_%s.%s", this.packageName, this.packageVersion, extension))
 }
 
 func main() {
@@ -104,9 +109,8 @@ func main() {
 
 	uploader := remote.NewGoogleCloudStorageUploader(http.DefaultClient, credentials, config.remoteBucket)
 	// TODO: wrap uploader in retry-uploader
-
 	archiveRequest := contracts.UploadRequest{
-		Path:        path.Join(config.remotePathPrefix, "bowling-game_1.2.3.tar.gz"), // TODO: derive
+		Path:        config.composeRemotePath("tar.gz"),
 		Body:        body,
 		Size:        int64(manifest.Archive.Size),
 		ContentType: "application/gzip",
@@ -124,7 +128,7 @@ func main() {
 	encoder.SetIndent("", "  ")
 	_ = encoder.Encode(manifest)
 	manifestRequest := contracts.UploadRequest{
-		Path:        path.Join(config.remotePathPrefix ,"bowling-game_1.2.3.json"), // TODO: derive
+		Path:        config.composeRemotePath("json"),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
 		ContentType: "application/json",
