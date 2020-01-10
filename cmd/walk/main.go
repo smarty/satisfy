@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 
 	"github.com/smartystreets/gcs"
 
@@ -107,8 +108,9 @@ func main() {
 	}
 	defer body.Close()
 
-	uploader := remote.NewGoogleCloudStorageUploader(http.DefaultClient, credentials, config.remoteBucket)
-	// TODO: wrap uploader in retry-uploader
+	client := &http.Client{Timeout: time.Minute}
+	gcsUploader := remote.NewGoogleCloudStorageUploader(client, credentials, config.remoteBucket)
+	uploader := remote.NewRetryUploader(gcsUploader, 5)
 	archiveRequest := contracts.UploadRequest{
 		Path:        config.composeRemotePath("tar.gz"),
 		Body:        body,
