@@ -23,13 +23,12 @@ func NewGoogleCloudStorageUploader(client *http.Client, credentials gcs.Credenti
 
 func (this *GoogleCloudStorageUploader) Upload(request contracts.UploadRequest) error {
 	gcsRequest, err := gcs.NewRequest("PUT",
-		//gcs.WithEndpoint("scheme", "host"),
 		gcs.WithCredentials(this.credentials),
 		gcs.WithBucket(this.bucket),
 		gcs.WithResource(request.Path),
 		gcs.PutWithContent(request.Body),
 		gcs.PutWithContentLength(request.Size),
-		//gcs.PutWithContentMD5(request.Checksum), // TODO: get this working...
+		gcs.PutWithContentMD5(request.Checksum),
 		gcs.PutWithContentType(request.ContentType),
 	)
 	if err != nil {
@@ -40,8 +39,9 @@ func (this *GoogleCloudStorageUploader) Upload(request contracts.UploadRequest) 
 		return err
 	}
 	if response.StatusCode != http.StatusOK {
+		requestDump, _ := httputil.DumpRequestOut(gcsRequest, false)
 		dump, _ := httputil.DumpResponse(response, true)
-		log.Printf("non 200 status code: %s", dump)
+		log.Printf("non 200 status code: \nrequest: \n%s\nresponse:\n%s", requestDump, dump)
 		return fmt.Errorf("non 200 status code: %s", response.Status)
 	}
 	return nil

@@ -11,12 +11,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/smartystreets/gcs"
+
 	"bitbucket.org/smartystreets/satisfy/archive"
 	"bitbucket.org/smartystreets/satisfy/build"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/fs"
 	"bitbucket.org/smartystreets/satisfy/remote"
-	"github.com/smartystreets/gcs"
 )
 
 func main() {
@@ -27,8 +28,8 @@ func main() {
 	localPath := file.Name()
 	log.Println(localPath)
 	hasher := md5.New()
-	compressor := gzip.NewWriter(file)
-	writer := io.MultiWriter(hasher, compressor)
+	writer := io.MultiWriter(hasher, file)
+	compressor := gzip.NewWriter(writer)
 
 	builder := build.NewPackageBuilder(
 		fs.NewDiskFileSystem("/Users/Mike/src/github.com/smartystreets/gunit/advanced_examples"), // TODO: CLI
