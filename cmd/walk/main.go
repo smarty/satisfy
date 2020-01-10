@@ -5,14 +5,12 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
-	"flag"
-	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"time"
 
 	"github.com/smartystreets/gcs"
@@ -24,74 +22,118 @@ import (
 	"bitbucket.org/smartystreets/satisfy/remote"
 )
 
-type Config struct {
-	sourceDirectory  string
-	packageName      string
-	packageVersion   string
-	remoteBucket     string
-	remotePathPrefix string
-}
-
-func (this Config) composeRemotePath(extension string) string {
-	return path.Join(this.remotePathPrefix, fmt.Sprintf("%s_%s.%s", this.packageName, this.packageVersion, extension))
-}
-
 func main() {
-	config := Config{}
-	flag.StringVar(&config.sourceDirectory, "local", "", "The directory containing package data.")
-	flag.StringVar(&config.packageName, "name", "", "The name of the package.")
-	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
-	flag.StringVar(&config.remoteBucket, "remote-bucket", "", "The remote bucket name.")
-	flag.StringVar(&config.remotePathPrefix, "remote-prefix", "", "The remote path prefix.")
-	flag.Parse()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	NewApp(parseConfig()).Run()
+}
 
-	file, err := ioutil.TempFile("", "")
+type App struct {
+	config     Config
+	file       *os.File
+	hasher     hash.Hash
+	compressor *gzip.Writer
+	builder    *build.PackageBuilder
+	manifest   contracts.Manifest
+	uploader   contracts.Uploader
+}
+
+func NewApp(config Config) *App {
+	return &App{config: config}
+}
+
+func (this *App) Run() {
+	var err error
+	this.file, err = ioutil.TempFile("", "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	localPath := file.Name()
-	log.Println(localPath)
-	hasher := md5.New()
-	writer := io.MultiWriter(hasher, file)
-	compressor := gzip.NewWriter(writer)
+	log.Println(this.file.Name())
+	this.hasher = md5.New()
+	writer := io.MultiWriter(this.hasher, this.file)
+	this.compressor = gzip.NewWriter(writer)
 
-	builder := build.NewPackageBuilder(
-		fs.NewDiskFileSystem(config.sourceDirectory),
-		archive.NewTarArchiveWriter(writer),
+	this.builder = build.NewPackageBuilder(
+		fs.NewDiskFileSystem(this.config.sourceDirectory),
+		archive.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
 
-	err = builder.Build()
+	err = this.builder.Build()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = compressor.Close()
+	err = this.compressor.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = file.Close()
+	this.closeArchiveFile()
+
+	fileInfo, err := os.Stat(this.file.Name())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fileInfo, err := os.Stat(localPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	manifest := contracts.Manifest{
-		Name:    config.packageName,
-		Version: config.packageVersion,
+	this.manifest = contracts.Manifest{
+		Name:    this.config.packageName,
+		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:    file.Name(), // TODO: this is wrong
+			Filename:    this.file.Name(), // TODO: this is wrong
 			Size:        uint64(fileInfo.Size()),
-			MD5Checksum: hasher.Sum(nil),
-			Contents:    builder.Contents(),
+			MD5Checksum: this.hasher.Sum(nil),
+			Contents:    this.builder.Contents(),
 		},
 	}
 
+	this.buildUploader()
+	err = this.uploader.Upload(this.buildArchiveUploadRequest())
+	if err != nil {
+		log.Fatal(err)
+	}
+	this.closeArchiveFile()
+
+	err = this.uploader.Upload(this.buildManifestUploadRequest())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (this *App) closeArchiveFile() {
+	_ = this.file.Close() //TODO investigate file already closed
+}
+
+func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
+	buffer := this.writeManifestToBuffer()
+	return contracts.UploadRequest{
+		Path:        this.config.composeRemotePath("json"),
+		Body:        bytes.NewReader(buffer.Bytes()),
+		Size:        int64(buffer.Len()),
+		ContentType: "application/json",
+		Checksum:    this.hasher.Sum(nil),
+	}
+}
+
+func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
+	this.openArchiveFile()
+	return contracts.UploadRequest{
+		Path:        this.config.composeRemotePath("tar.gz"),
+		Body:        this.file,
+		Size:        int64(this.manifest.Archive.Size),
+		ContentType: "application/gzip",
+		Checksum:    this.manifest.Archive.MD5Checksum,
+	}
+}
+
+func (this *App) openArchiveFile() {
+	var err error
+	this.file, err = os.Open(this.file.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (this *App) buildUploader() {
 	raw, err := ioutil.ReadFile("gcs-credentials.json") // TODO: ENV?
 	if err != nil {
 		log.Fatal(err)
@@ -102,42 +144,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	body, err := os.Open(localPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer body.Close()
-
 	client := &http.Client{Timeout: time.Minute}
-	gcsUploader := remote.NewGoogleCloudStorageUploader(client, credentials, config.remoteBucket)
-	uploader := remote.NewRetryUploader(gcsUploader, 5)
-	archiveRequest := contracts.UploadRequest{
-		Path:        config.composeRemotePath("tar.gz"),
-		Body:        body,
-		Size:        int64(manifest.Archive.Size),
-		ContentType: "application/gzip",
-		Checksum:    manifest.Archive.MD5Checksum,
-	}
-	err = uploader.Upload(archiveRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
+	gcsUploader := remote.NewGoogleCloudStorageUploader(client, credentials, this.config.remoteBucket)
+	this.uploader = remote.NewRetryUploader(gcsUploader, 5)
+}
 
+func (this *App) writeManifestToBuffer() *bytes.Buffer {
 	buffer := new(bytes.Buffer)
-	hasher.Reset()
-	writer = io.MultiWriter(buffer, hasher)
+	this.hasher.Reset()
+	writer := io.MultiWriter(buffer, this.hasher)
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(manifest)
-	manifestRequest := contracts.UploadRequest{
-		Path:        config.composeRemotePath("json"),
-		Body:        bytes.NewReader(buffer.Bytes()),
-		Size:        int64(buffer.Len()),
-		ContentType: "application/json",
-		Checksum:    hasher.Sum(nil),
-	}
-	err = uploader.Upload(manifestRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
+	_ = encoder.Encode(this.manifest)
+	return buffer
 }
