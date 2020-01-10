@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 simple-test:
+	go fmt ./...
 	go test -timeout=1s -count=1 -short ./...
 
 test:
