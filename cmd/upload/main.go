@@ -131,10 +131,11 @@ func (this *App) completeManifest() {
 		Name:    this.config.packageName,
 		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:    filepath.Base(this.config.composeRemotePath("json")),
-			Size:        uint64(fileInfo.Size()),
-			MD5Checksum: this.hasher.Sum(nil),
-			Contents:    this.builder.Contents(),
+			Filename:             filepath.Base(this.config.composeRemotePath("json")),
+			Size:                 uint64(fileInfo.Size()),
+			MD5Checksum:          this.hasher.Sum(nil),
+			Contents:             this.builder.Contents(),
+			CompressionAlgorithm: "gzip",
 		},
 	}
 }
