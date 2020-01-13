@@ -50,7 +50,7 @@ func parseConfig() (config Config) {
 	return config
 }
 
-var compression = map[string]func(io.Writer) io.WriteCloser {
+var compression = map[string]func(io.Writer) io.WriteCloser{
 	"zstd": func(writer io.Writer) io.WriteCloser {
 		compressor, err := zstd.NewWriter(writer)
 		if err != nil {

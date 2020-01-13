@@ -142,7 +142,7 @@ func (this *App) completeManifest() {
 		Name:    this.config.packageName,
 		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.composeRemotePath("tar."+this.config.compressionAlgorithm)),
+			Filename:             filepath.Base(this.config.composeRemotePath("tar." + this.config.compressionAlgorithm)),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
