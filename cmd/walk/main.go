@@ -23,13 +23,13 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	NewApp(parseConfig()).Run()
 }
 
 type App struct {
 	config     Config
 	file       *os.File
-	file2      *os.File
 	hasher     hash.Hash
 	compressor *gzip.Writer
 	builder    *build.PackageBuilder
@@ -43,9 +43,11 @@ func NewApp(config Config) *App {
 
 func (this *App) Run() {
 	var err error
-	this.openArchiveFile()
-
-	log.Println("Writing archive at:", this.file.Name())
+	this.file, err = ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(this.file.Name())
 	this.hasher = md5.New()
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.compressor = gzip.NewWriter(writer)
@@ -85,14 +87,10 @@ func (this *App) Run() {
 	}
 
 	this.buildUploader()
-
-	this.openArchiveFile()
-
 	err = this.uploader.Upload(this.buildArchiveUploadRequest())
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	this.closeArchiveFile()
 
 	err = this.uploader.Upload(this.buildManifestUploadRequest())
@@ -101,19 +99,35 @@ func (this *App) Run() {
 	}
 }
 
-func (this *App) openArchiveFile() {
-	var err error
-	if this.file == nil {
-		this.file, err = ioutil.TempFile("", "")
-	} else {
-		this.file, err = os.Open(this.file.Name())
-	}
-	if err != nil {
-		log.Fatal(err)
+func (this *App) closeArchiveFile() {
+	_ = this.file.Close() //TODO investigate file already closed
+}
+
+func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
+	buffer := this.writeManifestToBuffer()
+	return contracts.UploadRequest{
+		Path:        this.config.composeRemotePath("json"),
+		Body:        bytes.NewReader(buffer.Bytes()),
+		Size:        int64(buffer.Len()),
+		ContentType: "application/json",
+		Checksum:    this.hasher.Sum(nil),
 	}
 }
-func (this *App) closeArchiveFile(){
-	err := this.file.Close()
+
+func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
+	this.openArchiveFile()
+	return contracts.UploadRequest{
+		Path:        this.config.composeRemotePath("tar.gz"),
+		Body:        this.file,
+		Size:        int64(this.manifest.Archive.Size),
+		ContentType: "application/gzip",
+		Checksum:    this.manifest.Archive.MD5Checksum,
+	}
+}
+
+func (this *App) openArchiveFile() {
+	var err error
+	this.file, err = os.Open(this.file.Name())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,28 +148,10 @@ func (this *App) buildUploader() {
 	gcsUploader := remote.NewGoogleCloudStorageUploader(client, credentials, this.config.remoteBucket)
 	this.uploader = remote.NewRetryUploader(gcsUploader, 5)
 }
-func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
-	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("tar.gz"),
-		Body:        NopReadSeekCloser(this.file),
-		Size:        int64(this.manifest.Archive.Size),
-		ContentType: "application/gzip",
-		Checksum:    this.manifest.Archive.MD5Checksum,
-	}
-}
-func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
-	buffer := this.writeManifestToBuffer()
-	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("json"),
-		Body:        bytes.NewReader(buffer.Bytes()),
-		Size:        int64(buffer.Len()),
-		ContentType: "application/json",
-		Checksum:    this.hasher.Sum(nil),
-	}
-}
+
 func (this *App) writeManifestToBuffer() *bytes.Buffer {
-	this.hasher.Reset()
 	buffer := new(bytes.Buffer)
+	this.hasher.Reset()
 	writer := io.MultiWriter(buffer, this.hasher)
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")

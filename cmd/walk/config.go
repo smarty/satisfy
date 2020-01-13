@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"path"
 )
 
@@ -20,7 +19,6 @@ func (this Config) composeRemotePath(extension string) string {
 }
 
 func parseConfig() (config Config) {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.StringVar(&config.sourceDirectory, "local", "", "The directory containing package data.")
 	flag.StringVar(&config.packageName, "name", "", "The name of the package.")
 	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
