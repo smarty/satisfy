@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"hash"
@@ -13,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 
 	"bitbucket.org/smartystreets/satisfy/archive"
 	"bitbucket.org/smartystreets/satisfy/build"
@@ -31,7 +32,7 @@ type App struct {
 	config     Config
 	file       *os.File
 	hasher     hash.Hash
-	compressor *gzip.Writer
+	compressor *zstd.Encoder
 	builder    *build.PackageBuilder
 	manifest   contracts.Manifest
 	uploader   contracts.Uploader
@@ -47,6 +48,8 @@ func (this *App) Run() {
 	this.buildArchiveAndManifestContents()
 
 	this.completeManifest()
+
+	log.Println("Manifest:", this.dumpManifest())
 
 	this.buildUploader()
 
@@ -68,10 +71,10 @@ func (this *App) Run() {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("tar.gz"),
+		Path:        this.config.composeRemotePath("tar.zstd"),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
-		ContentType: "application/gzip",
+		ContentType: "application/zstd",
 		Checksum:    this.manifest.Archive.MD5Checksum,
 	}
 }
@@ -84,7 +87,10 @@ func (this *App) buildArchiveAndManifestContents() {
 	}
 	this.hasher = md5.New()
 	writer := io.MultiWriter(this.hasher, this.file)
-	this.compressor = gzip.NewWriter(writer)
+	this.compressor, err = zstd.NewWriter(writer)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	this.builder = build.NewPackageBuilder(
 		fs.NewDiskFileSystem(this.config.sourceDirectory),
@@ -131,11 +137,11 @@ func (this *App) completeManifest() {
 		Name:    this.config.packageName,
 		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.composeRemotePath("json")),
+			Filename:             filepath.Base(this.config.composeRemotePath("tar.zstd")),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
-			CompressionAlgorithm: "gzip",
+			CompressionAlgorithm: "zstd",
 		},
 	}
 }
@@ -177,4 +183,12 @@ func (this *App) writeManifestToBuffer() *bytes.Buffer {
 	encoder.SetIndent("", "  ")
 	_ = encoder.Encode(this.manifest)
 	return buffer
+}
+
+func (this *App) dumpManifest() string {
+	raw, err := json.MarshalIndent(this.manifest, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(raw)
 }
