@@ -1,23 +1,27 @@
 package main
 
 import (
+	"compress/gzip"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/gcs"
 )
 
 type Config struct {
-	sourceDirectory   string
-	packageName       string
-	packageVersion    string
-	remoteBucket      string
-	remotePathPrefix  string
-	googleCredentials gcs.Credentials
+	compressionAlgorithm string
+	sourceDirectory      string
+	packageName          string
+	packageVersion       string
+	remoteBucket         string
+	remotePathPrefix     string
+	googleCredentials    gcs.Credentials
 }
 
 func (this Config) composeRemotePath(extension string) string {
@@ -25,6 +29,7 @@ func (this Config) composeRemotePath(extension string) string {
 }
 
 func parseConfig() (config Config) {
+	flag.StringVar(&config.compressionAlgorithm, "compression", "zstd", "The compression algorithm to use.")
 	flag.StringVar(&config.sourceDirectory, "local", "", "The directory containing package data.")
 	flag.StringVar(&config.packageName, "name", "", "The name of the package.")
 	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
@@ -43,4 +48,17 @@ func parseConfig() (config Config) {
 	}
 
 	return config
+}
+
+var compression = map[string]func(io.Writer) io.WriteCloser {
+	"zstd": func(writer io.Writer) io.WriteCloser {
+		compressor, err := zstd.NewWriter(writer)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return compressor
+	},
+	"gzip": func(writer io.Writer) io.WriteCloser {
+		return gzip.NewWriter(writer)
+	},
 }

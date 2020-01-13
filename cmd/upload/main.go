@@ -13,8 +13,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/klauspost/compress/zstd"
-
 	"bitbucket.org/smartystreets/satisfy/archive"
 	"bitbucket.org/smartystreets/satisfy/build"
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -32,7 +30,7 @@ type App struct {
 	config     Config
 	file       *os.File
 	hasher     hash.Hash
-	compressor *zstd.Encoder
+	compressor io.WriteCloser
 	builder    *build.PackageBuilder
 	manifest   contracts.Manifest
 	uploader   contracts.Uploader
@@ -87,10 +85,7 @@ func (this *App) buildArchiveAndManifestContents() {
 	}
 	this.hasher = md5.New()
 	writer := io.MultiWriter(this.hasher, this.file)
-	this.compressor, err = zstd.NewWriter(writer)
-	if err != nil {
-		log.Fatal(err)
-	}
+	this.InitializeCompressor(writer)
 
 	this.builder = build.NewPackageBuilder(
 		fs.NewDiskFileSystem(this.config.sourceDirectory),
@@ -109,6 +104,14 @@ func (this *App) buildArchiveAndManifestContents() {
 	}
 
 	this.closeArchiveFile()
+}
+
+func (this *App) InitializeCompressor(writer io.Writer) {
+	factory, found := compression[this.config.compressionAlgorithm]
+	if !found {
+		log.Fatalln("Unsupported compression algorithm:", this.config.compressionAlgorithm)
+	}
+	this.compressor = factory(writer)
 }
 
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
@@ -137,11 +140,11 @@ func (this *App) completeManifest() {
 		Name:    this.config.packageName,
 		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.composeRemotePath("tar.zstd")),
+			Filename:             filepath.Base(this.config.composeRemotePath("tar."+this.config.compressionAlgorithm)),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
-			CompressionAlgorithm: "zstd",
+			CompressionAlgorithm: this.config.compressionAlgorithm,
 		},
 	}
 }
