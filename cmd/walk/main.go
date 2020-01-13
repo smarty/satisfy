@@ -100,7 +100,10 @@ func (this *App) Run() {
 }
 
 func (this *App) closeArchiveFile() {
-	_ = this.file.Close() //TODO investigate file already closed
+	err := this.file.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
@@ -118,7 +121,7 @@ func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
 		Path:        this.config.composeRemotePath("tar.gz"),
-		Body:        this.file,
+		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
 		ContentType: "application/gzip",
 		Checksum:    this.manifest.Archive.MD5Checksum,
