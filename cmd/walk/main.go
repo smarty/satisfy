@@ -11,9 +11,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
-
-	"github.com/smartystreets/gcs"
 
 	"bitbucket.org/smartystreets/satisfy/archive"
 	"bitbucket.org/smartystreets/satisfy/build"
@@ -25,6 +24,7 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	NewApp(parseConfig()).Run()
+	log.Println("OK")
 }
 
 type App struct {
@@ -42,12 +42,46 @@ func NewApp(config Config) *App {
 }
 
 func (this *App) Run() {
+	log.Println("Building the archive...")
+
+	this.buildArchiveAndManifestContents()
+
+	this.completeManifest()
+
+	this.buildUploader()
+
+	log.Println("Uploading the archive...")
+
+	this.upload(this.buildArchiveUploadRequest())
+
+	this.closeArchiveFile()
+
+	log.Println("Uploading the manifest...")
+
+	this.upload(this.buildManifestUploadRequest())
+
+	log.Println("Cleaning up...")
+
+	this.deleteLocalArchiveFile()
+}
+
+func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
+	this.openArchiveFile()
+	return contracts.UploadRequest{
+		Path:        this.config.composeRemotePath("tar.gz"),
+		Body:        NewFileWrapper(this.file),
+		Size:        int64(this.manifest.Archive.Size),
+		ContentType: "application/gzip",
+		Checksum:    this.manifest.Archive.MD5Checksum,
+	}
+}
+
+func (this *App) buildArchiveAndManifestContents() {
 	var err error
 	this.file, err = ioutil.TempFile("", "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(this.file.Name())
 	this.hasher = md5.New()
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.compressor = gzip.NewWriter(writer)
@@ -69,41 +103,6 @@ func (this *App) Run() {
 	}
 
 	this.closeArchiveFile()
-
-	fileInfo, err := os.Stat(this.file.Name())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	this.manifest = contracts.Manifest{
-		Name:    this.config.packageName,
-		Version: this.config.packageVersion,
-		Archive: contracts.Archive{
-			Filename:    this.file.Name(), // TODO: this is wrong
-			Size:        uint64(fileInfo.Size()),
-			MD5Checksum: this.hasher.Sum(nil),
-			Contents:    this.builder.Contents(),
-		},
-	}
-
-	this.buildUploader()
-	err = this.uploader.Upload(this.buildArchiveUploadRequest())
-	if err != nil {
-		log.Fatal(err)
-	}
-	this.closeArchiveFile()
-
-	err = this.uploader.Upload(this.buildManifestUploadRequest())
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *App) closeArchiveFile() {
-	err := this.file.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
@@ -117,14 +116,40 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	}
 }
 
-func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
-	this.openArchiveFile()
-	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("tar.gz"),
-		Body:        NewFileWrapper(this.file),
-		Size:        int64(this.manifest.Archive.Size),
-		ContentType: "application/gzip",
-		Checksum:    this.manifest.Archive.MD5Checksum,
+func (this *App) buildUploader() {
+	client := &http.Client{Timeout: time.Minute}
+	gcsUploader := remote.NewGoogleCloudStorageUploader(client, this.config.googleCredentials, this.config.remoteBucket)
+	this.uploader = remote.NewRetryUploader(gcsUploader, 5)
+}
+
+func (this *App) completeManifest() {
+	fileInfo, err := os.Stat(this.file.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+	this.manifest = contracts.Manifest{
+		Name:    this.config.packageName,
+		Version: this.config.packageVersion,
+		Archive: contracts.Archive{
+			Filename:    filepath.Base(this.config.composeRemotePath("json")),
+			Size:        uint64(fileInfo.Size()),
+			MD5Checksum: this.hasher.Sum(nil),
+			Contents:    this.builder.Contents(),
+		},
+	}
+}
+
+func (this *App) closeArchiveFile() {
+	err := this.file.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (this *App) deleteLocalArchiveFile() {
+	err := os.Remove(this.file.Name())
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -136,20 +161,11 @@ func (this *App) openArchiveFile() {
 	}
 }
 
-func (this *App) buildUploader() {
-	raw, err := ioutil.ReadFile("gcs-credentials.json") // TODO: ENV?
+func (this *App) upload(request contracts.UploadRequest) {
+	err := this.uploader.Upload(request)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	credentials, err := gcs.ParseCredentialsFromJSON(raw)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	client := &http.Client{Timeout: time.Minute}
-	gcsUploader := remote.NewGoogleCloudStorageUploader(client, credentials, this.config.remoteBucket)
-	this.uploader = remote.NewRetryUploader(gcsUploader, 5)
 }
 
 func (this *App) writeManifestToBuffer() *bytes.Buffer {
