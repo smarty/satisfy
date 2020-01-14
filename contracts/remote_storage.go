@@ -13,3 +13,11 @@ type UploadRequest struct {
 	ContentType string
 	Checksum    []byte
 }
+
+type Downloader interface {
+	Download(DownloadRequest) (io.ReadCloser, error)
+}
+
+type DownloadRequest struct {
+	Path string
+}
