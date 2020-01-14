@@ -11,17 +11,17 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type GoogleCloudStorageUploader struct {
+type GoogleCloudStorageClient struct {
 	client      *http.Client
 	credentials gcs.Credentials
 	bucket      string
 }
 
-func NewGoogleCloudStorageUploader(client *http.Client, credentials gcs.Credentials, bucket string) *GoogleCloudStorageUploader {
-	return &GoogleCloudStorageUploader{client: client, credentials: credentials, bucket: bucket}
+func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials, bucket string) *GoogleCloudStorageClient {
+	return &GoogleCloudStorageClient{client: client, credentials: credentials, bucket: bucket}
 }
 
-func (this *GoogleCloudStorageUploader) Upload(request contracts.UploadRequest) error {
+func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) error {
 	gcsRequest, err := gcs.NewRequest("PUT",
 		gcs.WithCredentials(this.credentials),
 		gcs.WithBucket(this.bucket),
