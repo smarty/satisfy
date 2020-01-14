@@ -108,7 +108,7 @@ func (this *App) InitializeCompressor(writer io.Writer) {
 	if !found {
 		log.Fatalln("Unsupported compression algorithm:", this.config.compressionAlgorithm)
 	}
-	this.compressor = factory(writer)
+	this.compressor = factory(writer, this.config.compressionLevel)
 }
 
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {

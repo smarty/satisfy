@@ -15,8 +15,8 @@ import (
 )
 
 type Config struct {
-	// TODO: compression level (& flag)
 	compressionAlgorithm string
+	compressionLevel     int
 	sourceDirectory      string
 	packageName          string
 	packageVersion       string
@@ -32,7 +32,10 @@ func (this Config) composeRemotePath(extension string) string {
 }
 
 func parseConfig() (config Config) {
-	flag.StringVar(&config.compressionAlgorithm, "compression", "zstd", "The compression algorithm to use.")
+	flag.StringVar(&config.compressionAlgorithm, "compression", "zstd",
+		"The compression algorithm to use. The only two valid values are zstd and gzip.")
+	flag.IntVar(&config.compressionLevel, "compression-level", 5,
+		"The compression level to use. See the documentation corresponding to the specified compression flag value.")
 	flag.StringVar(&config.sourceDirectory, "local", "", "The directory containing package data.")
 	flag.StringVar(&config.packageName, "name", "", "The name of the package.")
 	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
@@ -54,15 +57,19 @@ func parseConfig() (config Config) {
 	return config
 }
 
-var compression = map[string]func(io.Writer) io.WriteCloser{
-	"zstd": func(writer io.Writer) io.WriteCloser {
-		compressor, err := zstd.NewWriter(writer)
+var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
+	"zstd": func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 		if err != nil {
 			log.Fatal(err)
 		}
 		return compressor
 	},
-	"gzip": func(writer io.Writer) io.WriteCloser {
-		return gzip.NewWriter(writer)
+	"gzip": func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := gzip.NewWriterLevel(writer, level)
+		if err != nil {
+			log.Panicln(err)
+		}
+		return compressor
 	},
 }
