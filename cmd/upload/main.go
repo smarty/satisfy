@@ -20,8 +20,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/remote"
 )
 
-// TODO: if manifest is already on remote storage, don't upload anything.
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	NewApp(parseConfig()).Run()
