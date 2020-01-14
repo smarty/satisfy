@@ -66,7 +66,7 @@ func (this *App) Run() {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("tar.zstd"),
+		Path:        this.config.composeRemotePath(remoteArchiveFilename),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
 		ContentType: "application/zstd",
@@ -114,7 +114,7 @@ func (this *App) InitializeCompressor(writer io.Writer) {
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath("json"),
+		Path:        this.config.composeRemotePath(remoteManifestFilename),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
 		ContentType: "application/json",
@@ -137,7 +137,7 @@ func (this *App) completeManifest() {
 		Name:    this.config.packageName,
 		Version: this.config.packageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.composeRemotePath("tar." + this.config.compressionAlgorithm)),
+			Filename:             filepath.Base(this.config.composeRemotePath(remoteArchiveFilename)),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),

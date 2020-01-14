@@ -3,7 +3,6 @@ package main
 import (
 	"compress/gzip"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,10 +25,14 @@ type Config struct {
 	maxRetry             int
 }
 
-func (this Config) composeRemotePath(extension string) string {
-	// TODO: directory for version containing 'manifest.json' and 'archive' (extension of archive supplied by manifest?)
-	return path.Join(this.remotePathPrefix, this.packageName, fmt.Sprintf("%s.%s", this.packageVersion, extension))
+func (this Config) composeRemotePath(filename string) string {
+	return path.Join(this.remotePathPrefix, this.packageName, this.packageVersion, filename)
 }
+
+const (
+	remoteManifestFilename = "manifest.json"
+	remoteArchiveFilename  = "archive"
+)
 
 func parseConfig() (config Config) {
 	flag.StringVar(&config.compressionAlgorithm, "compression", "zstd",
