@@ -26,10 +26,6 @@ func (this *RetryUploader) Upload(request contracts.UploadRequest) (err error) {
 			return nil
 		}
 		if x < this.maxRetry {
-			_, err = request.Body.Seek(0, 0)
-			if err != nil {
-				return err
-			}
 			this.logger.Println("[WARN] upload failed, retry imminent.")
 			this.sleeper.Sleep(time.Second * 3)
 		}
