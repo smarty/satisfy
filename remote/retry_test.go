@@ -19,13 +19,13 @@ func TestRetryFixture(t *testing.T) {
 
 type RetryFixture struct {
 	*gunit.Fixture
-	retryUploader *RetryUploader
+	retryUploader *RetryClient
 	fakeUploader  *FakeUploader
 }
 
 func (this *RetryFixture) Setup() {
 	this.fakeUploader = &FakeUploader{}
-	this.retryUploader = NewRetryUploader(this.fakeUploader, 4)
+	this.retryUploader = NewRetryClient(this.fakeUploader, 4)
 	this.retryUploader.sleeper = clock.StayAwake()
 	this.retryUploader.logger = logging.Capture()
 }

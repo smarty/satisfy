@@ -35,7 +35,7 @@ type App struct {
 	compressor io.WriteCloser
 	builder    *build.PackageBuilder
 	manifest   contracts.Manifest
-	uploader   contracts.Uploader
+	client     contracts.RemoteStorage
 }
 
 func NewApp(config Config) *App {
@@ -43,14 +43,19 @@ func NewApp(config Config) *App {
 }
 
 func (this *App) Run() {
+	this.buildRemoteStorageClient()
+
+	if this.uploadedPreviously() {
+		log.Println("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
+		return
+	}
+
 	log.Println("Building the archive...")
 
 	this.buildArchiveAndManifestContents()
 	this.completeManifest()
 
 	log.Println("Manifest:", this.dumpManifest())
-
-	this.buildUploader()
 
 	log.Println("Uploading the archive...")
 
@@ -61,6 +66,22 @@ func (this *App) Run() {
 	log.Println("Uploading the manifest...")
 
 	this.upload(this.buildManifestUploadRequest())
+}
+
+func (this *App) uploadedPreviously() bool {
+	if this.config.forceUpload {
+		return false
+	}
+	return this.remoteManifestExists()
+}
+
+func (this *App) remoteManifestExists() bool {
+	reader, err := this.client.Download(contracts.DownloadRequest{Path: this.config.composeRemotePath(remoteManifestFilename)})
+	if err != nil {
+		return false
+	}
+	_ = reader.Close()
+	return true
 }
 
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
@@ -122,10 +143,10 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	}
 }
 
-func (this *App) buildUploader() {
+func (this *App) buildRemoteStorageClient() {
 	client := &http.Client{Timeout: time.Minute}
-	gcsUploader := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials, this.config.remoteBucket)
-	this.uploader = remote.NewRetryUploader(gcsUploader, this.config.maxRetry)
+	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials, this.config.remoteBucket)
+	this.client = remote.NewRetryClient(gcsClient, this.config.maxRetry)
 }
 
 func (this *App) completeManifest() {
@@ -169,7 +190,7 @@ func (this *App) openArchiveFile() {
 }
 
 func (this *App) upload(request contracts.UploadRequest) {
-	err := this.uploader.Upload(request)
+	err := this.client.Upload(request)
 	if err != nil {
 		log.Fatal(err)
 	}

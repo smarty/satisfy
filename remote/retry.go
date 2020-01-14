@@ -1,25 +1,27 @@
 package remote
 
 import (
+	"io"
 	"time"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/clock"
 	"github.com/smartystreets/logging"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type RetryUploader struct {
+type RetryClient struct {
 	sleeper  *clock.Sleeper
 	logger   *logging.Logger
-	inner    contracts.Uploader
+	inner    contracts.RemoteStorage
 	maxRetry int
 }
 
-func NewRetryUploader(inner contracts.Uploader, maxRetry int) *RetryUploader {
-	return &RetryUploader{inner: inner, maxRetry: maxRetry}
+func NewRetryClient(inner contracts.RemoteStorage, maxRetry int) *RetryClient {
+	return &RetryClient{inner: inner, maxRetry: maxRetry}
 }
 
-func (this *RetryUploader) Upload(request contracts.UploadRequest) (err error) {
+func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 	for x := 0; x <= this.maxRetry; x++ {
 		err = this.inner.Upload(request)
 		if err == nil {
@@ -31,4 +33,8 @@ func (this *RetryUploader) Upload(request contracts.UploadRequest) (err error) {
 		}
 	}
 	return err
+}
+
+func (this *RetryClient) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
+	return this.inner.Download(request) // TODO: implement retry
 }

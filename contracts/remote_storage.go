@@ -2,6 +2,11 @@ package contracts
 
 import "io"
 
+type RemoteStorage interface {
+	Uploader
+	Downloader
+}
+
 type Uploader interface {
 	Upload(UploadRequest) error
 }

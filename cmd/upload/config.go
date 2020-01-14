@@ -23,6 +23,7 @@ type Config struct {
 	remotePathPrefix     string
 	googleCredentials    gcs.Credentials
 	maxRetry             int
+	forceUpload          bool
 }
 
 func (this Config) composeRemotePath(filename string) string {
@@ -45,6 +46,7 @@ func parseConfig() (config Config) {
 	flag.StringVar(&config.remoteBucket, "remote-bucket", "", "The remote bucket name.")
 	flag.StringVar(&config.remotePathPrefix, "remote-prefix", "", "The remote path prefix.")
 	flag.IntVar(&config.maxRetry, "max-retry", 5, "The max retry value.")
+	flag.BoolVar(&config.forceUpload, "force-upload", false, "When set, build and upload the package even if it already exists remotely.")
 	flag.Parse()
 
 	raw, err := ioutil.ReadFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
