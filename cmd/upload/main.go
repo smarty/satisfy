@@ -46,7 +46,6 @@ func (this *App) Run() {
 	log.Println("Building the archive...")
 
 	this.buildArchiveAndManifestContents()
-
 	this.completeManifest()
 
 	log.Println("Manifest:", this.dumpManifest())
@@ -56,16 +55,12 @@ func (this *App) Run() {
 	log.Println("Uploading the archive...")
 
 	this.upload(this.buildArchiveUploadRequest())
-
 	this.closeArchiveFile()
+	this.deleteLocalArchiveFile()
 
 	log.Println("Uploading the manifest...")
 
 	this.upload(this.buildManifestUploadRequest())
-
-	log.Println("Cleaning up...")
-
-	this.deleteLocalArchiveFile()
 }
 
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
@@ -130,7 +125,7 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 func (this *App) buildUploader() {
 	client := &http.Client{Timeout: time.Minute}
 	gcsUploader := remote.NewGoogleCloudStorageUploader(client, this.config.googleCredentials, this.config.remoteBucket)
-	this.uploader = remote.NewRetryUploader(gcsUploader, 5)
+	this.uploader = remote.NewRetryUploader(gcsUploader, maxRetry)
 }
 
 func (this *App) completeManifest() {

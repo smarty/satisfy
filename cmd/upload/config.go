@@ -14,7 +14,10 @@ import (
 	"github.com/smartystreets/gcs"
 )
 
+const maxRetry = 5 // TODO: flag?
+
 type Config struct {
+	// TODO: compression level (& flag)
 	compressionAlgorithm string
 	sourceDirectory      string
 	packageName          string
@@ -25,7 +28,8 @@ type Config struct {
 }
 
 func (this Config) composeRemotePath(extension string) string {
-	return path.Join(this.remotePathPrefix, fmt.Sprintf("%s_%s.%s", this.packageName, this.packageVersion, extension))
+	// TODO: directory for version containing 'manifest.json' and 'archive' (extension of archive supplied by manifest?)
+	return path.Join(this.remotePathPrefix, this.packageName, fmt.Sprintf("%s.%s", this.packageVersion, extension))
 }
 
 func parseConfig() (config Config) {
