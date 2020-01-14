@@ -14,8 +14,6 @@ import (
 	"github.com/smartystreets/gcs"
 )
 
-const maxRetry = 5 // TODO: flag?
-
 type Config struct {
 	// TODO: compression level (& flag)
 	compressionAlgorithm string
@@ -25,6 +23,7 @@ type Config struct {
 	remoteBucket         string
 	remotePathPrefix     string
 	googleCredentials    gcs.Credentials
+	maxRetry             int
 }
 
 func (this Config) composeRemotePath(extension string) string {
@@ -39,6 +38,7 @@ func parseConfig() (config Config) {
 	flag.StringVar(&config.packageVersion, "version", "", "The version of the package.")
 	flag.StringVar(&config.remoteBucket, "remote-bucket", "", "The remote bucket name.")
 	flag.StringVar(&config.remotePathPrefix, "remote-prefix", "", "The remote path prefix.")
+	flag.IntVar(&config.maxRetry, "max-retry", 5, "The max retry value.")
 	flag.Parse()
 
 	raw, err := ioutil.ReadFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))

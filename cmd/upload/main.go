@@ -125,7 +125,7 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 func (this *App) buildUploader() {
 	client := &http.Client{Timeout: time.Minute}
 	gcsUploader := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials, this.config.remoteBucket)
-	this.uploader = remote.NewRetryUploader(gcsUploader, maxRetry)
+	this.uploader = remote.NewRetryUploader(gcsUploader, this.config.maxRetry)
 }
 
 func (this *App) completeManifest() {
