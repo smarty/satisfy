@@ -18,13 +18,13 @@ type PackageBuilderFixture struct {
 	*gunit.Fixture
 	builder    *PackageBuilder
 	fileSystem contracts.FileSystem
-	archive    *FakeArchiveWriter
+	archive    *FakeArchive
 	hasher     *FakeHasher
 }
 
 func (this *PackageBuilderFixture) Setup() {
 	this.fileSystem = fs.NewInMemoryFileSystem()
-	this.archive = NewFakeArchiveWriter()
+	this.archive = NewFakeArchive()
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
 	this.fileSystem.WriteFile("file0.txt", []byte("a"))
