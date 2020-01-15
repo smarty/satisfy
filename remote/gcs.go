@@ -15,18 +15,17 @@ import (
 type GoogleCloudStorageClient struct {
 	client      *http.Client
 	credentials gcs.Credentials
-	bucket      string
 }
 
-func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials, bucket string) *GoogleCloudStorageClient {
-	return &GoogleCloudStorageClient{client: client, credentials: credentials, bucket: bucket}
+func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials) *GoogleCloudStorageClient {
+	return &GoogleCloudStorageClient{client: client, credentials: credentials}
 }
 
 func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) error {
 	gcsRequest, err := gcs.NewRequest("PUT",
 		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(this.bucket),
-		gcs.WithResource(request.Path),
+		gcs.WithBucket(request.Bucket),
+		gcs.WithResource(request.Resource),
 		gcs.PutWithContent(request.Body),
 		gcs.PutWithContentLength(request.Size),
 		gcs.PutWithContentMD5(request.Checksum),
@@ -49,8 +48,8 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 func (this *GoogleCloudStorageClient) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
 	gcsRequest, err := gcs.NewRequest("GET",
 		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(this.bucket),
-		gcs.WithResource(request.Path),
+		gcs.WithBucket(request.Bucket),
+		gcs.WithResource(request.Resource),
 	)
 	if err != nil {
 		return nil, err

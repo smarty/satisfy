@@ -12,7 +12,8 @@ type Uploader interface {
 }
 
 type UploadRequest struct {
-	Path        string
+	Bucket      string
+	Resource    string
 	Body        io.ReadSeeker
 	Size        int64
 	ContentType string
@@ -24,5 +25,6 @@ type Downloader interface {
 }
 
 type DownloadRequest struct {
-	Path string
+	Bucket   string
+	Resource string
 }

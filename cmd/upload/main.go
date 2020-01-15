@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"bitbucket.org/smartystreets/satisfy/archive"
-	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/contracts"
+	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/fs"
 	"bitbucket.org/smartystreets/satisfy/remote"
 )
@@ -74,7 +74,11 @@ func (this *App) uploadedPreviously() bool {
 }
 
 func (this *App) remoteManifestExists() bool {
-	reader, err := this.client.Download(contracts.DownloadRequest{Path: this.config.composeRemotePath(remoteManifestFilename)})
+	request := contracts.DownloadRequest{
+		Bucket:   this.config.remoteBucket,
+		Resource: this.config.composeRemotePath(remoteManifestFilename),
+	}
+	reader, err := this.client.Download(request)
 	if err != nil {
 		return false
 	}
@@ -85,7 +89,8 @@ func (this *App) remoteManifestExists() bool {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath(remoteArchiveFilename),
+		Bucket:      this.config.remoteBucket,
+		Resource:    this.config.composeRemotePath(remoteArchiveFilename),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
 		ContentType: "application/zstd",
@@ -133,7 +138,8 @@ func (this *App) InitializeCompressor(writer io.Writer) {
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		Path:        this.config.composeRemotePath(remoteManifestFilename),
+		Bucket:      this.config.remoteBucket,
+		Resource:    this.config.composeRemotePath(remoteManifestFilename),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
 		ContentType: "application/json",
@@ -143,7 +149,7 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 
 func (this *App) buildRemoteStorageClient() {
 	client := &http.Client{Timeout: time.Minute}
-	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials, this.config.remoteBucket)
+	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials)
 	this.client = remote.NewRetryClient(gcsClient, this.config.maxRetry)
 }
 
