@@ -1,20 +1,11 @@
 package contracts
 
-import (
-	"io"
-	"time"
-)
+import "time"
 
 type ArchiveWriter interface {
 	Write([]byte) (int, error)
 	Close() error
 	WriteHeader(ArchiveHeader)
-}
-
-type ArchiveReader interface {
-	Next() bool
-	Header() ArchiveHeader
-	Reader() io.Reader
 }
 
 type ArchiveHeader struct {
