@@ -19,4 +19,3 @@ func (this *HashReader) Read(p []byte) (n int, err error) {
 	this.Hash.Write(p[:n])
 	return n, err
 }
-

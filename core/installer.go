@@ -22,4 +22,3 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 func NewPackageInstaller(downloader contracts.Downloader, filesystem contracts.FileSystem) *PackageInstaller {
 	return &PackageInstaller{downloader: downloader, filesystem: filesystem}
 }
-
