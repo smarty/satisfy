@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"bitbucket.org/smartystreets/satisfy/archive"
-	"bitbucket.org/smartystreets/satisfy/build"
+	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/fs"
 	"bitbucket.org/smartystreets/satisfy/remote"
@@ -31,7 +31,7 @@ type App struct {
 	file       *os.File
 	hasher     hash.Hash
 	compressor io.WriteCloser
-	builder    *build.PackageBuilder
+	builder    *core.PackageBuilder
 	manifest   contracts.Manifest
 	client     contracts.RemoteStorage
 }
@@ -103,7 +103,7 @@ func (this *App) buildArchiveAndManifestContents() {
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.InitializeCompressor(writer)
 
-	this.builder = build.NewPackageBuilder(
+	this.builder = core.NewPackageBuilder(
 		fs.NewDiskFileSystem(this.config.sourceDirectory),
 		archive.NewTarArchiveWriter(this.compressor),
 		md5.New(),
