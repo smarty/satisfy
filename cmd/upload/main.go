@@ -67,7 +67,7 @@ func (this *App) Run() {
 }
 
 func (this *App) uploadedPreviously() bool {
-	if this.config.forceUpload {
+	if this.config.ForceUpload {
 		return false
 	}
 	return this.remoteManifestExists()
@@ -75,7 +75,7 @@ func (this *App) uploadedPreviously() bool {
 
 func (this *App) remoteManifestExists() bool {
 	request := contracts.DownloadRequest{
-		Bucket:   this.config.remoteBucket,
+		Bucket:   this.config.RemoteBucket,
 		Resource: this.config.composeRemotePath(remoteManifestFilename),
 	}
 	reader, err := this.client.Download(request)
@@ -89,7 +89,7 @@ func (this *App) remoteManifestExists() bool {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Bucket:      this.config.remoteBucket,
+		Bucket:      this.config.RemoteBucket,
 		Resource:    this.config.composeRemotePath(remoteArchiveFilename),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
@@ -109,7 +109,7 @@ func (this *App) buildArchiveAndManifestContents() {
 	this.InitializeCompressor(writer)
 
 	this.builder = core.NewPackageBuilder(
-		fs.NewDiskFileSystem(this.config.sourceDirectory),
+		fs.NewDiskFileSystem(this.config.SourceDirectory),
 		archive.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
@@ -128,17 +128,17 @@ func (this *App) buildArchiveAndManifestContents() {
 }
 
 func (this *App) InitializeCompressor(writer io.Writer) {
-	factory, found := compression[this.config.compressionAlgorithm]
+	factory, found := compression[this.config.CompressionAlgorithm]
 	if !found {
-		log.Fatalln("Unsupported compression algorithm:", this.config.compressionAlgorithm)
+		log.Fatalln("Unsupported compression algorithm:", this.config.CompressionAlgorithm)
 	}
-	this.compressor = factory(writer, this.config.compressionLevel)
+	this.compressor = factory(writer, this.config.CompressionLevel)
 }
 
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		Bucket:      this.config.remoteBucket,
+		Bucket:      this.config.RemoteBucket,
 		Resource:    this.config.composeRemotePath(remoteManifestFilename),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
@@ -149,8 +149,8 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 
 func (this *App) buildRemoteStorageClient() {
 	client := &http.Client{Timeout: time.Minute}
-	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.googleCredentials)
-	this.client = remote.NewRetryClient(gcsClient, this.config.maxRetry)
+	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials)
+	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
 }
 
 func (this *App) completeManifest() {
@@ -159,14 +159,14 @@ func (this *App) completeManifest() {
 		log.Fatal(err)
 	}
 	this.manifest = contracts.Manifest{
-		Name:    this.config.packageName,
-		Version: this.config.packageVersion,
+		Name:    this.config.PackageName,
+		Version: this.config.PackageVersion,
 		Archive: contracts.Archive{
 			Filename:             filepath.Base(this.config.composeRemotePath(remoteArchiveFilename)),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
-			CompressionAlgorithm: this.config.compressionAlgorithm,
+			CompressionAlgorithm: this.config.CompressionAlgorithm,
 		},
 	}
 }
