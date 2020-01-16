@@ -13,7 +13,6 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	NewApp(cmd.ParseConfig()).Run()
-	log.Println("OK")
 }
 
 type App struct {
@@ -26,28 +25,24 @@ func NewApp(config cmd.Config) *App {
 }
 
 func (this *App) Run() {
-	this.buildRemoteStorageClient()
-
-	if this.uploadedPreviously() {
+	if this.uploadedPreviously(cmd.RemoteManifestFilename) {
 		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
 	}
 }
 
-func (this *App) uploadedPreviously() bool {
+func (this *App) uploadedPreviously(path string) bool {
+	this.buildRemoteStorageClient()
+
 	request := contracts.DownloadRequest{
 		Bucket:   this.config.RemoteBucket,
-		Resource: this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
+		Resource: this.config.ComposeRemotePath(path),
 	}
-	reader, err := this.client.Download(request)
-	if err != nil {
-		return false
-	}
-	_ = reader.Close()
-	return true
+	_, err := this.client.Download(request)
+	return err != nil
 }
 
 func (this *App) buildRemoteStorageClient() {
 	client := &http.Client{Timeout: time.Minute}
-	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials)
+	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
 	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

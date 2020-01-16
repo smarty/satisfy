@@ -15,10 +15,11 @@ import (
 type GoogleCloudStorageClient struct {
 	client      *http.Client
 	credentials gcs.Credentials
+	expectedStatus int
 }
 
-func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials) *GoogleCloudStorageClient {
-	return &GoogleCloudStorageClient{client: client, credentials: credentials}
+func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials, expectedStatus int) *GoogleCloudStorageClient {
+	return &GoogleCloudStorageClient{client: client, credentials: credentials, expectedStatus: expectedStatus}
 }
 
 func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) error {
@@ -38,9 +39,9 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	if err != nil {
 		return err
 	}
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != this.expectedStatus {
 		this.dump(gcsRequest, response)
-		return fmt.Errorf("non 200 status code: %s", response.Status)
+		return fmt.Errorf("unexpected status code: %s", response.Status)
 	}
 	return nil
 }
@@ -58,9 +59,9 @@ func (this *GoogleCloudStorageClient) Download(request contracts.DownloadRequest
 	if err != nil {
 		return nil, err
 	}
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != this.expectedStatus {
 		this.dump(gcsRequest, response)
-		return nil, fmt.Errorf("non 200 status code: %s", response.Status)
+		return nil, fmt.Errorf("unexpected status code: %s", response.Status)
 	}
 	return response.Body, nil
 }
@@ -68,5 +69,5 @@ func (this *GoogleCloudStorageClient) Download(request contracts.DownloadRequest
 func (this *GoogleCloudStorageClient) dump(request *http.Request, response *http.Response) {
 	requestDump, _ := httputil.DumpRequestOut(request, false)
 	responseDump, _ := httputil.DumpResponse(response, true)
-	log.Printf("non 200 status code: \nrequest: \n%s\nresponse:\n%s", requestDump, responseDump)
+	log.Printf("unexpected status code: \nrequest: \n%s\nresponse:\n%s", requestDump, responseDump)
 }
