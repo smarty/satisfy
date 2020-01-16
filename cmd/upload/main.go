@@ -47,11 +47,6 @@ func NewApp(config cmd.Config) *App {
 func (this *App) Run() {
 	this.buildRemoteStorageClient()
 
-	if this.uploadedPreviously() {
-		log.Println("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
-		return
-	}
-
 	log.Println("Building the archive...")
 
 	this.buildArchiveAndManifestContents()
@@ -68,26 +63,6 @@ func (this *App) Run() {
 	log.Println("Uploading the manifest...")
 
 	this.upload(this.buildManifestUploadRequest())
-}
-
-func (this *App) uploadedPreviously() bool {
-	if this.config.ForceUpload {
-		return false
-	}
-	return this.remoteManifestExists()
-}
-
-func (this *App) remoteManifestExists() bool {
-	request := contracts.DownloadRequest{
-		Bucket:   this.config.RemoteBucket,
-		Resource: this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
-	}
-	reader, err := this.client.Download(request)
-	if err != nil {
-		return false
-	}
-	_ = reader.Close()
-	return true
 }
 
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {

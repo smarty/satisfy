@@ -20,7 +20,6 @@ type Config struct {
 	RemoteBucket         string          `json:"remote_bucket"`
 	RemotePathPrefix     string          `json:"remote_path_prefix"`
 	MaxRetry             int             `json:"max_retry"`
-	ForceUpload          bool            `json:"force_upload"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
 }
