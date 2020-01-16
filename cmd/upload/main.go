@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"hash"
@@ -13,7 +14,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
+
 	"bitbucket.org/smartystreets/satisfy/archive"
+	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/fs"
@@ -22,12 +26,12 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	NewApp(parseConfig()).Run()
+	NewApp(cmd.ParseConfig()).Run()
 	log.Println("OK")
 }
 
 type App struct {
-	config     Config
+	config     cmd.Config
 	file       *os.File
 	hasher     hash.Hash
 	compressor io.WriteCloser
@@ -36,7 +40,7 @@ type App struct {
 	client     contracts.RemoteStorage
 }
 
-func NewApp(config Config) *App {
+func NewApp(config cmd.Config) *App {
 	return &App{config: config}
 }
 
@@ -76,7 +80,7 @@ func (this *App) uploadedPreviously() bool {
 func (this *App) remoteManifestExists() bool {
 	request := contracts.DownloadRequest{
 		Bucket:   this.config.RemoteBucket,
-		Resource: this.config.composeRemotePath(remoteManifestFilename),
+		Resource: this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
 	}
 	reader, err := this.client.Download(request)
 	if err != nil {
@@ -90,7 +94,7 @@ func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
 		Bucket:      this.config.RemoteBucket,
-		Resource:    this.config.composeRemotePath(remoteArchiveFilename),
+		Resource:    this.config.ComposeRemotePath(cmd.RemoteArchiveFilename),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
 		ContentType: "application/zstd",
@@ -135,11 +139,28 @@ func (this *App) InitializeCompressor(writer io.Writer) {
 	this.compressor = factory(writer, this.config.CompressionLevel)
 }
 
+var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
+	"zstd": func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
+		if err != nil {
+			log.Fatal(err)
+		}
+		return compressor
+	},
+	"gzip": func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := gzip.NewWriterLevel(writer, level)
+		if err != nil {
+			log.Panicln(err)
+		}
+		return compressor
+	},
+}
+
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
 		Bucket:      this.config.RemoteBucket,
-		Resource:    this.config.composeRemotePath(remoteManifestFilename),
+		Resource:    this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
 		ContentType: "application/json",
@@ -162,7 +183,7 @@ func (this *App) completeManifest() {
 		Name:    this.config.PackageName,
 		Version: this.config.PackageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.composeRemotePath(remoteArchiveFilename)),
+			Filename:             filepath.Base(this.config.ComposeRemotePath(cmd.RemoteArchiveFilename)),
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),

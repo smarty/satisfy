@@ -1,16 +1,13 @@
-package main
+package cmd
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"flag"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 
-	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/gcs"
 )
 
@@ -28,16 +25,16 @@ type Config struct {
 	JSONPath             string          `json:"-"`
 }
 
-func (this Config) composeRemotePath(filename string) string {
+func (this Config) ComposeRemotePath(filename string) string {
 	return path.Join(this.RemotePathPrefix, this.PackageName, this.PackageVersion, filename)
 }
 
 const (
-	remoteManifestFilename = "manifest.json"
-	remoteArchiveFilename  = "archive"
+	RemoteManifestFilename = "manifest.json"
+	RemoteArchiveFilename  = "archive"
 )
 
-func parseConfig() (config Config) {
+func ParseConfig() (config Config) {
 	flag.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.")
 	flag.Parse()
 
@@ -62,21 +59,4 @@ func parseConfig() (config Config) {
 	}
 
 	return config
-}
-
-var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
-	"zstd": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
-		if err != nil {
-			log.Fatal(err)
-		}
-		return compressor
-	},
-	"gzip": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := gzip.NewWriterLevel(writer, level)
-		if err != nil {
-			log.Panicln(err)
-		}
-		return compressor
-	},
 }
