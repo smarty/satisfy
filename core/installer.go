@@ -56,20 +56,21 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	if err != nil {
 		return err
 	}
-	err = this.extractArchive(gzipReader, request)
+	paths, err := this.extractArchive(gzipReader, request)
 	if err != nil {
+		this.revertFileSystem(paths)
 		return err
 	}
 	actualChecksum := hashReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
-		// TODO: Clean up fileSystem
+		this.revertFileSystem(paths)
 		return fmt.Errorf("checksum mistmatch: %x != %x", actualChecksum, manifest.Archive.MD5Checksum)
 	}
 
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(gzipReader *gzip.Reader, request contracts.InstallationRequest) error {
+func (this *PackageInstaller) extractArchive(gzipReader *gzip.Reader, request contracts.InstallationRequest) (paths []string, err error) {
 	tarReader := tar.NewReader(gzipReader)
 	for {
 		header, err := tarReader.Next()
@@ -77,16 +78,23 @@ func (this *PackageInstaller) extractArchive(gzipReader *gzip.Reader, request co
 			break
 		}
 		if err != nil {
-			return err
+			return paths, err
 		}
 		path := filepath.Join(request.LocalPath, header.Name)
+		paths = append(paths, path)
 		writer := this.filesystem.Create(path)
 		_, err = io.Copy(writer, tarReader)
 		if err != nil {
-			return err
+			return paths, err
 		}
 	}
-	return nil
+	return paths, nil
+}
+
+func (this *PackageInstaller) revertFileSystem(paths []string) {
+	for _, path := range paths {
+		this.filesystem.Delete(path)
+	}
 }
 
 func composeManifestPath(localPath string, manifest contracts.Manifest) string {

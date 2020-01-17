@@ -106,7 +106,7 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch")), this.installationRequest())
 
 	this.So(err, should.NotBeNil)
-	//this.So(this.filesystem.Listing(), should.BeEmpty) TODO
+	this.So(this.filesystem.Listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) buildManifest(checksum []byte) contracts.Manifest {
@@ -140,6 +140,11 @@ type FakeDownloader struct {
 	request contracts.DownloadRequest
 }
 
+func (this *FakeDownloader) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
+	this.request = request
+	return this.Body, this.Error
+}
+
 func (this *FakeDownloader) prepareArchiveDownload() []byte {
 	hasher := md5.New()
 	writer := bytes.NewBuffer(nil)
@@ -165,16 +170,11 @@ func (this *FakeDownloader) prepareArchiveDownload() []byte {
 	return hasher.Sum(nil)
 }
 
-func (this *FakeDownloader) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
-	this.request = request
-	return this.Body, this.Error
-}
-
 func (this *FakeDownloader) prepareManifestDownload(manifest contracts.Manifest) {
 	raw, _ := json.Marshal(manifest)
 	this.Body = ioutil.NopCloser(bytes.NewReader(raw))
 }
 
 func (this *FakeDownloader) prepareMalformedDownload() {
-	this.Body = ioutil.NopCloser(strings.NewReader("malformed json"))
+	this.Body = ioutil.NopCloser(strings.NewReader("malformed"))
 }
