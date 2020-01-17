@@ -83,6 +83,13 @@ func (this *DiskFileSystem) WriteFile(path string, content []byte) {
 	}
 }
 
+func (this *DiskFileSystem) Delete(path string) {
+	err := os.Remove(path)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
 func (this *DiskFileSystem) absolute(path string) string {
 	return filepath.Join(this.root, path)
 }

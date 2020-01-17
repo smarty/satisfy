@@ -69,3 +69,11 @@ func (this *MemoryFixture) TestListing() {
 	this.So(fileInfo[2].Path(), should.Equal, "sub/file0.txt")
 	this.So(fileInfo[2].Size(), should.Equal, 2)
 }
+
+func (this *MemoryFixture) TestDelete() {
+	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
+
+	this.fileSystem.Delete("/file.txt")
+
+	this.So(this.fileSystem.Listing(), should.BeEmpty)
+}

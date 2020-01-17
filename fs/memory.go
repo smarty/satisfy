@@ -76,3 +76,8 @@ func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
 		mod:      InMemoryModTime,
 	}
 }
+
+func (this *InMemoryFileSystem) Delete(path string) {
+	this.fileSystem[path] = nil
+	delete(this.fileSystem, path)
+}

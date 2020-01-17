@@ -11,6 +11,7 @@ type FileSystem interface {
 	Create(path string) io.WriteCloser
 	ReadFile(path string) []byte
 	WriteFile(path string, content []byte)
+	Delete(path string)
 }
 
 type FileInfo interface {

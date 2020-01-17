@@ -89,7 +89,7 @@ func (this *PackageInstaller) extractArchive(gzipReader *gzip.Reader, request co
 	return nil
 }
 
-func composeManifestPath(localPath string,manifest contracts.Manifest) string {
+func composeManifestPath(localPath string, manifest contracts.Manifest) string {
 	cleanPackageName := strings.ReplaceAll(manifest.Name, "/", "|")
 	fileName := fmt.Sprintf("manifest_%s_%s.json", cleanPackageName, manifest.Version)
 	return filepath.Join(localPath, fileName)
