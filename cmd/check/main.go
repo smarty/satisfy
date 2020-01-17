@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -43,8 +42,7 @@ func (this *App) uploadedPreviously(path string) bool {
 }
 
 func (this *App) buildRemoteStorageClient() {
-	// TODO: using a clean http.Client and Transport
-	client := &http.Client{Timeout: time.Minute}
+	client := cmd.NewHTTPClient()
 	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
 	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

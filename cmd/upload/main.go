@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/klauspost/compress/zstd"
 
@@ -141,7 +140,7 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 }
 
 func (this *App) buildRemoteStorageClient() {
-	client := &http.Client{Timeout: time.Minute} // TODO: clean http.Client and Transport
+	client := cmd.NewHTTPClient()
 	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
 	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

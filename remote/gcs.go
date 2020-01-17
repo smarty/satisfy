@@ -13,8 +13,8 @@ import (
 )
 
 type GoogleCloudStorageClient struct {
-	client      *http.Client
-	credentials gcs.Credentials
+	client         *http.Client
+	credentials    gcs.Credentials
 	expectedStatus int
 }
 
