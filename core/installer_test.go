@@ -9,9 +9,11 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"strings"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
 
@@ -72,20 +74,39 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.So(manifest, should.BeZeroValue)
 }
 
-func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystem() {
-	checksum := this.downloader.prepareArchiveDownload()
+func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
+	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest())
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
 	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
 }
 
+func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZstdCompression() {
+	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
+
+	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest())
+
+	this.So(err, should.BeNil)
+	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+}
+
+func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
+
+	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+
+	err := this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest())
+
+	this.So(err, should.NotBeNil)
+}
+
 func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 	this.downloader.prepareMalformedDownload()
 
-	err := this.installer.InstallPackage(this.buildManifest(nil), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest())
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
@@ -94,22 +115,22 @@ func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 	this.downloader.Error = errors.New("i am an error")
 
-	err := this.installer.InstallPackage(this.buildManifest(nil), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest())
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
-	this.downloader.prepareArchiveDownload()
+	this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch")), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest())
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
 }
 
-func (this *PackageInstallerFixture) buildManifest(checksum []byte) contracts.Manifest {
+func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) contracts.Manifest {
 	return contracts.Manifest{
 		Archive: contracts.Archive{
 			MD5Checksum: checksum,
@@ -117,7 +138,7 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte) contracts.Ma
 				{Path: "Hello/World"},
 				{Path: "Goodbye/World"},
 			},
-			CompressionAlgorithm: "gzip",
+			CompressionAlgorithm: compressionAlgorithm,
 		},
 	}
 }
@@ -145,11 +166,11 @@ func (this *FakeDownloader) Download(request contracts.DownloadRequest) (io.Read
 	return this.Body, this.Error
 }
 
-func (this *FakeDownloader) prepareArchiveDownload() []byte {
+func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) []byte {
 	hasher := md5.New()
 	writer := bytes.NewBuffer(nil)
 	multi := io.MultiWriter(hasher, writer)
-	compressor := gzip.NewWriter(multi)
+	compressor := compression[compressionAlgorithm](multi, 4)
 	archiveWriter := tar.NewWriter(compressor)
 
 	_ = archiveWriter.WriteHeader(&tar.Header{
@@ -178,3 +199,26 @@ func (this *FakeDownloader) prepareManifestDownload(manifest contracts.Manifest)
 func (this *FakeDownloader) prepareMalformedDownload() {
 	this.Body = ioutil.NopCloser(strings.NewReader("malformed"))
 }
+
+var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
+	"zstd": func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
+		if err != nil {
+			log.Fatal(err)
+		}
+		return compressor
+	},
+	gzipAlgorithm: func(writer io.Writer, level int) io.WriteCloser {
+		compressor, err := gzip.NewWriterLevel(writer, level)
+		if err != nil {
+			log.Panicln(err)
+		}
+		return compressor
+	},
+}
+
+
+const (
+	gzipAlgorithm = "gzip"
+	zstdAlgorithm = "zstd"
+)

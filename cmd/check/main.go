@@ -24,8 +24,6 @@ func NewApp(config cmd.Config) *App {
 }
 
 func (this *App) Run() {
-	// TODO: public contract, e.g. exit code 0 + output vs exit 1 + output
-	// TODO: FYI Jonathan: log.Fatal results in exit 1 (Mike thinks we've addressed your concern)
 	if this.uploadedPreviously(cmd.RemoteManifestFilename) {
 		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
 	}

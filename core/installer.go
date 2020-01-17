@@ -6,10 +6,13 @@ import (
 	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
+
+	"github.com/klauspost/compress/zstd"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -46,17 +49,23 @@ func (this *PackageInstaller) writeLocalManifest(localPath string, manifest cont
 	_ = encoder.Encode(manifest)
 }
 
+
 func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
 	body, err := this.downloader.Download(request.DownloadRequest)
 	if err != nil {
 		return err
 	}
 	hashReader := NewHashReader(body, md5.New())
-	gzipReader, err := gzip.NewReader(hashReader)
+
+	factory, found := decompression[manifest.Archive.CompressionAlgorithm]
+	if !found {
+		return errors.New("invalid compression algorithm")
+	}
+	decompressor, err := factory(hashReader)
 	if err != nil {
 		return err
 	}
-	paths, err := this.extractArchive(gzipReader, request)
+	paths, err := this.extractArchive(decompressor, request)
 	if err != nil {
 		this.revertFileSystem(paths)
 		return err
@@ -70,8 +79,8 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(gzipReader *gzip.Reader, request contracts.InstallationRequest) (paths []string, err error) {
-	tarReader := tar.NewReader(gzipReader)
+func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest) (paths []string, err error) {
+	tarReader := tar.NewReader(decompressor)
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -101,4 +110,21 @@ func composeManifestPath(localPath string, manifest contracts.Manifest) string {
 	cleanPackageName := strings.ReplaceAll(manifest.Name, "/", "|")
 	fileName := fmt.Sprintf("manifest_%s_%s.json", cleanPackageName, manifest.Version)
 	return filepath.Join(localPath, fileName)
+}
+
+var decompression = map[string]func(_ io.Reader) (io.Reader, error) {
+	"zstd": func(reader io.Reader) (io.Reader, error) {
+		decompressor, err := zstd.NewReader(reader)
+		if err != nil {
+			return nil, err
+		}
+		return decompressor, nil
+	},
+	"gzip": func(reader io.Reader) (io.Reader, error) {
+		decompressor, err := gzip.NewReader(reader)
+		if err != nil {
+			return nil, err
+		}
+		return decompressor, nil
+	},
 }

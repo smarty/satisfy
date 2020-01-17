@@ -17,7 +17,7 @@ type Config struct {
 	SourceDirectory      string          `json:"source_directory"`
 	PackageName          string          `json:"package_name"`
 	PackageVersion       string          `json:"package_version"`
-	RemoteBucket         string          `json:"remote_bucket"`
+	RemoteBucket         string          `json:"remote_bucket"` // TODO: Combine with RemotePathPrefix (RemoteAddress)
 	RemotePathPrefix     string          `json:"remote_path_prefix"`
 	MaxRetry             int             `json:"max_retry"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
