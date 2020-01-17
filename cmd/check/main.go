@@ -25,6 +25,7 @@ func NewApp(config cmd.Config) *App {
 }
 
 func (this *App) Run() {
+	// TODO: public contract, e.g. exit code 0 + output vs exit 1 + output
 	if this.uploadedPreviously(cmd.RemoteManifestFilename) {
 		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
 	}
@@ -42,6 +43,7 @@ func (this *App) uploadedPreviously(path string) bool {
 }
 
 func (this *App) buildRemoteStorageClient() {
+	// TODO: using a clean http.Client and Transport
 	client := &http.Client{Timeout: time.Minute}
 	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
 	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
