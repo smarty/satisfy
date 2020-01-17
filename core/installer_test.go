@@ -217,7 +217,6 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 	},
 }
 
-
 const (
 	gzipAlgorithm = "gzip"
 	zstdAlgorithm = "zstd"

@@ -7,5 +7,5 @@ type FileListingIntegrityChecker struct {
 }
 
 func NewFileListingIntegrityChecker(fileSystem contracts.FileSystem) *FileListingIntegrityChecker {
-	return &FileListingIntegrityChecker{fileSystem:fileSystem}
+	return &FileListingIntegrityChecker{fileSystem: fileSystem}
 }

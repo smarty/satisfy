@@ -49,7 +49,6 @@ func (this *PackageInstaller) writeLocalManifest(localPath string, manifest cont
 	_ = encoder.Encode(manifest)
 }
 
-
 func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
 	body, err := this.downloader.Download(request.DownloadRequest)
 	if err != nil {
@@ -112,7 +111,7 @@ func composeManifestPath(localPath string, manifest contracts.Manifest) string {
 	return filepath.Join(localPath, fileName)
 }
 
-var decompression = map[string]func(_ io.Reader) (io.Reader, error) {
+var decompression = map[string]func(_ io.Reader) (io.Reader, error){
 	"zstd": func(reader io.Reader) (io.Reader, error) {
 		decompressor, err := zstd.NewReader(reader)
 		if err != nil {
