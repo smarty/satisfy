@@ -7,7 +7,7 @@ import (
 	"github.com/smartystreets/gunit"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/fs"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func TestIntegrityListingFixture(t *testing.T) {
@@ -18,12 +18,12 @@ type IntegrityListingFixture struct {
 	*gunit.Fixture
 
 	checker    *FileListingIntegrityChecker
-	fileSystem *fs.InMemoryFileSystem
+	fileSystem *shell.InMemoryFileSystem
 	manifest   contracts.Manifest
 }
 
 func (this *IntegrityListingFixture) Setup() {
-	this.fileSystem = fs.NewInMemoryFileSystem()
+	this.fileSystem = shell.NewInMemoryFileSystem()
 	this.checker = NewFileListingIntegrityChecker(this.fileSystem)
 	this.manifest = contracts.Manifest{
 		Archive: contracts.Archive{

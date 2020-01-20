@@ -19,7 +19,7 @@ import (
 	"github.com/smartystreets/gunit"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/fs"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func TestPackageInstallerFixture(t *testing.T) {
@@ -30,12 +30,12 @@ type PackageInstallerFixture struct {
 	*gunit.Fixture
 	installer  *PackageInstaller
 	downloader *FakeDownloader
-	filesystem *fs.InMemoryFileSystem
+	filesystem *shell.InMemoryFileSystem
 }
 
 func (this *PackageInstallerFixture) Setup() {
 	this.downloader = &FakeDownloader{}
-	this.filesystem = fs.NewInMemoryFileSystem()
+	this.filesystem = shell.NewInMemoryFileSystem()
 	this.installer = NewPackageInstaller(this.downloader, this.filesystem)
 }
 

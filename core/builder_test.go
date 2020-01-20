@@ -8,7 +8,7 @@ import (
 	"github.com/smartystreets/gunit"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/fs"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func TestPackageBuilderFixture(t *testing.T) {
@@ -24,7 +24,7 @@ type PackageBuilderFixture struct {
 }
 
 func (this *PackageBuilderFixture) Setup() {
-	this.fileSystem = fs.NewInMemoryFileSystem()
+	this.fileSystem = shell.NewInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
@@ -49,9 +49,9 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: fs.InMemoryModTime}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: fs.InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: fs.InMemoryModTime}, contents: []byte("ccc")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: shell.InMemoryModTime}, contents: []byte("a")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: shell.InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: shell.InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }

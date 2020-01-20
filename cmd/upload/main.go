@@ -14,12 +14,10 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"bitbucket.org/smartystreets/satisfy/archive"
 	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
-	"bitbucket.org/smartystreets/satisfy/fs"
-	"bitbucket.org/smartystreets/satisfy/remote"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func main() {
@@ -82,8 +80,8 @@ func (this *App) buildArchiveAndManifestContents() {
 	this.InitializeCompressor(writer)
 
 	this.builder = core.NewPackageBuilder(
-		fs.NewDiskFileSystem(this.config.SourceDirectory),
-		archive.NewTarArchiveWriter(this.compressor),
+		shell.NewDiskFileSystem(this.config.SourceDirectory),
+		shell.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
 
@@ -138,8 +136,8 @@ func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 
 func (this *App) buildRemoteStorageClient() {
 	client := cmd.NewHTTPClient()
-	gcsClient := remote.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
-	this.client = remote.NewRetryClient(gcsClient, this.config.MaxRetry)
+	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }
 
 func (this *App) completeManifest() {

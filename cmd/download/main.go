@@ -12,8 +12,7 @@ import (
 	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
-	"bitbucket.org/smartystreets/satisfy/fs"
-	"bitbucket.org/smartystreets/satisfy/remote"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func main() {
@@ -35,12 +34,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	disk := fs.NewDiskFileSystem(dir)
+	disk := shell.NewDiskFileSystem(dir)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New(), disk, config.Verify),
 	)
-	client := remote.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
+	client := shell.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
 	installer := core.NewPackageInstaller(client, disk)
 	for _, dependency := range listing.Dependencies { // TODO Concurrent installation
 		manifest, err := loadManifest(dependency)
