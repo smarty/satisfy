@@ -1,11 +1,24 @@
 package core
 
-import "bitbucket.org/smartystreets/satisfy/contracts"
+import (
+	"errors"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
+)
 
 type VersionIntegrityCheck struct {
-	expectedVersion string
+	desiredVersion string
+}
+
+func NewVersionIntegrityCheck(desiredVersion string) *VersionIntegrityCheck {
+	return &VersionIntegrityCheck{desiredVersion: desiredVersion}
 }
 
 func (this *VersionIntegrityCheck) Verify(manifest contracts.Manifest) error {
-	panic("implement me")
+	if manifest.Version != this.desiredVersion {
+		return errVersionMismatch
+	}
+	return nil
 }
+
+var errVersionMismatch = errors.New("version mismatch")
