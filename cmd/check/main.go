@@ -33,7 +33,7 @@ func (this *App) uploadedPreviously(path string) bool {
 	this.buildRemoteStorageClient()
 
 	request := contracts.DownloadRequest{
-		Bucket:   this.config.RemoteAddress.Bucket(),
+		Bucket:   this.config.RemoteAddress.Host,
 		Resource: this.config.ComposeRemotePath(path),
 	}
 	_, err := this.client.Download(request)

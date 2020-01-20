@@ -1,6 +1,9 @@
 package contracts
 
-import "io"
+import (
+	"io"
+	"net/url"
+)
 
 type RemoteStorage interface {
 	Uploader
@@ -12,19 +15,21 @@ type Uploader interface {
 }
 
 type UploadRequest struct {
-	Bucket      string
-	Resource    string
-	Body        io.ReadSeeker
-	Size        int64
-	ContentType string
-	Checksum    []byte
+	Bucket        string // deprecated
+	Resource      string // deprecated
+	RemoteAddress url.URL
+	Body          io.ReadSeeker
+	Size          int64
+	ContentType   string
+	Checksum      []byte
 }
 
 type Downloader interface {
-	Download(DownloadRequest) (io.ReadCloser, error)
+	Download(DownloadRequest) (io.ReadCloser, error) // TODO this method will receive a URL
 }
 
-type DownloadRequest struct {
-	Bucket   string
-	Resource string
+type DownloadRequest struct { // TODO delete this
+	Bucket        string // deprecated
+	Resource      string // deprecated
+	RemoteAddress url.URL
 }

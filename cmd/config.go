@@ -5,9 +5,9 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/smartystreets/gcs"
 )
@@ -18,23 +18,14 @@ type Config struct {
 	SourceDirectory      string          `json:"source_directory"`
 	PackageName          string          `json:"package_name"`
 	PackageVersion       string          `json:"package_version"`
-	RemoteAddress        RemoteAddress   `json:"remote_address"`
+	RemoteAddress        url.URL         `json:"remote_address"`
 	MaxRetry             int             `json:"max_retry"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
 }
 
-type RemoteAddress string
-
-func (this RemoteAddress) Bucket() string {
-	return strings.Split(string(this), "/")[0]
-}
-func (this RemoteAddress) PathPrefix() string {
-	return strings.Split(string(this), "/")[1]
-}
-
 func (this Config) ComposeRemotePath(filename string) string {
-	return path.Join(this.RemoteAddress.PathPrefix(), this.PackageName, this.PackageVersion, filename)
+	return path.Join(this.RemoteAddress.Path, this.PackageName, this.PackageVersion, filename)
 }
 
 const (

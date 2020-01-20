@@ -64,7 +64,7 @@ func (this *App) Run() {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Bucket:      this.config.RemoteAddress.Bucket(),
+		Bucket:      this.config.RemoteAddress.Host,
 		Resource:    this.config.ComposeRemotePath(cmd.RemoteArchiveFilename),
 		Body:        NewFileWrapper(this.file),
 		Size:        int64(this.manifest.Archive.Size),
@@ -130,7 +130,7 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		Bucket:      this.config.RemoteAddress.Bucket(),
+		Bucket:      this.config.RemoteAddress.Host,
 		Resource:    this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
 		Body:        bytes.NewReader(buffer.Bytes()),
 		Size:        int64(buffer.Len()),
