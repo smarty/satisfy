@@ -2,6 +2,7 @@ package remote
 
 import (
 	"io"
+	"net/url"
 	"time"
 
 	"github.com/smartystreets/clock"
@@ -35,6 +36,6 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 	return err
 }
 
-func (this *RetryClient) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
+func (this *RetryClient) Download(request url.URL) (io.ReadCloser, error) {
 	return this.inner.Download(request) // TODO: implement retry
 }

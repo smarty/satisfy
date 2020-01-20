@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -44,7 +45,7 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 
 	manifest, err := this.installer.InstallManifest(this.installationRequest())
 
-	this.So(this.downloader.request, should.Resemble, this.installationRequest().DownloadRequest)
+	this.So(this.downloader.request, should.Resemble, this.installationRequest().RemoteAddress)
 	this.So(manifest, should.Resemble, originalManifest)
 	this.So(err, should.BeNil)
 	fileName := "local/path/manifest_Package|Name_1.2.3.json"
@@ -145,11 +146,8 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 
 func (this *PackageInstallerFixture) installationRequest() contracts.InstallationRequest {
 	return contracts.InstallationRequest{
-		DownloadRequest: contracts.DownloadRequest{
-			Bucket:   "bucket",
-			Resource: "resource",
-		},
-		LocalPath: "local/path",
+		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
+		LocalPath:     "local/path",
 	}
 }
 
@@ -158,10 +156,10 @@ func (this *PackageInstallerFixture) installationRequest() contracts.Installatio
 type FakeDownloader struct {
 	Body    io.ReadCloser
 	Error   error
-	request contracts.DownloadRequest
+	request url.URL
 }
 
-func (this *FakeDownloader) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
+func (this *FakeDownloader) Download(request url.URL) (io.ReadCloser, error) {
 	this.request = request
 	return this.Body, this.Error
 }

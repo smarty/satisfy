@@ -1,6 +1,8 @@
 package contracts
 
+import "net/url"
+
 type InstallationRequest struct {
-	DownloadRequest
-	LocalPath string
+	RemoteAddress url.URL
+	LocalPath     string
 }

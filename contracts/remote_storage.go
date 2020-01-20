@@ -25,11 +25,5 @@ type UploadRequest struct {
 }
 
 type Downloader interface {
-	Download(DownloadRequest) (io.ReadCloser, error) // TODO this method will receive a URL
-}
-
-type DownloadRequest struct { // TODO delete this
-	Bucket        string // deprecated
-	Resource      string // deprecated
-	RemoteAddress url.URL
+	Download(url.URL) (io.ReadCloser, error)
 }

@@ -27,7 +27,7 @@ func NewPackageInstaller(downloader contracts.Downloader, filesystem contracts.F
 }
 
 func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
-	body, err := this.downloader.Download(request.DownloadRequest)
+	body, err := this.downloader.Download(request.RemoteAddress)
 	if err != nil {
 		return manifest, err
 	}
@@ -50,7 +50,7 @@ func (this *PackageInstaller) writeLocalManifest(localPath string, manifest cont
 }
 
 func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
-	body, err := this.downloader.Download(request.DownloadRequest)
+	body, err := this.downloader.Download(request.RemoteAddress)
 	if err != nil {
 		return err
 	}

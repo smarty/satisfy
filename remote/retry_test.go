@@ -3,6 +3,7 @@ package remote
 import (
 	"errors"
 	"io"
+	"net/url"
 	"testing"
 	"time"
 
@@ -63,7 +64,7 @@ type FakeClient struct {
 	attempts int
 }
 
-func (this *FakeClient) Download(contracts.DownloadRequest) (io.ReadCloser, error) {
+func (this *FakeClient) Download(url.URL) (io.ReadCloser, error) {
 	panic("implement me")
 }
 
