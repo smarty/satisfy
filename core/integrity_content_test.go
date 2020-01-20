@@ -43,16 +43,22 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 		},
 	}
 
-	this.checker = NewFileContentIntegrityCheck(this.fakeHasher, this.fileSystem)
+	this.checker = NewFileContentIntegrityCheck(this.fakeHasher, this.fileSystem, false)
 }
 
 func (this *FileContentIntegrityCheckFixture) TestFileContentsIntact() {
 	this.So(this.checker.Verify(this.manifest), should.BeNil)
 }
 
-func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContents() {
+func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsCauseErrorWhenEnabled() {
+	this.checker.enabled = true
 	this.fileSystem.WriteFile("/bb", []byte("modified"))
 
 	this.So(this.checker.Verify(this.manifest), should.NotBeNil)
 }
 
+func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsIgnoredWhenDisabled() {
+	this.fileSystem.WriteFile("/bb", []byte("modified"))
+
+	this.So(this.checker.Verify(this.manifest), should.BeNil)
+}

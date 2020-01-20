@@ -10,15 +10,19 @@ import (
 )
 
 type FileContentIntegrityCheck struct {
-	hasher hash.Hash
+	hasher     hash.Hash
 	fileSystem contracts.FileSystem
+	enabled    bool
 }
 
-func NewFileContentIntegrityCheck(hasher hash.Hash, fileSystem contracts.FileSystem) *FileContentIntegrityCheck {
-	return &FileContentIntegrityCheck{hasher: hasher, fileSystem:fileSystem}
+func NewFileContentIntegrityCheck(hasher hash.Hash, fileSystem contracts.FileSystem, enabled bool) *FileContentIntegrityCheck {
+	return &FileContentIntegrityCheck{hasher: hasher, fileSystem: fileSystem, enabled: enabled}
 }
 
 func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest) error {
+	if !this.enabled {
+		return nil
+	}
 	for _, item := range manifest.Archive.Contents {
 		this.hasher.Reset()
 		reader := this.fileSystem.Open(item.Path)
