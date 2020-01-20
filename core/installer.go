@@ -112,18 +112,6 @@ func composeManifestPath(localPath string, manifest contracts.Manifest) string {
 }
 
 var decompression = map[string]func(_ io.Reader) (io.Reader, error){
-	"zstd": func(reader io.Reader) (io.Reader, error) {
-		decompressor, err := zstd.NewReader(reader)
-		if err != nil {
-			return nil, err
-		}
-		return decompressor, nil
-	},
-	"gzip": func(reader io.Reader) (io.Reader, error) {
-		decompressor, err := gzip.NewReader(reader)
-		if err != nil {
-			return nil, err
-		}
-		return decompressor, nil
-	},
+	"zstd": func(reader io.Reader) (io.Reader, error) { return zstd.NewReader(reader) },
+	"gzip": func(reader io.Reader) (io.Reader, error) { return gzip.NewReader(reader) },
 }
