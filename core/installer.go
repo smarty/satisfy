@@ -107,7 +107,7 @@ func (this *PackageInstaller) revertFileSystem(paths []string) {
 
 func composeManifestPath(localPath string, manifest contracts.Manifest) string {
 	cleanPackageName := strings.ReplaceAll(manifest.Name, "/", "|")
-	fileName := fmt.Sprintf("manifest_%s_%s.json", cleanPackageName, manifest.Version)
+	fileName := fmt.Sprintf("manifest_%s.json", cleanPackageName)
 	return filepath.Join(localPath, fileName)
 }
 
