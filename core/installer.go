@@ -72,7 +72,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	actualChecksum := hashReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
 		this.revertFileSystem(paths)
-		return fmt.Errorf("checksum mistmatch: %x != %x", actualChecksum, manifest.Archive.MD5Checksum)
+		return fmt.Errorf("checksum mismatch: %x != %x", actualChecksum, manifest.Archive.MD5Checksum)
 	}
 
 	return nil
