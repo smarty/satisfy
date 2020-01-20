@@ -15,8 +15,6 @@ type Uploader interface {
 }
 
 type UploadRequest struct {
-	Bucket        string // deprecated
-	Resource      string // deprecated
 	RemoteAddress url.URL
 	Body          io.ReadSeeker
 	Size          int64

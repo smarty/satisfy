@@ -26,8 +26,8 @@ func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credential
 func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) error {
 	gcsRequest, err := gcs.NewRequest("PUT",
 		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.Bucket),
-		gcs.WithResource(request.Resource),
+		gcs.WithBucket(request.RemoteAddress.Host),
+		gcs.WithResource(request.RemoteAddress.Path),
 		gcs.PutWithContent(request.Body),
 		gcs.PutWithContentLength(request.Size),
 		gcs.PutWithContentMD5(request.Checksum),
