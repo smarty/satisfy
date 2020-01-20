@@ -10,11 +10,11 @@ import (
 	"bitbucket.org/smartystreets/satisfy/fs"
 )
 
-func TestIntegrityFixture(t *testing.T) {
-	gunit.Run(new(IntegrityFixture), t)
+func TestIntegrityListingFixture(t *testing.T) {
+	gunit.Run(new(IntegrityListingFixture), t)
 }
 
-type IntegrityFixture struct {
+type IntegrityListingFixture struct {
 	*gunit.Fixture
 
 	checker    *FileListingIntegrityChecker
@@ -22,7 +22,7 @@ type IntegrityFixture struct {
 	manifest   contracts.Manifest
 }
 
-func (this *IntegrityFixture) Setup() {
+func (this *IntegrityListingFixture) Setup() {
 	this.fileSystem = fs.NewInMemoryFileSystem()
 	this.checker = NewFileListingIntegrityChecker(this.fileSystem)
 	this.manifest = contracts.Manifest{
@@ -41,11 +41,11 @@ func (this *IntegrityFixture) Setup() {
 	this.fileSystem.WriteFile("/dddd", []byte("dddd"))
 }
 
-func (this *IntegrityFixture) TestFileListingIntegrityCheck() {
+func (this *IntegrityListingFixture) TestFileListingIntegrityCheck() {
 	this.So(this.checker.Verify(this.manifest), should.BeNil)
 }
 
-func (this *IntegrityFixture) TestManifestFileNotOnFileSystem() {
+func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
 	this.manifest.Archive.Contents = append(this.manifest.Archive.Contents, contracts.ArchiveItem{
 		Path: "/eeeee",
 		Size: 5,
@@ -54,7 +54,7 @@ func (this *IntegrityFixture) TestManifestFileNotOnFileSystem() {
 	this.So(this.checker.Verify(this.manifest), should.Resemble, errFileNotFound)
 }
 
-func (this *IntegrityFixture) TestFileSizeMismatch() {
+func (this *IntegrityListingFixture) TestFileSizeMismatch() {
 	this.manifest.Archive.Contents[0].Size = 0
 
 	this.So(this.checker.Verify(this.manifest), should.Resemble, errFileSizeMismatch)

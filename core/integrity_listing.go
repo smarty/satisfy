@@ -6,18 +6,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type IntegrityCheck interface {
-	Verify(manifest contracts.Manifest) error
-}
-
-type VersionIntegrityCheck struct {
-	expectedVersion string
-}
-
-func (this *VersionIntegrityCheck) Verify(manifest contracts.Manifest) error {
-	panic("implement me")
-}
-
 type FileListingIntegrityChecker struct {
 	fileSystem contracts.FileSystem
 }
