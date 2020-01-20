@@ -43,7 +43,7 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 }
 
 func (this *PackageInstaller) writeLocalManifest(localPath string, manifest contracts.Manifest) {
-	file := this.filesystem.Create(composeManifestPath(localPath, manifest))
+	file := this.filesystem.Create(ComposeManifestPath(localPath, manifest.Name))
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "   ")
 	_ = encoder.Encode(manifest)
@@ -105,8 +105,8 @@ func (this *PackageInstaller) revertFileSystem(paths []string) {
 	}
 }
 
-func composeManifestPath(localPath string, manifest contracts.Manifest) string {
-	cleanPackageName := strings.ReplaceAll(manifest.Name, "/", "|")
+func ComposeManifestPath(localPath, name string) string {
+	cleanPackageName := strings.ReplaceAll(name, "/", "|")
 	fileName := fmt.Sprintf("manifest_%s.json", cleanPackageName)
 	return filepath.Join(localPath, fileName)
 }

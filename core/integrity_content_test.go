@@ -31,7 +31,6 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 	this.fileSystem.WriteFile("/cc/c", []byte("ccc"))
 	this.fileSystem.WriteFile("/dddd", []byte("dddd"))
 
-
 	this.manifest = contracts.Manifest{
 		Archive: contracts.Archive{
 			Contents: []contracts.ArchiveItem{

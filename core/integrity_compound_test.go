@@ -11,15 +11,15 @@ import (
 )
 
 func TestCompoundIntegrityCheckFixture(t *testing.T) {
-    gunit.Run(new(CompoundIntegrityCheckFixture), t)
+	gunit.Run(new(CompoundIntegrityCheckFixture), t)
 }
 
 type CompoundIntegrityCheckFixture struct {
-    *gunit.Fixture
+	*gunit.Fixture
 
-    checker *CompoundIntegrityCheck
-    innerA *FakeIntegrityCheck
-    innerB *FakeIntegrityCheck
+	checker *CompoundIntegrityCheck
+	innerA  *FakeIntegrityCheck
+	innerB  *FakeIntegrityCheck
 }
 
 func (this *CompoundIntegrityCheckFixture) Setup() {
@@ -37,6 +37,7 @@ func (this *CompoundIntegrityCheckFixture) TestAnyIntegrityTestsFail() {
 
 	this.So(this.checker.Verify(contracts.Manifest{}), should.NotBeNil)
 }
+
 //////////////////////////////////////////////////////////////////////
 
 type FakeIntegrityCheck struct {
