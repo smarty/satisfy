@@ -49,8 +49,8 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 func (this *GoogleCloudStorageClient) Download(request contracts.DownloadRequest) (io.ReadCloser, error) {
 	gcsRequest, err := gcs.NewRequest("GET",
 		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.Bucket),
-		gcs.WithResource(request.Resource),
+		gcs.WithBucket(request.RemoteAddress.Host),
+		gcs.WithResource(request.RemoteAddress.Path),
 	)
 	if err != nil {
 		return nil, err

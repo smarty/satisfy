@@ -18,14 +18,21 @@ type Config struct {
 	SourceDirectory      string          `json:"source_directory"`
 	PackageName          string          `json:"package_name"`
 	PackageVersion       string          `json:"package_version"`
-	RemoteAddress        url.URL         `json:"remote_address"`
+	RemoteAddressPrefix  url.URL         `json:"remote_address"`
 	MaxRetry             int             `json:"max_retry"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
 }
 
 func (this Config) ComposeRemotePath(filename string) string {
-	return path.Join(this.RemoteAddress.Path, this.PackageName, this.PackageVersion, filename)
+	return path.Join(this.RemoteAddressPrefix.Path, this.PackageName, this.PackageVersion, filename)
+}
+func (this Config) ComposeRemoteAddress(filename string) url.URL {
+	parsed, err := url.Parse(path.Join(this.RemoteAddressPrefix.String(), this.PackageName, this.PackageVersion, filename))
+	if err != nil {
+		log.Panic(err)
+	}
+	return *parsed
 }
 
 const (
