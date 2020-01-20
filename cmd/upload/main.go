@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/klauspost/compress/zstd"
 
@@ -64,12 +63,11 @@ func (this *App) Run() {
 func (this *App) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		Bucket:      this.config.RemoteAddressPrefix.Host,
-		Resource:    this.config.ComposeRemotePath(cmd.RemoteArchiveFilename),
-		Body:        NewFileWrapper(this.file),
-		Size:        int64(this.manifest.Archive.Size),
-		ContentType: "application/zstd",
-		Checksum:    this.manifest.Archive.MD5Checksum,
+		RemoteAddress: this.config.ComposeRemoteAddress(cmd.RemoteArchiveFilename),
+		Body:          NewFileWrapper(this.file),
+		Size:          int64(this.manifest.Archive.Size),
+		ContentType:   "application/zstd",
+		Checksum:      this.manifest.Archive.MD5Checksum,
 	}
 }
 
@@ -130,12 +128,11 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 func (this *App) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		Bucket:      this.config.RemoteAddressPrefix.Host,
-		Resource:    this.config.ComposeRemotePath(cmd.RemoteManifestFilename),
-		Body:        bytes.NewReader(buffer.Bytes()),
-		Size:        int64(buffer.Len()),
-		ContentType: "application/json",
-		Checksum:    this.hasher.Sum(nil),
+		RemoteAddress: this.config.ComposeRemoteAddress(cmd.RemoteManifestFilename),
+		Body:          bytes.NewReader(buffer.Bytes()),
+		Size:          int64(buffer.Len()),
+		ContentType:   "application/json",
+		Checksum:      this.hasher.Sum(nil),
 	}
 }
 
@@ -154,7 +151,7 @@ func (this *App) completeManifest() {
 		Name:    this.config.PackageName,
 		Version: this.config.PackageVersion,
 		Archive: contracts.Archive{
-			Filename:             filepath.Base(this.config.ComposeRemotePath(cmd.RemoteArchiveFilename)),
+			Filename:             cmd.RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),

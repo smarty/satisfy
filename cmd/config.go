@@ -24,9 +24,6 @@ type Config struct {
 	JSONPath             string          `json:"-"`
 }
 
-func (this Config) ComposeRemotePath(filename string) string {
-	return path.Join(this.RemoteAddressPrefix.Path, this.PackageName, this.PackageVersion, filename)
-}
 func (this Config) ComposeRemoteAddress(filename string) url.URL {
 	parsed, err := url.Parse(path.Join(this.RemoteAddressPrefix.String(), this.PackageName, this.PackageVersion, filename))
 	if err != nil {
