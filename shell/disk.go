@@ -11,16 +11,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type FileInfo struct {
-	path string
-	size int64
-	mod  time.Time
-}
-
-func (this FileInfo) Path() string       { return this.path }
-func (this FileInfo) Size() int64        { return this.size }
-func (this FileInfo) ModTime() time.Time { return this.mod }
-
 type DiskFileSystem struct{ root string }
 
 func NewDiskFileSystem(root string) *DiskFileSystem {
@@ -93,3 +83,15 @@ func (this *DiskFileSystem) Delete(path string) {
 func (this *DiskFileSystem) absolute(path string) string {
 	return filepath.Join(this.root, path)
 }
+
+////////////////////////////////////////
+
+type FileInfo struct {
+	path string
+	size int64
+	mod  time.Time
+}
+
+func (this FileInfo) Path() string       { return this.path }
+func (this FileInfo) Size() int64        { return this.size }
+func (this FileInfo) ModTime() time.Time { return this.mod }
