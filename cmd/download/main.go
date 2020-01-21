@@ -29,18 +29,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	dir, err := os.Getwd()
+
+	working, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	disk := shell.NewDiskFileSystem(dir)
+	disk := shell.NewDiskFileSystem(working)
+	client := shell.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
+	installer := core.NewPackageInstaller(client, disk)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New(), disk, config.Verify),
 	)
-	client := shell.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
-	installer := core.NewPackageInstaller(client, disk)
+
 	for _, dependency := range listing.Dependencies { // TODO Concurrent installation
 		manifest, err := loadManifest(dependency)
 
@@ -52,6 +54,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err) // TODO Don't prevent other packages from installing
 			}
+
 			err = installer.InstallPackage(manifest, contracts.InstallationRequest{
 				RemoteAddress: *dependency.RemoteAddress.Value(), // TODO Combine with archive path
 				LocalPath:     dependency.LocalDirectory,
@@ -65,18 +68,22 @@ func main() {
 
 func loadManifest(dependency cmd.Dependency) (manifest contracts.Manifest, err error) {
 	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.Name)
+
 	_, err = os.Stat(path)
 	if os.IsNotExist(err) {
 		return manifest, errNotInstalled
 	}
+
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
 		return manifest, err
 	}
+
 	err = json.Unmarshal(raw, &manifest)
 	if err != nil {
 		return manifest, err
 	}
+
 	return manifest, nil
 }
 
