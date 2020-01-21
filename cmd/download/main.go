@@ -38,7 +38,7 @@ func main() {
 
 	disk := shell.NewDiskFileSystem(working)
 	client := shell.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
-	installer := core.NewPackageInstaller(client, disk)
+	installer := core.NewPackageInstaller(core.NewRetryClient(client, 5), disk) // TODO: config setting for maxRetry
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New(), disk, config.Verify),
