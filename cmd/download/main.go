@@ -1,10 +1,10 @@
 package main
-// TODO Nonzero status code in the case of any failure
 
 import (
 	"crypto/md5"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -54,19 +54,32 @@ type App struct {
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
 	waiter    *sync.WaitGroup
+	results   chan error
 }
 
 func NewApp(listing cmd.DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *App {
 	waiter := new(sync.WaitGroup)
 	waiter.Add(len(listing.Dependencies))
-	return &App{listing: listing, installer: installer, integrity: integrity, waiter: waiter}
+	results := make(chan error)
+	return &App{listing: listing, installer: installer, integrity: integrity, waiter: waiter, results: results}
 }
 
 func (this *App) Run() {
 	for _, dependency := range this.listing.Dependencies {
 		go this.install(dependency)
 	}
+	go this.awaitCompletion()
+	var failed int
+	for err := range this.results {
+		failed++
+		log.Println("[WARN]", err)
+	}
+	os.Exit(failed)
+}
+
+func (this *App) awaitCompletion() {
 	this.waiter.Wait()
+	close(this.results)
 }
 
 func (this *App) install(dependency cmd.Dependency) {
@@ -80,14 +93,14 @@ func (this *App) install(dependency cmd.Dependency) {
 	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
 	manifest, err = this.installer.InstallManifest(installation)
 	if err != nil {
-		log.Println("[WARN] Failed to install manifest:", dependency.Name, err)
+		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Name, err)
 		return
 	}
 
 	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
 	err = this.installer.InstallPackage(manifest, installation)
 	if err != nil {
-		log.Println("[WARN] Failed to install package:", dependency.Name, err)
+		this.results <- fmt.Errorf("[WARN] Failed to install package for %s: %v", dependency.Name, err)
 	}
 }
 

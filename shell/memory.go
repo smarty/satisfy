@@ -83,4 +83,3 @@ func (this *file) Path() string {
 func (this *file) Size() int64 {
 	return int64(len(this.contents))
 }
-

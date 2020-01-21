@@ -21,7 +21,7 @@ func (this *DependencyListingFixture) Setup() {
 	this.listing = DependencyListing{}
 }
 
-func (this*DependencyListingFixture) TestValidateEachDependencyIsPopulated_NoError() {
+func (this *DependencyListingFixture) TestValidateEachDependencyIsPopulated_NoError() {
 	this.appendDependency("name", "1.2.3", "host", "directory")
 
 	err := this.listing.Validate()
@@ -72,10 +72,10 @@ func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameAndDiffere
 
 func (this *DependencyListingFixture) appendDependency(name, version, address, directory string) {
 	this.listing.Dependencies = append(this.listing.Dependencies, Dependency{
-		Name:           name,
-		Version:        version,
-		RemoteAddress:  URL{
-			Host:       address,
+		Name:    name,
+		Version: version,
+		RemoteAddress: URL{
+			Host: address,
 		},
 		LocalDirectory: directory,
 	})

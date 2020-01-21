@@ -31,4 +31,3 @@ func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url
 	prefix.Path = path.Join(prefix.Path, packageName, version, fileName)
 	return prefix
 }
-
