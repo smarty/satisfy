@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -19,15 +20,9 @@ import (
 
 func main() {
 	config := parseConfig()
+	listing := readDependencyListing(config.jsonPath)
 
-	decoder := json.NewDecoder(os.Stdin)
-	var listing cmd.DependencyListing
-	err := decoder.Decode(&listing)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = listing.Validate()
+	err := listing.Validate()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,6 +42,48 @@ func main() {
 
 	app := NewApp(listing, installer, integrity)
 	app.Run()
+}
+
+func readDependencyListing(path string) (listing cmd.DependencyListing) {
+	if path == "_STDIN_" {
+		return readFromReader(os.Stdin)
+	} else {
+		return readFromFile(path)
+	}
+}
+
+func readFromFile(fileName string) (listing cmd.DependencyListing) {
+	file, err := os.Open(fileName)
+	if os.IsNotExist(err) {
+		createExampleDependenciesFile(fileName)
+		log.Fatalln("Specified dependency file not found; an example file has been written instead:", fileName)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	return readFromReader(file)
+}
+
+func createExampleDependenciesFile(fileName string) {
+	var listing cmd.DependencyListing
+	listing.Dependencies = append(listing.Dependencies, cmd.Dependency{
+		Name:           "example_package_name",
+		Version:        "0.0.1",
+		RemoteAddress:  cmd.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		LocalDirectory: "local/path",
+	})
+	raw, _ := json.MarshalIndent(listing, "", "  ")
+	_ = ioutil.WriteFile(fileName, raw, 0644)
+}
+
+func readFromReader(reader io.Reader) (listing cmd.DependencyListing) {
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&listing)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return listing
 }
 
 type App struct {

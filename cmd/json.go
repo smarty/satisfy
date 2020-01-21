@@ -7,6 +7,10 @@ import (
 
 type URL url.URL
 
+func (this *URL) MarshalJSON() ([]byte, error) {
+	return []byte(this.Value().String()), nil
+}
+
 func (this *URL) UnmarshalJSON(p []byte) error {
 	raw := string(p)
 	if raw == `"null"` {
