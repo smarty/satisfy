@@ -3,7 +3,9 @@ package core
 import (
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,34 +23,34 @@ func TestRetryFixture(t *testing.T) {
 
 type RetryFixture struct {
 	*gunit.Fixture
-	retryUploader *RetryClient
-	fakeClient    *FakeClient
+	client     *RetryClient
+	fakeClient *FakeClient
 }
 
 func (this *RetryFixture) Setup() {
 	this.fakeClient = &FakeClient{}
-	this.retryUploader = NewRetryClient(this.fakeClient, 4)
-	this.retryUploader.sleeper = clock.StayAwake()
-	this.retryUploader.logger = logging.Capture()
+	this.client = NewRetryClient(this.fakeClient, 4)
+	this.client.sleeper = clock.StayAwake()
+	this.client.logger = logging.Capture()
 }
 
 func (this *RetryFixture) TestUploadCallsInner() {
 	sent := contracts.UploadRequest{ContentType: "test"}
 
-	err := this.retryUploader.Upload(sent)
+	err := this.client.Upload(sent)
 
 	this.So(err, should.BeNil)
-	this.So(this.fakeClient.received.ContentType, should.Equal, "test")
+	this.So(this.fakeClient.uploadRequest.ContentType, should.Equal, "test")
 }
 
-var anError = errors.New("this is an error")
-
-func (this *RetryFixture) TestRetryOnError() {
+func (this *RetryFixture) TestUploadRetryOnError() {
 	this.fakeClient.error = anError
-	err := this.retryUploader.Upload(contracts.UploadRequest{})
+
+	err := this.client.Upload(contracts.UploadRequest{})
+
 	this.So(err, should.Equal, anError)
-	this.So(this.fakeClient.attempts, should.Equal, 5)
-	this.So(this.retryUploader.sleeper.Naps, should.Resemble, []time.Duration{
+	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
+	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
 		time.Second * 3,
 		time.Second * 3,
 		time.Second * 3,
@@ -56,20 +58,56 @@ func (this *RetryFixture) TestRetryOnError() {
 	})
 }
 
+func (this *RetryFixture) TestDownloadCallsInner() {
+	this.fakeClient.downloadContent = "content"
+	request := url.URL{Host: "host.com"}
+
+	reader, err := this.client.Download(request)
+
+	all, _ := ioutil.ReadAll(reader)
+	this.So(string(all), should.Equal, "content")
+	this.So(err, should.BeNil)
+	this.So(this.fakeClient.downloadRequest, should.Resemble, request)
+}
+
+func (this *RetryFixture) TestDownloadRetryOnError() {
+	this.fakeClient.error = anError
+
+	_, err := this.client.Download(url.URL{})
+
+	this.So(err, should.Equal, anError)
+	this.So(this.fakeClient.downloadAttempts, should.Equal, 5)
+	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
+		time.Second * 3,
+		time.Second * 3,
+		time.Second * 3,
+		time.Second * 3,
+	})
+}
+
+var anError = errors.New("this is an error")
+
 /////////////////////////////////////////////////////////////////////////////////
 
 type FakeClient struct {
-	received contracts.UploadRequest
-	error    error
-	attempts int
+	uploadRequest  contracts.UploadRequest
+	uploadAttempts int
+
+	downloadRequest  url.URL
+	downloadContent  string
+	downloadAttempts int
+
+	error error
 }
 
-func (this *FakeClient) Download(url.URL) (io.ReadCloser, error) {
-	panic("implement me")
+func (this *FakeClient) Download(request url.URL) (io.ReadCloser, error) {
+	this.downloadRequest = request
+	this.downloadAttempts++
+	return ioutil.NopCloser(strings.NewReader(this.downloadContent)), this.error
 }
 
 func (this *FakeClient) Upload(request contracts.UploadRequest) error {
-	this.received = request
-	this.attempts++
+	this.uploadRequest = request
+	this.uploadAttempts++
 	return this.error
 }

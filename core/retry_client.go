@@ -36,6 +36,16 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 	return err
 }
 
-func (this *RetryClient) Download(request url.URL) (io.ReadCloser, error) {
-	return this.inner.Download(request) // TODO: implement retry
+func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err error) {
+	for x := 0; x <= this.maxRetry; x++ {
+		body, err = this.inner.Download(request)
+		if err == nil {
+			return body, nil
+		}
+		if x < this.maxRetry {
+			this.logger.Println("[WARN] download failed, retry imminent.")
+			this.sleeper.Sleep(time.Second * 3)
+		}
+	}
+	return nil, err
 }
