@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -51,31 +52,41 @@ type App struct {
 	listing   cmd.DependencyListing
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
+	waiter    *sync.WaitGroup
 }
 
 func NewApp(listing cmd.DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *App {
-	return &App{listing: listing, installer: installer, integrity: integrity}
+	waiter := new(sync.WaitGroup)
+	waiter.Add(len(listing.Dependencies))
+	return &App{listing: listing, installer: installer, integrity: integrity, waiter: waiter}
 }
 
 func (this *App) Run() {
-	for _, dependency := range this.listing.Dependencies { // TODO Concurrent installation
-		manifest, err := loadManifest(dependency)
+	for _, dependency := range this.listing.Dependencies {
+		go this.install(dependency)
+	}
+	this.waiter.Wait()
+}
 
-		if err == errNotInstalled || manifest.Version != dependency.Version || this.integrity.Verify(manifest) != nil {
-			installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
+func (this *App) install(dependency cmd.Dependency) {
+	defer this.waiter.Done()
+	manifest, err := loadManifest(dependency)
+	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest) == nil {
+		return
+	}
+	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
-			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
-			manifest, err = this.installer.InstallManifest(installation)
-			if err != nil {
-				log.Fatal(err) // TODO Don't prevent other packages from installing
-			}
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
+	manifest, err = this.installer.InstallManifest(installation)
+	if err != nil {
+		log.Println("[WARN] Failed to install manifest:", dependency.Name, err)
+		return
+	}
 
-			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
-			err = this.installer.InstallPackage(manifest, installation)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
+	err = this.installer.InstallPackage(manifest, installation)
+	if err != nil {
+		log.Println("[WARN] Failed to install package:", dependency.Name, err)
 	}
 }
 
