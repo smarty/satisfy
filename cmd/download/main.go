@@ -43,20 +43,35 @@ func main() {
 		core.NewFileContentIntegrityCheck(md5.New(), disk, config.Verify),
 	)
 
-	for _, dependency := range listing.Dependencies { // TODO Concurrent installation
+	app := NewApp(listing, installer, integrity)
+	app.Run()
+}
+
+type App struct {
+	listing   cmd.DependencyListing
+	installer *core.PackageInstaller
+	integrity contracts.IntegrityCheck
+}
+
+func NewApp(listing cmd.DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *App {
+	return &App{listing: listing, installer: installer, integrity: integrity}
+}
+
+func (this *App) Run() {
+	for _, dependency := range this.listing.Dependencies { // TODO Concurrent installation
 		manifest, err := loadManifest(dependency)
 
-		if err == errNotInstalled || manifest.Version != dependency.Version || integrity.Verify(manifest) != nil {
+		if err == errNotInstalled || manifest.Version != dependency.Version || this.integrity.Verify(manifest) != nil {
 			installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
 			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
-			manifest, err = installer.InstallManifest(installation)
+			manifest, err = this.installer.InstallManifest(installation)
 			if err != nil {
 				log.Fatal(err) // TODO Don't prevent other packages from installing
 			}
 
 			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
-			err = installer.InstallPackage(manifest, installation)
+			err = this.installer.InstallPackage(manifest, installation)
 			if err != nil {
 				log.Fatal(err)
 			}
