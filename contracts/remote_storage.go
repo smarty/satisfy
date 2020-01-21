@@ -3,6 +3,7 @@ package contracts
 import (
 	"io"
 	"net/url"
+	"path"
 )
 
 type RemoteStorage interface {
@@ -25,3 +26,9 @@ type UploadRequest struct {
 type Downloader interface {
 	Download(url.URL) (io.ReadCloser, error)
 }
+
+func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
+	prefix.Path = path.Join(prefix.Path, packageName, version, fileName)
+	return prefix
+}
+

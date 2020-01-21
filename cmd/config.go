@@ -7,9 +7,10 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path"
 
 	"github.com/smartystreets/gcs"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type Config struct {
@@ -25,11 +26,7 @@ type Config struct {
 }
 
 func (this Config) ComposeRemoteAddress(filename string) url.URL {
-	parsed, err := url.Parse(path.Join(this.RemoteAddressPrefix.Value().String(), this.PackageName, this.PackageVersion, filename))
-	if err != nil {
-		log.Panic(err)
-	}
-	return *parsed
+	return contracts.AppendRemotePath(url.URL(this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
 }
 
 const (

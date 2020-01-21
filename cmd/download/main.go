@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 
 	"bitbucket.org/smartystreets/satisfy/cmd"
@@ -50,13 +49,13 @@ func main() {
 		if err == errNotInstalled || manifest.Version != dependency.Version || integrity.Verify(manifest) != nil {
 			installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
-			installation.RemoteAddress = url.URL(dependency.RemoteAddress) // TODO: append manifest path
+			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
 			manifest, err = installer.InstallManifest(installation)
 			if err != nil {
 				log.Fatal(err) // TODO Don't prevent other packages from installing
 			}
 
-			installation.RemoteAddress = url.URL(dependency.RemoteAddress) // TODO: append archive path
+			installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
 			err = installer.InstallPackage(manifest, installation)
 			if err != nil {
 				log.Fatal(err)
