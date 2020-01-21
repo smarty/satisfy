@@ -1,4 +1,5 @@
 package main
+// TODO Nonzero status code in the case of any failure
 
 import (
 	"crypto/md5"

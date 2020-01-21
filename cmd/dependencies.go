@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -11,7 +13,30 @@ type DependencyListing struct {
 }
 
 func (this *DependencyListing) Validate() error {
-	return nil // TODO
+	inventory := make(map[string]string)
+
+	for _, dependency := range this.Dependencies {
+
+		if dependency.LocalDirectory == "" {
+			return errors.New("local directory is required")
+		}
+		if dependency.Name == "" {
+			return errors.New("name is required")
+		}
+		if dependency.Version == "" {
+			return errors.New("version is required")
+		}
+		if dependency.RemoteAddress.Value().String() == "" {
+			return errors.New("remote address is required")
+		}
+
+		key := fmt.Sprintf("%s %s", dependency.Name, dependency.LocalDirectory)
+		if version, found := inventory[key]; found && version != dependency.Version {
+			return errors.New("local directory conflict")
+		}
+		inventory[key] = dependency.Version
+	}
+	return nil
 }
 
 type Dependency struct {
