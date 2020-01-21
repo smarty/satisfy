@@ -10,35 +10,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type file struct {
-	path     string
-	contents []byte
-	mod      time.Time
-}
-
-var InMemoryModTime = time.Now()
-
-func (this *file) ModTime() time.Time {
-	return this.mod
-}
-
-func (this *file) Write(p []byte) (n int, err error) {
-	this.contents = append(this.contents, p...)
-	return len(p), nil
-}
-
-func (this *file) Close() error {
-	return nil
-}
-
-func (this *file) Path() string {
-	return this.path
-}
-
-func (this *file) Size() int64 {
-	return int64(len(this.contents))
-}
-
 type InMemoryFileSystem struct {
 	fileSystem map[string]*file
 }
@@ -81,3 +52,35 @@ func (this *InMemoryFileSystem) Delete(path string) {
 	this.fileSystem[path] = nil
 	delete(this.fileSystem, path)
 }
+
+/////////////////////////////////////////////////
+
+type file struct {
+	path     string
+	contents []byte
+	mod      time.Time
+}
+
+var InMemoryModTime = time.Now()
+
+func (this *file) ModTime() time.Time {
+	return this.mod
+}
+
+func (this *file) Write(p []byte) (n int, err error) {
+	this.contents = append(this.contents, p...)
+	return len(p), nil
+}
+
+func (this *file) Close() error {
+	return nil
+}
+
+func (this *file) Path() string {
+	return this.path
+}
+
+func (this *file) Size() int64 {
+	return int64(len(this.contents))
+}
+
