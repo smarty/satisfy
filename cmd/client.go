@@ -8,7 +8,7 @@ import (
 
 func NewHTTPClient() *http.Client {
 	return &http.Client{
-		Timeout: time.Hour,
+		Timeout: time.Hour, // TODO: configurable?
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
