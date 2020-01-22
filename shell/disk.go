@@ -55,7 +55,12 @@ func (this *DiskFileSystem) Open(path string) io.ReadCloser {
 }
 
 func (this *DiskFileSystem) Create(path string) io.WriteCloser {
-	writer, err := os.Create(this.absolute(path))
+	absolute := this.absolute(path)
+	err := os.MkdirAll(filepath.Dir(absolute), 0755)
+	if err != nil {
+		log.Panic(err)
+	}
+	writer, err := os.Create(absolute)
 	if err != nil {
 		log.Panic(err)
 	}
