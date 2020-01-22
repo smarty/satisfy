@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+type DirectoryCreator interface {
+	CreateDirectory(path string) error
+}
+
 type PathLister interface {
 	Listing() []FileInfo
 }

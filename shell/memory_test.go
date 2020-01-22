@@ -2,6 +2,7 @@ package shell
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -77,3 +78,20 @@ func (this *MemoryFixture) TestDelete() {
 
 	this.So(this.fileSystem.Listing(), should.BeEmpty)
 }
+
+func (this *MemoryFixture) TestCreateDirectory() {
+	err := this.fileSystem.CreateDirectory("/folder")
+
+	this.So(err, should.BeNil)
+	this.So(this.fileSystem.directories, should.ContainKey, "/folder")
+}
+
+func (this *MemoryFixture) TestCreateDirectoryError() {
+	this.fileSystem.directoryErrors["/folder"] = fileSystemError
+	err := this.fileSystem.CreateDirectory("/folder")
+
+	this.So(err, should.Equal, fileSystemError)
+	this.So(this.fileSystem.directories, should.BeEmpty)
+}
+
+var fileSystemError = errors.New("this is a file system error")

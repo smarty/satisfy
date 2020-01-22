@@ -11,11 +11,25 @@ import (
 )
 
 type InMemoryFileSystem struct {
-	fileSystem map[string]*file
+	fileSystem      map[string]*file
+	directories     map[string]struct{}
+	directoryErrors map[string]error
 }
 
 func NewInMemoryFileSystem() *InMemoryFileSystem {
-	return &InMemoryFileSystem{fileSystem: make(map[string]*file)}
+	return &InMemoryFileSystem{
+		fileSystem:      make(map[string]*file),
+		directories:     make(map[string]struct{}),
+		directoryErrors: make(map[string]error),
+	}
+}
+
+func (this *InMemoryFileSystem) CreateDirectory(path string) error {
+	if err, found := this.directoryErrors[path]; found {
+		return err
+	}
+	this.directories[path] = struct{}{}
+	return nil
 }
 
 func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
