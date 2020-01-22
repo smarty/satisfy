@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Llongfile)
+	log.SetFlags(log.Ltime | log.Lshortfile)
 	config := parseConfig()
 	listing := readDependencyListing(config.jsonPath)
 
