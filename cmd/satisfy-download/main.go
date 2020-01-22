@@ -130,24 +130,35 @@ func (this *App) awaitCompletion() {
 
 func (this *App) install(dependency cmd.Dependency) {
 	defer this.waiter.Done()
+
+	log.Printf("Installing dependency: %s", dependency.Title())
+
 	manifest, err := loadManifest(dependency)
 	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest) == nil {
+		log.Printf("Dependency installed: %s", dependency.Title())
 		return
 	}
 	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
+	log.Printf("Downloading manifest for %s", dependency.Title())
+
 	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
 	manifest, err = this.installer.InstallManifest(installation)
 	if err != nil {
-		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Name, err)
+		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Title(), err)
 		return
 	}
+
+	log.Printf("Downloading and extracting package contents for %s", dependency.Title())
 
 	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
 	err = this.installer.InstallPackage(manifest, installation)
 	if err != nil {
-		this.results <- fmt.Errorf("[WARN] Failed to install package for %s: %v", dependency.Name, err)
+		this.results <- fmt.Errorf("failed to install package contents for %s: %v", dependency.Title(), err)
+		return
 	}
+
+	log.Printf("Dependency installed: %s", dependency.Title())
 }
 
 func loadManifest(dependency cmd.Dependency) (manifest contracts.Manifest, err error) {
