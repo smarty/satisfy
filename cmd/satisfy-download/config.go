@@ -2,10 +2,8 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
-	"log"
-	"os"
 
+	"bitbucket.org/smartystreets/satisfy/cmd"
 	"github.com/smartystreets/gcs"
 )
 
@@ -34,19 +32,7 @@ func parseConfig() (config Config) {
 	)
 	flag.Parse()
 
-	googleCredentialsPath, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	if !found {
-		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
-	}
-	raw, err := ioutil.ReadFile(googleCredentialsPath)
-	if err != nil {
-		log.Fatal("Could not open google credentials file:", err)
-	}
-
-	config.GoogleCredentials, err = gcs.ParseCredentialsFromJSON(raw)
-	if err != nil {
-		log.Fatal(err)
-	}
+	config.GoogleCredentials = cmd.ParseGoogleCredentialsFromEnvironment()
 
 	return config
 }
