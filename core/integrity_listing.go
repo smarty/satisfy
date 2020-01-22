@@ -39,6 +39,5 @@ func (this *FileListingIntegrityChecker) buildFileMap() map[string]contracts.Fil
 
 var (
 	errFileNotFound     = errors.New("filename not found")
-	errCreateDirectory  = errors.New("can not create directory")
 	errFileSizeMismatch = errors.New("file size mismatch")
 )
