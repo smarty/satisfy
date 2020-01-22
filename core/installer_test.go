@@ -93,7 +93,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
 }
 
-func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZstdCompression() {
+func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
 	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
 
 	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest())
