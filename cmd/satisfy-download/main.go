@@ -21,7 +21,7 @@ import (
 func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
 	config := parseConfig()
-	listing := readDependencyListing(config.jsonPath)
+	listing := readDependencyListing(config.JSONPath)
 
 	err := listing.Validate()
 	if err != nil {
