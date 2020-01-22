@@ -18,7 +18,7 @@ func TestPackageBuilderFixture(t *testing.T) {
 type PackageBuilderFixture struct {
 	*gunit.Fixture
 	builder    *PackageBuilder
-	fileSystem contracts.FileSystem
+	fileSystem *shell.InMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
 }

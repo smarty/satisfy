@@ -7,10 +7,10 @@ import (
 )
 
 type FileListingIntegrityChecker struct {
-	fileSystem contracts.FileSystem
+	fileSystem contracts.PathLister
 }
 
-func NewFileListingIntegrityChecker(fileSystem contracts.FileSystem) *FileListingIntegrityChecker {
+func NewFileListingIntegrityChecker(fileSystem contracts.PathLister) *FileListingIntegrityChecker {
 	return &FileListingIntegrityChecker{fileSystem: fileSystem}
 }
 

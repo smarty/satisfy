@@ -7,14 +7,19 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
+type PackageBuilderFileSystem interface {
+	contracts.PathLister
+	contracts.FileOpener
+}
+
 type PackageBuilder struct {
-	storage  contracts.FileSystem
+	storage  PackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
 	contents []contracts.ArchiveItem
 }
 
-func NewPackageBuilder(storage contracts.FileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) *PackageBuilder {
+func NewPackageBuilder(storage PackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) *PackageBuilder {
 	return &PackageBuilder{
 		storage: storage,
 		archive: archive,

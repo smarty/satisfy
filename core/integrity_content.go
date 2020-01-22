@@ -11,11 +11,11 @@ import (
 
 type FileContentIntegrityCheck struct {
 	hasher     hash.Hash
-	fileSystem contracts.FileSystem
+	fileSystem contracts.FileOpener
 	enabled    bool
 }
 
-func NewFileContentIntegrityCheck(hasher hash.Hash, fileSystem contracts.FileSystem, enabled bool) *FileContentIntegrityCheck {
+func NewFileContentIntegrityCheck(hasher hash.Hash, fileSystem contracts.FileOpener, enabled bool) *FileContentIntegrityCheck {
 	return &FileContentIntegrityCheck{hasher: hasher, fileSystem: fileSystem, enabled: enabled}
 }
 

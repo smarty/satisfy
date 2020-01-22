@@ -17,12 +17,17 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type PackageInstaller struct {
-	downloader contracts.Downloader
-	filesystem contracts.FileSystem
+type PackageInstallerFileSystem interface {
+	contracts.FileCreator
+	contracts.Deleter
 }
 
-func NewPackageInstaller(downloader contracts.Downloader, filesystem contracts.FileSystem) *PackageInstaller {
+type PackageInstaller struct {
+	downloader contracts.Downloader
+	filesystem PackageInstallerFileSystem
+}
+
+func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem) *PackageInstaller {
 	return &PackageInstaller{downloader: downloader, filesystem: filesystem}
 }
 
