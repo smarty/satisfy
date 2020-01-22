@@ -4,6 +4,7 @@ __MACOSX
 /.idea/
 /workspace/
 /coverage.out
+/coverage.txt
 config.json
 *.tar
 *.tar.*
