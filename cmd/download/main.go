@@ -41,7 +41,7 @@ func main() {
 	)
 
 	app := NewApp(listing, installer, integrity)
-	app.Run()
+	os.Exit(app.Run())
 }
 
 func readDependencyListing(path string) (listing cmd.DependencyListing) {
@@ -55,8 +55,8 @@ func readDependencyListing(path string) (listing cmd.DependencyListing) {
 func readFromFile(fileName string) (listing cmd.DependencyListing) {
 	file, err := os.Open(fileName)
 	if os.IsNotExist(err) {
-		createExampleDependenciesFile(fileName)
-		log.Fatalln("Specified dependency file not found; an example file has been written instead:", fileName)
+		emitExampleDependenciesFile()
+		log.Fatalln("Specified dependency file not found:", fileName)
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -65,7 +65,7 @@ func readFromFile(fileName string) (listing cmd.DependencyListing) {
 	return readFromReader(file)
 }
 
-func createExampleDependenciesFile(fileName string) {
+func emitExampleDependenciesFile() {
 	var listing cmd.DependencyListing
 	listing.Dependencies = append(listing.Dependencies, cmd.Dependency{
 		Name:           "example_package_name",
@@ -74,7 +74,7 @@ func createExampleDependenciesFile(fileName string) {
 		LocalDirectory: "local/path",
 	})
 	raw, _ := json.MarshalIndent(listing, "", "  ")
-	_ = ioutil.WriteFile(fileName, raw, 0644)
+	log.Print("Example json file:\n", string(raw))
 }
 
 func readFromReader(reader io.Reader) (listing cmd.DependencyListing) {
@@ -98,20 +98,25 @@ func NewApp(listing cmd.DependencyListing, installer *core.PackageInstaller, int
 	waiter := new(sync.WaitGroup)
 	waiter.Add(len(listing.Dependencies))
 	results := make(chan error)
-	return &App{listing: listing, installer: installer, integrity: integrity, waiter: waiter, results: results}
+	return &App{
+		listing:   listing,
+		installer: installer,
+		integrity: integrity,
+		waiter:    waiter,
+		results:   results,
+	}
 }
 
-func (this *App) Run() {
+func (this *App) Run() (failed int) {
 	for _, dependency := range this.listing.Dependencies {
 		go this.install(dependency)
 	}
 	go this.awaitCompletion()
-	var failed int
 	for err := range this.results {
 		failed++
 		log.Println("[WARN]", err)
 	}
-	os.Exit(failed)
+	return failed
 }
 
 func (this *App) awaitCompletion() {
