@@ -19,6 +19,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Llongfile)
 	config := parseConfig()
 	listing := readDependencyListing(config.jsonPath)
 
@@ -73,7 +74,10 @@ func emitExampleDependenciesFile() {
 		RemoteAddress:  cmd.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
-	raw, _ := json.MarshalIndent(listing, "", "  ")
+	raw, err := json.MarshalIndent(listing, "", "  ")
+	if err != nil {
+		log.Print(err)
+	}
 	log.Print("Example json file:\n", string(raw))
 }
 

@@ -34,9 +34,13 @@ func parseConfig() (config Config) {
 	)
 	flag.Parse()
 
-	raw, err := ioutil.ReadFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+	googleCredentialsPath, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !found {
+		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
+	}
+	raw, err := ioutil.ReadFile(googleCredentialsPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Could not open google credentials file:", err)
 	}
 
 	config.GoogleCredentials, err = gcs.ParseCredentialsFromJSON(raw)
