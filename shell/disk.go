@@ -13,10 +13,6 @@ import (
 
 type DiskFileSystem struct{ root string }
 
-func (this *DiskFileSystem) CreateDirectory(path string) error {
-	return os.MkdirAll(path, 0755)
-}
-
 func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: root}
 }

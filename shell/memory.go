@@ -24,14 +24,6 @@ func NewInMemoryFileSystem() *InMemoryFileSystem {
 	}
 }
 
-func (this *InMemoryFileSystem) CreateDirectory(path string) error {
-	if err, found := this.DirectoryErrors[path]; found {
-		return err
-	}
-	this.Directories[path] = struct{}{}
-	return nil
-}
-
 func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 	for _, file := range this.fileSystem {
 		files = append(files, file)

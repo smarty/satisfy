@@ -79,19 +79,4 @@ func (this *MemoryFixture) TestDelete() {
 	this.So(this.fileSystem.Listing(), should.BeEmpty)
 }
 
-func (this *MemoryFixture) TestCreateDirectory() {
-	err := this.fileSystem.CreateDirectory("/folder")
-
-	this.So(err, should.BeNil)
-	this.So(this.fileSystem.Directories, should.ContainKey, "/folder")
-}
-
-func (this *MemoryFixture) TestCreateDirectoryError() {
-	this.fileSystem.DirectoryErrors["/folder"] = fileSystemError
-	err := this.fileSystem.CreateDirectory("/folder")
-
-	this.So(err, should.Equal, fileSystemError)
-	this.So(this.fileSystem.Directories, should.BeEmpty)
-}
-
 var fileSystemError = errors.New("this is a file system error")
