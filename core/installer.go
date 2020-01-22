@@ -20,6 +20,7 @@ import (
 type PackageInstallerFileSystem interface {
 	contracts.FileCreator
 	contracts.Deleter
+	contracts.DirectoryCreator
 }
 
 type PackageInstaller struct {
@@ -42,6 +43,10 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 		return manifest, err
 	}
 
+	err = this.filesystem.CreateDirectory(request.LocalPath)
+	if err != nil {
+		return manifest, errCreateDirectory
+	}
 	this.writeLocalManifest(request.LocalPath, manifest)
 
 	return manifest, nil

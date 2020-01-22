@@ -12,23 +12,23 @@ import (
 
 type InMemoryFileSystem struct {
 	fileSystem      map[string]*file
-	directories     map[string]struct{}
-	directoryErrors map[string]error
+	Directories     map[string]struct{}
+	DirectoryErrors map[string]error
 }
 
 func NewInMemoryFileSystem() *InMemoryFileSystem {
 	return &InMemoryFileSystem{
 		fileSystem:      make(map[string]*file),
-		directories:     make(map[string]struct{}),
-		directoryErrors: make(map[string]error),
+		Directories:     make(map[string]struct{}),
+		DirectoryErrors: make(map[string]error),
 	}
 }
 
 func (this *InMemoryFileSystem) CreateDirectory(path string) error {
-	if err, found := this.directoryErrors[path]; found {
+	if err, found := this.DirectoryErrors[path]; found {
 		return err
 	}
-	this.directories[path] = struct{}{}
+	this.Directories[path] = struct{}{}
 	return nil
 }
 

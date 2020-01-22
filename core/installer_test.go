@@ -45,6 +45,7 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 
 	manifest, err := this.installer.InstallManifest(this.installationRequest())
 
+	this.So(this.filesystem.Directories, should.ContainKey, this.installationRequest().LocalPath)
 	this.So(this.downloader.request, should.Resemble, this.installationRequest().RemoteAddress)
 	this.So(manifest, should.Resemble, originalManifest)
 	this.So(err, should.BeNil)
@@ -74,7 +75,14 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.So(err, should.NotBeNil)
 	this.So(manifest, should.BeZeroValue)
 }
+func (this *PackageInstallerFixture) TestInstallManifestDirectoryCreationError() {
+	originalManifest := contracts.Manifest{Name: "Package/Name", Version: "1.2.3"}
+	this.downloader.prepareManifestDownload(originalManifest)
+	this.filesystem.DirectoryErrors[this.installationRequest().LocalPath] = errors.New("error")
 
+	_, err := this.installer.InstallManifest(this.installationRequest())
+	this.So(err, should.Equal, errCreateDirectory)
+}
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
