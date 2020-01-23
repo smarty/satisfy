@@ -56,5 +56,5 @@ func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
 }
 
 func (this Dependency) Title() string {
-	return fmt.Sprintf("%s @ %s", this.Name, this.Version)
+	return fmt.Sprintf("%s@%s", this.Name, this.Version)
 }

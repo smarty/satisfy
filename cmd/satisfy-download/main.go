@@ -135,7 +135,7 @@ func (this *App) install(dependency cmd.Dependency) {
 
 	manifest, err := loadManifest(dependency)
 	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest, dependency.LocalDirectory) == nil {
-		log.Printf("Dependency installed: %s", dependency.Title())
+		log.Printf("Dependency already installed: %s", dependency.Title())
 		return
 	}
 	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}

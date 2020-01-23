@@ -61,12 +61,12 @@ func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
 
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Fatal("Could not open google credentials file:", err)
+		log.Fatal("Could not open Google credentials file:", err)
 	}
 
 	credentials, err := gcs.ParseCredentialsFromJSON(raw)
 	if err != nil {
-		log.Fatal("Could not parse google credentials file:", err)
+		log.Fatal("Could not parse Google credentials file:", err)
 	}
 
 	return credentials
