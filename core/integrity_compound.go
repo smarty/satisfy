@@ -10,9 +10,9 @@ func NewCompoundIntegrityCheck(inners ...contracts.IntegrityCheck) *CompoundInte
 	return &CompoundIntegrityCheck{inners: inners}
 }
 
-func (this *CompoundIntegrityCheck) Verify(manifest contracts.Manifest) error {
+func (this *CompoundIntegrityCheck) Verify(manifest contracts.Manifest, localPath string) error {
 	for _, inner := range this.inners {
-		err := inner.Verify(manifest)
+		err := inner.Verify(manifest, localPath)
 		if err != nil {
 			return err
 		}

@@ -8,5 +8,5 @@ type InstallationRequest struct {
 }
 
 type IntegrityCheck interface {
-	Verify(manifest Manifest) error
+	Verify(manifest Manifest, localPath string) error
 }

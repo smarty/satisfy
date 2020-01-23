@@ -1,6 +1,7 @@
 package core
 
 import (
+	"hash"
 	"testing"
 
 	"github.com/smartystreets/assertions/should"
@@ -26,10 +27,10 @@ type FileContentIntegrityCheckFixture struct {
 func (this *FileContentIntegrityCheckFixture) Setup() {
 	this.fakeHasher = NewFakeHasher()
 	this.fileSystem = shell.NewInMemoryFileSystem()
-	this.fileSystem.WriteFile("/a", []byte("a"))
-	this.fileSystem.WriteFile("/bb", []byte("bb"))
-	this.fileSystem.WriteFile("/cc/c", []byte("ccc"))
-	this.fileSystem.WriteFile("/dddd", []byte("dddd"))
+	this.fileSystem.WriteFile("/local/a", []byte("a"))
+	this.fileSystem.WriteFile("/local/bb", []byte("bb"))
+	this.fileSystem.WriteFile("/local/cc/c", []byte("ccc"))
+	this.fileSystem.WriteFile("/local/dddd", []byte("dddd"))
 
 	this.manifest = contracts.Manifest{
 		Archive: contracts.Archive{
@@ -42,22 +43,27 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 		},
 	}
 
-	this.checker = NewFileContentIntegrityCheck(this.fakeHasher, this.fileSystem, false)
+	this.checker = NewFileContentIntegrityCheck(this.newHasher, this.fileSystem, false)
+}
+
+func (this *FileContentIntegrityCheckFixture) newHasher() hash.Hash {
+	this.fakeHasher.Reset()
+	return this.fakeHasher
 }
 
 func (this *FileContentIntegrityCheckFixture) TestFileContentsIntact() {
-	this.So(this.checker.Verify(this.manifest), should.BeNil)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
 }
 
 func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsCauseErrorWhenEnabled() {
 	this.checker.enabled = true
-	this.fileSystem.WriteFile("/bb", []byte("modified"))
+	this.fileSystem.WriteFile("/local/bb", []byte("modified"))
 
-	this.So(this.checker.Verify(this.manifest), should.NotBeNil)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.NotBeNil)
 }
 
 func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsIgnoredWhenDisabled() {
-	this.fileSystem.WriteFile("/bb", []byte("modified"))
+	this.fileSystem.WriteFile("/local/bb", []byte("modified"))
 
-	this.So(this.checker.Verify(this.manifest), should.BeNil)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
 }

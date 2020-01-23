@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"path/filepath"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -14,14 +15,15 @@ func NewFileListingIntegrityChecker(fileSystem contracts.PathLister) *FileListin
 	return &FileListingIntegrityChecker{fileSystem: fileSystem}
 }
 
-func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest) error {
+func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, localPath string) error {
 	files := this.buildFileMap()
 
 	for _, item := range manifest.Archive.Contents {
-		if _, found := files[item.Path]; !found {
+		fullPath := filepath.Join(localPath, item.Path)
+		if _, found := files[fullPath]; !found {
 			return errFileNotFound
 		}
-		if item.Size != files[item.Path].Size() {
+		if item.Size != files[fullPath].Size() {
 			return errFileSizeMismatch
 		}
 	}

@@ -38,7 +38,7 @@ func main() {
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
-		core.NewFileContentIntegrityCheck(md5.New(), disk, config.Verify),
+		core.NewFileContentIntegrityCheck(md5.New, disk, config.Verify),
 	)
 
 	app := NewApp(listing, installer, integrity)
@@ -134,7 +134,7 @@ func (this *App) install(dependency cmd.Dependency) {
 	log.Printf("Installing dependency: %s", dependency.Title())
 
 	manifest, err := loadManifest(dependency)
-	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest) == nil {
+	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest, dependency.LocalDirectory) == nil {
 		log.Printf("Dependency installed: %s", dependency.Title())
 		return
 	}

@@ -5,28 +5,29 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"path/filepath"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type FileContentIntegrityCheck struct {
-	hasher     hash.Hash
+	hasher     func() hash.Hash
 	fileSystem contracts.FileOpener
 	enabled    bool
 }
 
-func NewFileContentIntegrityCheck(hasher hash.Hash, fileSystem contracts.FileOpener, enabled bool) *FileContentIntegrityCheck {
+func NewFileContentIntegrityCheck(hasher func() hash.Hash, fileSystem contracts.FileOpener, enabled bool) *FileContentIntegrityCheck {
 	return &FileContentIntegrityCheck{hasher: hasher, fileSystem: fileSystem, enabled: enabled}
 }
 
-func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest) error {
+func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, localPath string) error {
 	if !this.enabled {
 		return nil
 	}
 	for _, item := range manifest.Archive.Contents {
-		this.hasher.Reset()
-		reader := this.fileSystem.Open(item.Path)
-		_, err := io.Copy(this.hasher, reader)
+		hasher := this.hasher()
+		reader := this.fileSystem.Open(filepath.Join(localPath, item.Path))
+		_, err := io.Copy(hasher, reader)
 		if err != nil {
 			return err
 		}
@@ -34,7 +35,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest) error
 		if err != nil {
 			return err
 		}
-		checksum := this.hasher.Sum(nil)
+		checksum := hasher.Sum(nil)
 		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
 			return errors.New("checksum mismatch")
 		}

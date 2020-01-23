@@ -35,14 +35,14 @@ func (this *IntegrityListingFixture) Setup() {
 			},
 		},
 	}
-	this.fileSystem.WriteFile("/a", []byte("a"))
-	this.fileSystem.WriteFile("/bb", []byte("bb"))
-	this.fileSystem.WriteFile("/cc/c", []byte("ccc"))
-	this.fileSystem.WriteFile("/dddd", []byte("dddd"))
+	this.fileSystem.WriteFile("/local/a", []byte("a"))
+	this.fileSystem.WriteFile("/local/bb", []byte("bb"))
+	this.fileSystem.WriteFile("/local/cc/c", []byte("ccc"))
+	this.fileSystem.WriteFile("/local/dddd", []byte("dddd"))
 }
 
 func (this *IntegrityListingFixture) TestFileListingIntegrityCheck() {
-	this.So(this.checker.Verify(this.manifest), should.BeNil)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
 }
 
 func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
@@ -51,11 +51,11 @@ func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
 		Size: 5,
 	})
 
-	this.So(this.checker.Verify(this.manifest), should.Resemble, errFileNotFound)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.Resemble, errFileNotFound)
 }
 
 func (this *IntegrityListingFixture) TestFileSizeMismatch() {
 	this.manifest.Archive.Contents[0].Size = 0
 
-	this.So(this.checker.Verify(this.manifest), should.Resemble, errFileSizeMismatch)
+	this.So(this.checker.Verify(this.manifest, "/local"), should.Resemble, errFileSizeMismatch)
 }
