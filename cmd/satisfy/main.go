@@ -160,17 +160,22 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	log.Printf("Installing dependency: %s", dependency.Title())
 
-	manifest, err := loadManifest(dependency)
-	if err == nil && manifest.Version == dependency.Version && this.integrity.Verify(manifest, dependency.LocalDirectory) == nil {
-		log.Printf("Dependency already installed: %s", dependency.Title())
-		return
+	manifest, manifestErr := loadManifest(dependency)
+	if manifestErr == nil && manifest.Version == dependency.Version {
+		verifyErr := this.integrity.Verify(manifest, dependency.LocalDirectory)
+		if verifyErr == nil {
+			log.Printf("Dependency already installed: %s", dependency.Title())
+			return
+		} else {
+			log.Printf("%s in %s", verifyErr.Error(), dependency.Title())
+		}
 	}
 	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
 	log.Printf("Downloading manifest for %s", dependency.Title())
 
 	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
-	manifest, err = this.installer.InstallManifest(installation)
+	manifest, err := this.installer.InstallManifest(installation)
 	if err != nil {
 		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Title(), err)
 		return
