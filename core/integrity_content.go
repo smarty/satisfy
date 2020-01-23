@@ -2,7 +2,7 @@ package core
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"hash"
 	"io"
 	"path/filepath"
@@ -37,7 +37,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 		}
 		checksum := hasher.Sum(nil)
 		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
-			return errors.New("checksum mismatch")
+			return fmt.Errorf("checksum mismatch [%s]", item.Path)
 		}
 	}
 	return nil

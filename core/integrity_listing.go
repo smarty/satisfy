@@ -38,8 +38,3 @@ func (this *FileListingIntegrityChecker) buildFileMap() map[string]contracts.Fil
 	}
 	return files
 }
-
-var (
-	errFileNotFound     = errors.New("filename not found")
-	errFileSizeMismatch = errors.New("file size mismatch")
-)
