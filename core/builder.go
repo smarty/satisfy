@@ -8,7 +8,7 @@ import (
 )
 
 type PackageBuilderFileSystem interface {
-	contracts.PathLister2
+	contracts.PathLister
 	contracts.FileOpener
 }
 
@@ -28,11 +28,7 @@ func NewPackageBuilder(storage PackageBuilderFileSystem, archive contracts.Archi
 }
 
 func (this *PackageBuilder) Build() error {
-	listing, err := this.storage.Listing2()
-	if err != nil {
-		return err // TODO: wrap
-	}
-	for _, file := range listing {
+	for _, file := range this.storage.Listing() {
 		err := this.add(file)
 		if err != nil {
 			return err

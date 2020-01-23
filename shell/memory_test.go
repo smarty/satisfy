@@ -71,15 +71,6 @@ func (this *MemoryFixture) TestListing() {
 	this.So(fileInfo[2].Size(), should.Equal, 2)
 }
 
-func (this *MemoryFixture) TestListingError() {
-	this.fileSystem.ListingError = fileSystemError
-
-	listing, err := this.fileSystem.Listing2()
-
-	this.So(listing, should.BeEmpty)
-	this.So(err, should.Equal, fileSystemError)
-}
-
 func (this *MemoryFixture) TestDelete() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
 
