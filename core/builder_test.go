@@ -56,6 +56,15 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 	this.So(this.archive.closed, should.BeTrue)
 }
 
+func (this *PackageBuilderFixture) TestSimulatedListingError() {
+	this.fileSystem.ListingError = errors.New("error")
+
+	err := this.builder.Build()
+
+	this.So(err, should.NotBeNil)
+	this.So(this.archive.items, should.BeEmpty)
+	this.So(this.builder.Contents(), should.BeEmpty)
+}
 func (this *PackageBuilderFixture) TestSimulatedArchiveWriteError() {
 	this.archive.writeError = writeErr
 

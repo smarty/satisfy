@@ -11,7 +11,8 @@ import (
 )
 
 type InMemoryFileSystem struct {
-	fileSystem map[string]*file
+	fileSystem   map[string]*file
+	ListingError error
 }
 
 func NewInMemoryFileSystem() *InMemoryFileSystem {
@@ -21,12 +22,19 @@ func NewInMemoryFileSystem() *InMemoryFileSystem {
 }
 
 func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+	if this.ListingError != nil {
+		return nil
+	}
 	for _, file := range this.fileSystem {
 		files = append(files, file)
 	}
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Path() < files[j].Path() })
 	return files
+}
+
+func (this *InMemoryFileSystem) Listing2() ([]contracts.FileInfo, error) {
+	return this.Listing(), this.ListingError
 }
 
 func (this *InMemoryFileSystem) Open(path string) io.ReadCloser {

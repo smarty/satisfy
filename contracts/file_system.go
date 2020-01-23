@@ -9,6 +9,10 @@ type PathLister interface {
 	Listing() []FileInfo
 }
 
+type PathLister2 interface {
+	Listing2() ([]FileInfo, error)
+}
+
 type FileOpener interface {
 	Open(path string) io.ReadCloser
 }

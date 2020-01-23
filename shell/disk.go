@@ -18,7 +18,15 @@ func NewDiskFileSystem(root string) *DiskFileSystem {
 }
 
 func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
-	err := filepath.Walk(this.root, func(path string, info os.FileInfo, err error) error {
+	listing, err := this.Listing2()
+	if err != nil {
+		log.Panic(err)
+	}
+	return listing
+}
+
+func (this *DiskFileSystem) Listing2() (listing []contracts.FileInfo, err error) {
+	return listing, filepath.Walk(this.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -36,10 +44,6 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		})
 		return nil
 	})
-	if err != nil {
-		log.Panic(err)
-	}
-	return listing
 }
 
 func (this *DiskFileSystem) Open(path string) io.ReadCloser {
