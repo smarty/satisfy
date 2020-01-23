@@ -11,16 +11,12 @@ import (
 )
 
 type InMemoryFileSystem struct {
-	fileSystem      map[string]*file
-	Directories     map[string]struct{}
-	DirectoryErrors map[string]error
+	fileSystem map[string]*file
 }
 
 func NewInMemoryFileSystem() *InMemoryFileSystem {
 	return &InMemoryFileSystem{
-		fileSystem:      make(map[string]*file),
-		Directories:     make(map[string]struct{}),
-		DirectoryErrors: make(map[string]error),
+		fileSystem: make(map[string]*file),
 	}
 }
 
