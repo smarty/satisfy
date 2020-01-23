@@ -31,6 +31,10 @@ type Deleter interface {
 	Delete(path string)
 }
 
+type FileChecker interface {
+	Stat(path string) FileInfo
+}
+
 type FileInfo interface {
 	Path() string
 	Size() int64

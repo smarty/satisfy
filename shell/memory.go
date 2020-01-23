@@ -20,6 +20,10 @@ func NewInMemoryFileSystem() *InMemoryFileSystem {
 	}
 }
 
+func (this *InMemoryFileSystem) Stat(path string) contracts.FileInfo {
+	return this.fileSystem[path]
+}
+
 func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 	for _, file := range this.fileSystem {
 		files = append(files, file)
