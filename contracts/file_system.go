@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// FUTURE: make each file system path return any underlying error.
+
 type PathLister interface {
 	Listing() []FileInfo
 }
