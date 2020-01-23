@@ -30,20 +30,20 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "upload":
-		uploadMain()
+		uploadMain(os.Args[2:])
 	case "check":
-		checkMain()
+		checkMain(os.Args[2:])
 	default:
 		downloadMain()
 	}
 }
 
-func checkMain() {
-	NewCheckApp(cmd.ParseConfig(os.Args[2:])).Run()
+func checkMain(args []string) {
+	NewCheckApp(cmd.ParseConfig(args)).Run()
 }
 
-func uploadMain() {
-	NewUploadApp(cmd.ParseConfig(os.Args[2:])).Run()
+func uploadMain(args []string) {
+	NewUploadApp(cmd.ParseConfig(args)).Run()
 }
 
 func downloadMain() {
