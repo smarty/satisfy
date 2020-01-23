@@ -34,9 +34,10 @@ const (
 	RemoteArchiveFilename  = "archive"
 )
 
-func ParseConfig() (config Config) {
-	flag.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.")
-	flag.Parse()
+func ParseConfig(args []string) (config Config) {
+	flags := flag.NewFlagSet("flags", flag.ExitOnError)
+	flags.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.")
+	_ = flags.Parse(args)
 
 	raw, err := ioutil.ReadFile(config.JSONPath)
 	if err != nil {
