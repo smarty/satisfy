@@ -12,7 +12,7 @@ import (
 
 type Config struct {
 	MaxRetry          int
-	Verify            bool
+	QuickVerification bool
 	JSONPath          string
 	GoogleCredentials gcs.Credentials
 }
@@ -23,10 +23,10 @@ func parseConfig() (config Config) {
 		5,
 		"How many times to retry attempts to download packages.",
 	)
-	flag.BoolVar(&config.Verify,
-		"verify",
-		false,
-		"When set, perform file content validation on installed packages.",
+	flag.BoolVar(&config.QuickVerification,
+		"quick",
+		true,
+		"When set to false, perform full file content validation on installed packages.",
 	)
 	flag.StringVar(&config.JSONPath,
 		"json",

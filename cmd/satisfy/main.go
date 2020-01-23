@@ -65,7 +65,7 @@ func downloadMain() {
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
-		core.NewFileContentIntegrityCheck(md5.New, disk, config.Verify),
+		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
 	)
 
 	app := NewDownloadApp(listing, installer, integrity)
