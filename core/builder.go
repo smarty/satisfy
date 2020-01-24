@@ -55,6 +55,7 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 	if err != nil {
 		log.Println(err)
 	}
+	// TODO: if symlink points to file outside of path, panic/log.Fatal
 	this.contents = append(this.contents, this.buildArchiveEntry(file))
 	return err
 }
