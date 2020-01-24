@@ -5,7 +5,7 @@ func Filter(original []Dependency, filter []string) (filtered []Dependency) {
 		return original
 	}
 	for _, dependency := range original {
-		if contains(filter, dependency.Name) {
+		if contains(filter, dependency.PackageName) {
 			filtered = append(filtered, dependency)
 		}
 	}

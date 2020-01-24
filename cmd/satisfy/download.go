@@ -70,8 +70,8 @@ func readFromFile(fileName string) (listing cmd.DependencyListing) {
 func emitExampleDependenciesFile() {
 	var listing cmd.DependencyListing
 	listing.Dependencies = append(listing.Dependencies, cmd.Dependency{
-		Name:           "example_package_name",
-		Version:        "0.0.1",
+		PackageName:    "example_package_name",
+		PackageVersion: "0.0.1",
 		RemoteAddress:  cmd.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
@@ -135,7 +135,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 	log.Printf("Installing dependency: %s", dependency.Title())
 
 	manifest, manifestErr := loadManifest(dependency)
-	if manifestErr == nil && manifest.Version == dependency.Version {
+	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
 		verifyErr := this.integrity.Verify(manifest, dependency.LocalDirectory)
 		if verifyErr == nil {
 			log.Printf("Dependency already installed: %s", dependency.Title())
@@ -168,7 +168,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 }
 
 func loadManifest(dependency cmd.Dependency) (manifest contracts.Manifest, err error) {
-	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.Name)
+	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.PackageName)
 
 	_, err = os.Stat(path)
 	if os.IsNotExist(err) {

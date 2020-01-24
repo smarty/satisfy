@@ -23,28 +23,28 @@ func (this *DependencyListing) Validate() error {
 		if dependency.LocalDirectory == "" {
 			return errors.New("local directory is required")
 		}
-		if dependency.Name == "" {
+		if dependency.PackageName == "" {
 			return errors.New("name is required")
 		}
-		if dependency.Version == "" {
+		if dependency.PackageVersion == "" {
 			return errors.New("version is required")
 		}
 		if dependency.RemoteAddress.Value().String() == "" {
 			return errors.New("remote address is required")
 		}
 
-		key := fmt.Sprintf("%s %s", dependency.Name, dependency.LocalDirectory)
-		if version, found := inventory[key]; found && version != dependency.Version {
+		key := fmt.Sprintf("%s %s", dependency.PackageName, dependency.LocalDirectory)
+		if version, found := inventory[key]; found && version != dependency.PackageVersion {
 			return errors.New("local directory conflict")
 		}
-		inventory[key] = dependency.Version
+		inventory[key] = dependency.PackageVersion
 	}
 	return nil
 }
 
 type Dependency struct {
-	Name           string `json:"name"`
-	Version        string `json:"version"`
+	PackageName    string `json:"package_name"`
+	PackageVersion string `json:"package_version"`
 	RemoteAddress  URL    `json:"remote_address"`
 	LocalDirectory string `json:"local_directory"`
 }
@@ -52,12 +52,12 @@ type Dependency struct {
 func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
 	return contracts.AppendRemotePath(
 		url.URL(this.RemoteAddress),
-		this.Name,
-		this.Version,
+		this.PackageName,
+		this.PackageVersion,
 		fileName,
 	)
 }
 
 func (this Dependency) Title() string {
-	return fmt.Sprintf("[%s @ %s]", this.Name, this.Version)
+	return fmt.Sprintf("[%s @ %s]", this.PackageName, this.PackageVersion)
 }

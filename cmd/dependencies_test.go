@@ -72,8 +72,8 @@ func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameAndDiffere
 
 func (this *DependencyListingFixture) appendDependency(name, version, address, directory string) {
 	this.listing.Dependencies = append(this.listing.Dependencies, Dependency{
-		Name:    name,
-		Version: version,
+		PackageName:    name,
+		PackageVersion: version,
 		RemoteAddress: URL{
 			Host: address,
 		},
