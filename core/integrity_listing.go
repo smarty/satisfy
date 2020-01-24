@@ -21,12 +21,10 @@ func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, loc
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		if _, found := files[fullPath]; !found {
-			return fmt.Errorf("filename not found for \"%s\" in [%s @ %s]",
-				fullPath, manifest.Name, manifest.Version)
+			return fmt.Errorf("filename not found for \"%s\"", fullPath)
 		}
 		if item.Size != files[fullPath].Size() {
-			return fmt.Errorf("file size mismatch for \"%s\" in [%s @ %s]",
-				fullPath, manifest.Name, manifest.Version)
+			return fmt.Errorf("file size mismatch for \"%s\"", fullPath)
 		}
 	}
 

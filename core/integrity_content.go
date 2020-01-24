@@ -37,7 +37,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 		}
 		checksum := hasher.Sum(nil)
 		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
-			return fmt.Errorf("checksum mismatch for \"%s\" in [%s @ %s]", item.Path, manifest.Name, manifest.Version)
+			return fmt.Errorf("checksum mismatch for \"%s\"", item.Path)
 		}
 	}
 	return nil
