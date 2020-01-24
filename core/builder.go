@@ -3,6 +3,7 @@ package core
 import (
 	"hash"
 	"io"
+	"log"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -38,6 +39,7 @@ func (this *PackageBuilder) Build() error {
 }
 
 func (this *PackageBuilder) add(file contracts.FileInfo) error {
+	log.Printf("Adding \"%s\" to archive.", file.Path())
 	this.archive.WriteHeader(contracts.ArchiveHeader{
 		Name:    file.Path(),
 		Size:    file.Size(),
