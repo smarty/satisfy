@@ -43,7 +43,9 @@ func checkMain(args []string) {
 }
 
 func uploadMain(args []string) {
-	NewUploadApp(cmd.ParseConfig(args)).Run()
+	config := cmd.ParseConfig(args)
+	NewCheckApp(config).Run()
+	NewUploadApp(config).Run()
 }
 
 func downloadMain() {
