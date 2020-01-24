@@ -43,10 +43,17 @@ func checkMain(args []string) {
 }
 
 func uploadMain(args []string) {
+	// TODO: run some check behavior to see if the remote manifest already exists
+	// otherwise we can/could accidentally clobber what's already there
 	NewUploadApp(cmd.ParseConfig(args)).Run()
 }
 
 func downloadMain() {
+	// TODO: potentially use the concept of download "tags" to have lots of dependencies in a single file but only select
+	// very specific dependencies.
+
+	// TODO: is there a risk of collisions on the downloaded manifest name? for example if two packages are named "data"
+	// and they're both downloaded from different locations to the same directory.
 	config := parseConfig()
 	listing := readDependencyListing(config.JSONPath)
 

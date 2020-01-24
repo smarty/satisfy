@@ -21,6 +21,7 @@ func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, loc
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		if _, found := files[fullPath]; !found {
+			// TODO: filename not found for "%s" in [package@version]
 			return fmt.Errorf("filename not found for %s", fullPath)
 		}
 		if item.Size != files[fullPath].Size() {

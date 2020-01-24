@@ -37,6 +37,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 		}
 		checksum := hasher.Sum(nil)
 		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
+			// TODO: checksum mismatch for "%s" in [package@version]
 			return fmt.Errorf("checksum mismatch [%s]", item.Path)
 		}
 	}

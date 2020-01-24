@@ -97,6 +97,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		}
 		path := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, path)
+		// TODO: "Extracting archive item "folderInTarball/filename" to "targetPath/folderInTarball/filename".
 		log.Println("Extracting archive item:", path)
 		writer := this.filesystem.Create(path)
 		_, err = io.Copy(writer, tarReader)

@@ -39,4 +39,6 @@ type FileInfo interface {
 	Path() string
 	Size() int64
 	ModTime() time.Time
+	// TODO: Symlink string (points to actual file)
+	// TODO: if symlink points to file outside of path, panic/log.Fatal
 }

@@ -52,6 +52,7 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 
 func (this *PackageBuilder) buildArchiveEntry(file contracts.FileInfo) contracts.ArchiveItem {
 	defer this.hasher.Reset()
+
 	return contracts.ArchiveItem{
 		Path:        file.Path(),
 		Size:        file.Size(),
