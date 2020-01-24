@@ -1,0 +1,28 @@
+image: golang:1.13-buster
+
+pipelines:
+  default:
+    - step:
+        script:
+          - make image
+        caches:
+          - golang
+
+  tags:
+    '*':
+      - step:
+          script:
+            - docker login -u "${DOCKER_USERNAME}" -p "${DOCKER_PASSWORD}" "${DOCKER_SERVER}"
+            - VERSION="${BITBUCKET_TAG}" make publish
+          caches:
+            - golang
+
+clone:
+  depth: 1
+
+options:
+  docker: true
+
+definitions:
+  caches:
+    golang: /go/pkg/mod
