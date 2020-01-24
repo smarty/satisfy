@@ -65,7 +65,10 @@ type file struct {
 	path     string
 	contents []byte
 	mod      time.Time
+	symlink  string
 }
+
+func (this *file) Symlink() string { return this.symlink }
 
 var InMemoryModTime = time.Now()
 

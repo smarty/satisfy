@@ -8,13 +8,13 @@ import (
 )
 
 func TestFilterFixture(t *testing.T) {
-    gunit.Run(new(FilterFixture), t)
+	gunit.Run(new(FilterFixture), t)
 }
 
 type FilterFixture struct {
-    *gunit.Fixture
+	*gunit.Fixture
 	listing []Dependency
-    filter []string
+	filter  []string
 }
 
 func (this *FilterFixture) Setup() {
@@ -31,12 +31,12 @@ func (this *FilterFixture) TestEmptyFilter() {
 
 func (this *FilterFixture) TestValidFilter() {
 	filtered := Filter(this.listing, []string{"B"})
-	this.So(filtered, should.Resemble, []Dependency{{Name:"B"}})
+	this.So(filtered, should.Resemble, []Dependency{{Name: "B"}})
 }
 
 func (this *FilterFixture) TestMultipleMatchesOnPackageName() {
 	filtered := Filter(this.listing, []string{"A"})
-	this.So(filtered, should.Resemble, []Dependency{{Name:"A"}, {Name:"A"}})
+	this.So(filtered, should.Resemble, []Dependency{{Name: "A"}, {Name: "A"}})
 }
 
 func (this *FilterFixture) appendDependency(name string) {
@@ -46,4 +46,3 @@ func (this *FilterFixture) appendDependency(name string) {
 func (this *FilterFixture) appendFilter(name string) {
 	this.filter = append(this.filter, name)
 }
-

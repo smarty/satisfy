@@ -35,7 +35,7 @@ const (
 )
 
 func ParseConfig(name string, args []string) (config Config) {
-	flags := flag.NewFlagSet("satisfy " + name, flag.ExitOnError)
+	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
 	flags.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.")
 	_ = flags.Parse(args)
 

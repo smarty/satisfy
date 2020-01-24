@@ -29,11 +29,18 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		if err != nil {
 			return err
 		}
-		listing = append(listing, FileInfo{
+		fileInfo := FileInfo{
 			path: relative,
 			size: info.Size(),
 			mod:  info.ModTime(),
-		})
+		}
+		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+			fileInfo.symlink, err = os.Readlink(path)
+			if err == nil {
+				return err
+			}
+		}
+		listing = append(listing, fileInfo)
 		return nil
 	})
 	if err != nil {
@@ -92,11 +99,13 @@ func (this *DiskFileSystem) absolute(path string) string {
 ////////////////////////////////////////
 
 type FileInfo struct {
-	path string
-	size int64
-	mod  time.Time
+	path    string
+	size    int64
+	mod     time.Time
+	symlink string
 }
 
 func (this FileInfo) Path() string       { return this.path }
 func (this FileInfo) Size() int64        { return this.size }
 func (this FileInfo) ModTime() time.Time { return this.mod }
+func (this FileInfo) Symlink() string    { return this.symlink }

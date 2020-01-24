@@ -3,6 +3,7 @@ package core
 import (
 	"hash"
 	"io"
+	"log"
 
 	"github.com/smartystreets/logging"
 
@@ -51,6 +52,9 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 	defer func() { _ = reader.Close() }()
 	writer := io.MultiWriter(this.hasher, this.archive)
 	_, err := io.Copy(writer, reader)
+	if err != nil {
+		log.Println(err)
+	}
 	this.contents = append(this.contents, this.buildArchiveEntry(file))
 	return err
 }

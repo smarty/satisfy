@@ -42,7 +42,7 @@ func parseConfig(args []string) (config Config) {
 		_, _ = fmt.Fprintf(output, "Usage of %s:\n", os.Args[0])
 		flags.PrintDefaults()
 		_, _ = fmt.Fprintln(output)
-		_, _ = fmt.Fprintln(output, "  Package names may be passed as non-flag arguments and will serve as a filter " +
+		_, _ = fmt.Fprintln(output, "  Package names may be passed as non-flag arguments and will serve as a filter "+
 			"against the provided dependency listing.")
 		_, _ = fmt.Fprintln(output)
 		_, _ = fmt.Fprintln(output, "  The satisfy tool also provides 2 additional subcommands:")
