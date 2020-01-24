@@ -19,9 +19,6 @@ import (
 )
 
 func downloadMain() {
-	// TODO: potentially use the concept of download "tags" to have lots of dependencies in a single file but only select
-	// very specific dependencies.
-
 	config := parseConfig()
 	listing := readDependencyListing(config.JSONPath)
 
@@ -29,6 +26,8 @@ func downloadMain() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	listing.Dependencies = cmd.Filter(listing.Dependencies, config.packageFilter)
 
 	working, err := os.Getwd()
 	if err != nil {

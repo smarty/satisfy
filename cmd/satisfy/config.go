@@ -15,9 +15,11 @@ type Config struct {
 	QuickVerification bool
 	JSONPath          string
 	GoogleCredentials gcs.Credentials
+	packageFilter     []string
 }
 
 func parseConfig() (config Config) {
+	// TODO Non-flag arguments for filtered package names.
 	flag.IntVar(&config.MaxRetry,
 		"max-retry",
 		5,
@@ -39,6 +41,9 @@ func parseConfig() (config Config) {
 		_, _ = fmt.Fprintf(output, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
 		_, _ = fmt.Fprintln(output)
+		_, _ = fmt.Fprintln(output, "Package names may be passed as non-flag arguments and will serve as a filter " +
+			"against the provided dependency listing.")
+		_, _ = fmt.Fprintln(output)
 		_, _ = fmt.Fprintln(output, "  The satisfy tool also provides 2 additional subcommands:")
 		_, _ = fmt.Fprintln(output, "	check	Has package@version already been uploaded according to json config?")
 		_, _ = fmt.Fprintln(output, "	upload	Upload package contents according to json config.")
@@ -46,6 +51,8 @@ func parseConfig() (config Config) {
 	}
 
 	flag.Parse()
+
+	config.packageFilter = flag.Args()
 
 	config.GoogleCredentials = cmd.ParseGoogleCredentialsFromEnvironment()
 
