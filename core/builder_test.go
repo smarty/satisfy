@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
+	"github.com/smartystreets/logging"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/shell"
@@ -28,6 +29,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
+	this.builder.logger = logging.Capture()
 	this.fileSystem.WriteFile("file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("file1.txt", []byte("bb"))
 	this.fileSystem.WriteFile("sub/file0.txt", []byte("ccc"))

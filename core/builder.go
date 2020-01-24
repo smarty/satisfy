@@ -3,7 +3,8 @@ package core
 import (
 	"hash"
 	"io"
-	"log"
+
+	"github.com/smartystreets/logging"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -14,6 +15,7 @@ type PackageBuilderFileSystem interface {
 }
 
 type PackageBuilder struct {
+	logger *logging.Logger
 	storage  PackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
@@ -39,7 +41,7 @@ func (this *PackageBuilder) Build() error {
 }
 
 func (this *PackageBuilder) add(file contracts.FileInfo) error {
-	log.Printf("Adding \"%s\" to archive.", file.Path())
+	this.logger.Printf("Adding \"%s\" to archive.", file.Path())
 	this.archive.WriteHeader(contracts.ArchiveHeader{
 		Name:    file.Path(),
 		Size:    file.Size(),
