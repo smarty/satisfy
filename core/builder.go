@@ -48,6 +48,7 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 		ModTime: file.ModTime(),
 	})
 	reader := this.storage.Open(file.Path())
+	defer func() { _ = reader.Close() }()
 	writer := io.MultiWriter(this.hasher, this.archive)
 	_, err := io.Copy(writer, reader)
 	this.contents = append(this.contents, this.buildArchiveEntry(file))
