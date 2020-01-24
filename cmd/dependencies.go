@@ -13,6 +13,9 @@ type DependencyListing struct {
 }
 
 func (this *DependencyListing) Validate() error {
+	// TODO: is there a risk of collisions on the downloaded manifest name? for example if two packages are named "data"
+	// and they're both downloaded from different locations to the same directory.
+
 	inventory := make(map[string]string)
 
 	for _, dependency := range this.Dependencies {
