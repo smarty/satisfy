@@ -19,7 +19,6 @@ type Config struct {
 }
 
 func parseConfig() (config Config) {
-	// TODO Non-flag arguments for filtered package names.
 	flag.IntVar(&config.MaxRetry,
 		"max-retry",
 		5,
