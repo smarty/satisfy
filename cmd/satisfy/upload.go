@@ -21,7 +21,7 @@ import (
 )
 
 func uploadMain(args []string) {
-	config := cmd.ParseConfig(args)
+	config := cmd.ParseConfig("upload", args)
 	NewCheckApp(config).Run()
 	NewUploadApp(config).Run()
 }

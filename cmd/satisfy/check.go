@@ -11,7 +11,7 @@ import (
 )
 
 func checkMain(args []string) {
-	NewCheckApp(cmd.ParseConfig(args)).Run()
+	NewCheckApp(cmd.ParseConfig("check", args)).Run()
 }
 
 type CheckApp struct {

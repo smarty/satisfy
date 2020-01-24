@@ -7,15 +7,16 @@ import (
 
 func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
-	if len(os.Args) == 1 {
-		os.Args = append(os.Args, "")
-	}
-	switch os.Args[1] {
-	case "upload":
+
+	if isSubCommand("upload") {
 		uploadMain(os.Args[2:])
-	case "check":
+	} else if isSubCommand("check") {
 		checkMain(os.Args[2:])
-	default:
-		downloadMain()
+	} else {
+		downloadMain(os.Args[1:])
 	}
+}
+
+func isSubCommand(name string) bool {
+	return len(os.Args) > 1 && os.Args[1] == name
 }

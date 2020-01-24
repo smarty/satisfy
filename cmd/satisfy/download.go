@@ -18,8 +18,8 @@ import (
 	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
-func downloadMain() {
-	config := parseConfig()
+func downloadMain(args []string) {
+	config := parseConfig(args)
 	listing := readDependencyListing(config.JSONPath)
 
 	err := listing.Validate()
