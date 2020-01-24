@@ -24,7 +24,7 @@ type PackageInstallerFileSystem interface {
 }
 
 type PackageInstaller struct {
-	logger *logging.Logger
+	logger     *logging.Logger
 	downloader contracts.Downloader
 	filesystem PackageInstallerFileSystem
 }

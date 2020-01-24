@@ -15,7 +15,7 @@ type PackageBuilderFileSystem interface {
 }
 
 type PackageBuilder struct {
-	logger *logging.Logger
+	logger   *logging.Logger
 	storage  PackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
