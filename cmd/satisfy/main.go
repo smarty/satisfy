@@ -43,8 +43,6 @@ func checkMain(args []string) {
 }
 
 func uploadMain(args []string) {
-	// TODO: run some check behavior to see if the remote manifest already exists
-	// otherwise we can/could accidentally clobber what's already there
 	NewUploadApp(cmd.ParseConfig(args)).Run()
 }
 
