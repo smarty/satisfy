@@ -396,7 +396,7 @@ func (this *UploadApp) dumpManifest() string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return string(raw)
+	return "\n"+string(raw)
 }
 
 ///////////////////////////////////////////////////////////////
