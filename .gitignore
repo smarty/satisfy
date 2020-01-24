@@ -9,3 +9,4 @@ config.json
 *.tar
 *.tar.*
 gcs-credentials.json
+cmd/upload
