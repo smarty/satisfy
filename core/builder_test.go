@@ -32,7 +32,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.builder.logger = logging.Capture()
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
-	this.fileSystem.WriteSymLink("/in/inner/link.txt", "/in/file0.txt")
+	this.fileSystem.WriteSymlink("/in/inner/link.txt", "/in/file0.txt")
 	this.fileSystem.WriteFile("/in/sub/file0.txt", []byte("ccc"))
 	this.fileSystem.Root = "/in"
 }
@@ -50,7 +50,7 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 }
 
 func (this *PackageBuilderFixture) TestSymlinkOutOfBoundsNotAllowed() {
-	this.fileSystem.WriteSymLink("/in/link.txt", "/out/of-bounds.txt")
+	this.fileSystem.WriteSymlink("/in/link.txt", "/out/of-bounds.txt")
 	err := this.builder.Build()
 	this.So(err, should.NotBeNil)
 }
@@ -86,7 +86,7 @@ func (this *PackageBuilderFixture) TestSimulatedArchiveCloseError() {
 
 func (this *PackageBuilderFixture) TestSymlinkCannotBeMadeRelativeToRootPath() {
 	this.fileSystem.Root = ""
-	this.fileSystem.WriteSymLink("/in/link.txt", "/out/of-bounds.txt")
+	this.fileSystem.WriteSymlink("/in/link.txt", "/out/of-bounds.txt")
 
 	err := this.builder.Build()
 

@@ -19,6 +19,10 @@ type FileCreator interface {
 	Create(path string) io.WriteCloser
 }
 
+type SymlinkCreator interface {
+	CreateSymlink(source, target string)
+}
+
 type FileReader interface {
 	ReadFile(path string) []byte
 }

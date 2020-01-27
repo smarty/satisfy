@@ -13,6 +13,13 @@ import (
 
 type DiskFileSystem struct{ root string }
 
+func (this *DiskFileSystem) CreateSymlink(source, target string) {
+	err := os.Symlink(source, target)
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
 func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: root}
 }

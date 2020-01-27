@@ -2,7 +2,6 @@ package shell
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -79,4 +78,11 @@ func (this *MemoryFixture) TestDelete() {
 	this.So(this.fileSystem.Listing(), should.BeEmpty)
 }
 
-var fileSystemError = errors.New("this is a file system error")
+func (this *MemoryFixture) TestCreateSymlink() {
+	this.fileSystem.WriteFile("/source.txt", []byte("Hello World"))
+
+	this.fileSystem.CreateSymlink("/source.txt", "/target.txt")
+
+	this.So(this.fileSystem.Listing(), should.HaveLength, 2)
+	this.So(this.fileSystem.ReadFile("/target.txt"), should.Resemble, []byte("Hello World"))
+}
