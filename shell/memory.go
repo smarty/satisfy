@@ -12,6 +12,7 @@ import (
 
 type InMemoryFileSystem struct {
 	fileSystem map[string]*file
+	Root       string
 }
 
 func NewInMemoryFileSystem() *InMemoryFileSystem {
@@ -34,7 +35,11 @@ func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 }
 
 func (this *InMemoryFileSystem) Open(path string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
+	target := this.fileSystem[path]
+	if target.symlink != "" {
+		target = this.fileSystem[target.symlink]
+	}
+	return ioutil.NopCloser(bytes.NewReader(target.contents))
 }
 
 func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
@@ -43,7 +48,11 @@ func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
 }
 
 func (this *InMemoryFileSystem) ReadFile(path string) []byte {
-	return this.fileSystem[path].contents
+	target := this.fileSystem[path]
+	if target.symlink != "" {
+		target = this.fileSystem[target.symlink]
+	}
+	return target.contents
 }
 
 func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
@@ -54,9 +63,22 @@ func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
 	}
 }
 
+func (this *InMemoryFileSystem) WriteSymLink(target, source string) {
+	this.fileSystem[target] = &file{
+		path:     target,
+		contents: nil,
+		mod:      InMemoryModTime,
+		symlink:  source,
+	}
+}
+
 func (this *InMemoryFileSystem) Delete(path string) {
 	this.fileSystem[path] = nil
 	delete(this.fileSystem, path)
+}
+
+func (this *InMemoryFileSystem) RootPath() string {
+	return this.Root
 }
 
 /////////////////////////////////////////////////

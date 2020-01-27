@@ -41,3 +41,7 @@ type FileInfo interface {
 	ModTime() time.Time
 	Symlink() string
 }
+
+type RootPath interface {
+	RootPath() string
+}

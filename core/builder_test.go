@@ -30,9 +30,11 @@ func (this *PackageBuilderFixture) Setup() {
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
 	this.builder.logger = logging.Capture()
-	this.fileSystem.WriteFile("file0.txt", []byte("a"))
-	this.fileSystem.WriteFile("file1.txt", []byte("bb"))
-	this.fileSystem.WriteFile("sub/file0.txt", []byte("ccc"))
+	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
+	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
+	this.fileSystem.WriteSymLink("/in/link.txt", "/in/file0.txt")
+	this.fileSystem.WriteFile("/in/sub/file0.txt", []byte("ccc"))
+	this.fileSystem.Root = "/in"
 }
 
 func (this *PackageBuilderFixture) TestContentsAreInventoried() {
@@ -40,10 +42,17 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 
 	this.So(err, should.BeNil)
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
-		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
-		{Path: "file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
-		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
+		{Path: "/in/file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "/in/file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
+		{Path: "/in/link.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "/in/sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
+}
+
+func (this *PackageBuilderFixture) TestSymlinkOutOfBoundsNotAllowed() {
+	this.fileSystem.WriteSymLink("/in/link.txt", "/out/of-bounds.txt")
+	err := this.builder.Build()
+	this.So(err, should.NotBeNil)
 }
 
 func (this *PackageBuilderFixture) TestContentsAreArchived() {
@@ -51,9 +60,10 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: shell.InMemoryModTime}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: shell.InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: shell.InMemoryModTime}, contents: []byte("ccc")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/file0.txt", Size: 1, ModTime: shell.InMemoryModTime}, contents: []byte("a")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/file1.txt", Size: 2, ModTime: shell.InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/link.txt", LinkName: "/in/file0.txt", Size: 0, ModTime: shell.InMemoryModTime}, contents: nil},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/sub/file0.txt", Size: 3, ModTime: shell.InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -72,6 +82,15 @@ func (this *PackageBuilderFixture) TestSimulatedArchiveCloseError() {
 	err := this.builder.Build()
 
 	this.So(err, should.Equal, closeErr)
+}
+
+func (this *PackageBuilderFixture) TestSymlinkCannotBeMadeRelativeToRootPath() {
+	this.fileSystem.Root = ""
+	this.fileSystem.WriteSymLink("/in/link.txt", "/out/of-bounds.txt")
+
+	err := this.builder.Build()
+
+	this.So(err, should.NotBeNil)
 }
 
 /////////////////////////

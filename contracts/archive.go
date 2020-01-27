@@ -9,7 +9,8 @@ type ArchiveWriter interface {
 }
 
 type ArchiveHeader struct {
-	Name    string
-	Size    int64
-	ModTime time.Time
+	Name     string
+	Size     int64
+	ModTime  time.Time
+	LinkName string
 }

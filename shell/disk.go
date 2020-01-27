@@ -17,6 +17,10 @@ func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: root}
 }
 
+func (this *DiskFileSystem) RootPath() string {
+	return this.root
+}
+
 func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 	err := filepath.Walk(this.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
