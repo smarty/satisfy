@@ -53,12 +53,19 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 			this.storage.RootPath())
 	}
 	this.logger.Printf("Adding \"%s\" to archive.", file.Path())
-	this.archive.WriteHeader(contracts.ArchiveHeader{
-		Name:     file.Path(),
-		Size:     file.Size(),
-		ModTime:  file.ModTime(),
-		LinkName: file.Symlink(),
-	})
+	header := contracts.ArchiveHeader{
+		Name:    file.Path(),
+		Size:    file.Size(),
+		ModTime: file.ModTime(),
+	}
+	if file.Symlink() != "" {
+		linkName, err := filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
+		if err != nil {
+			return err
+		}
+		header.LinkName = linkName
+	}
+	this.archive.WriteHeader(header)
 	reader := this.storage.Open(file.Path())
 	defer func() { _ = reader.Close() }()
 	writer := io.MultiWriter(this.hasher, this.archive)

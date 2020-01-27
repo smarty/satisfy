@@ -32,7 +32,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.builder.logger = logging.Capture()
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
-	this.fileSystem.WriteSymLink("/in/link.txt", "/in/file0.txt")
+	this.fileSystem.WriteSymLink("/in/inner/link.txt", "/in/file0.txt")
 	this.fileSystem.WriteFile("/in/sub/file0.txt", []byte("ccc"))
 	this.fileSystem.Root = "/in"
 }
@@ -44,7 +44,7 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
 		{Path: "/in/file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "/in/file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
-		{Path: "/in/link.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "/in/inner/link.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "/in/sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
@@ -62,7 +62,7 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/file0.txt", Size: 1, ModTime: shell.InMemoryModTime}, contents: []byte("a")},
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/file1.txt", Size: 2, ModTime: shell.InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/link.txt", LinkName: "/in/file0.txt", Size: 0, ModTime: shell.InMemoryModTime}, contents: nil},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: shell.InMemoryModTime}, contents: nil},
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "/in/sub/file0.txt", Size: 3, ModTime: shell.InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
