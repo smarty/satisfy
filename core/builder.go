@@ -83,8 +83,12 @@ func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contrac
 	if this.outOfBounds(file) {
 		return header, this.symlinkOutOfBoundError(file)
 	}
-	header.LinkName, err = filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
+	header.LinkName, err = relativeLinkSourcePath(file)
 	return header, err
+}
+
+func relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
+	return filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
 }
 
 func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
@@ -98,15 +102,20 @@ func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) erro
 func (this *PackageBuilder) buildArchiveEntry(file contracts.FileInfo) contracts.ArchiveItem {
 	defer this.hasher.Reset()
 
-	size := file.Size()
-	if file.Symlink() != "" {
-		size = 1
-	}
 	return contracts.ArchiveItem{
 		Path:        file.Path(),
-		Size:        size,
+		Size:        this.determineFileSize(file),
 		MD5Checksum: this.hasher.Sum(nil),
 	}
+}
+
+func (this *PackageBuilder) determineFileSize(file contracts.FileInfo) int64 {
+	size := file.Size()
+	if file.Symlink() == "" {
+		return size
+	}
+	linkName, _ := relativeLinkSourcePath(file)
+	return int64(len(linkName))
 }
 
 func (this *PackageBuilder) Contents() []contracts.ArchiveItem {

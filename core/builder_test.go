@@ -44,7 +44,7 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
 		{Path: "/in/file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "/in/file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
-		{Path: "/in/inner/link.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "/in/inner/link.txt", Size: 12, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "/in/sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
