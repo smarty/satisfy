@@ -45,27 +45,21 @@ func (this *PackageBuilder) Build() error {
 }
 
 func (this *PackageBuilder) add(file contracts.FileInfo) error {
-	if file.Symlink() != "" && this.outOfBounds(file) {
-		return fmt.Errorf(
-			"the file \"%s\" is a symlink that refers to \"%s\" which is outside of the configured root directory: \"%s\"",
-			file.Path(),
-			file.Symlink(),
-			this.storage.RootPath())
-	}
 	this.logger.Printf("Adding \"%s\" to archive.", file.Path())
-	header := contracts.ArchiveHeader{
-		Name:    file.Path(),
-		Size:    file.Size(),
-		ModTime: file.ModTime(),
-	}
-	if file.Symlink() != "" {
-		linkName, err := filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
-		if err != nil {
-			return err
-		}
-		header.LinkName = linkName
+	header, err := this.buildHeader(file)
+	if err != nil {
+		return err
 	}
 	this.archive.WriteHeader(header)
+	err = this.archiveContents(file)
+	if err != nil {
+		return err
+	}
+	this.contents = append(this.contents, this.buildArchiveEntry(file))
+	return err
+}
+
+func (this *PackageBuilder) archiveContents(file contracts.FileInfo) error {
 	reader := this.storage.Open(file.Path())
 	defer func() { _ = reader.Close() }()
 	writer := io.MultiWriter(this.hasher, this.archive)
@@ -73,11 +67,32 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 		writer = this.hasher
 	}
 	_, err := io.Copy(writer, reader)
-	if err != nil {
-		return err
-	}
-	this.contents = append(this.contents, this.buildArchiveEntry(file))
+
 	return err
+}
+
+func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contracts.ArchiveHeader, err error) {
+	header.Name = file.Path()
+	header.Size = file.Size()
+	header.ModTime = file.ModTime()
+
+	if file.Symlink() == "" {
+		return header, nil
+	}
+
+	if this.outOfBounds(file) {
+		return header, this.symlinkOutOfBoundError(file)
+	}
+	header.LinkName, err = filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
+	return header, err
+}
+
+func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
+	return fmt.Errorf(
+		"the file \"%s\" is a symlink that refers to \"%s\" which is outside of the configured root directory: \"%s\"",
+		file.Path(),
+		file.Symlink(),
+		this.storage.RootPath())
 }
 
 func (this *PackageBuilder) buildArchiveEntry(file contracts.FileInfo) contracts.ArchiveItem {
