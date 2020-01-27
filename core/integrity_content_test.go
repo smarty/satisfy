@@ -52,6 +52,8 @@ func (this *FileContentIntegrityCheckFixture) newHasher() hash.Hash {
 }
 
 func (this *FileContentIntegrityCheckFixture) TestFileContentsIntact() {
+	this.checker.enabled = true
+
 	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
 }
 
