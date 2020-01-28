@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"path/filepath"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -40,5 +41,6 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 			return fmt.Errorf("checksum mismatch for \"%s\"", item.Path)
 		}
 	}
+	log.Printf("Content integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
 	return nil
 }

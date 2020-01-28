@@ -24,8 +24,13 @@ func NewInMemoryFileSystem() *InMemoryFileSystem {
 	}
 }
 
-func (this *InMemoryFileSystem) Stat(path string) contracts.FileInfo {
-	return this.fileSystem[path]
+func (this *InMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
+	file, found := this.fileSystem[path]
+	if found {
+		return file, nil
+	} else {
+		return file, os.ErrNotExist
+	}
 }
 
 func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {

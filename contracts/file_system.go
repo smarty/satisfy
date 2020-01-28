@@ -36,7 +36,7 @@ type Deleter interface {
 }
 
 type FileChecker interface {
-	Stat(path string) FileInfo
+	Stat(path string) (FileInfo, error)
 }
 
 type FileInfo interface {

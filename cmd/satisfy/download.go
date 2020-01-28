@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"bitbucket.org/smartystreets/satisfy/cmd"
@@ -136,7 +137,8 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	manifest, manifestErr := loadManifest(dependency)
 	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
-		verifyErr := this.integrity.Verify(manifest, dependency.LocalDirectory)
+		absolute, _ := filepath.Abs(dependency.LocalDirectory)
+		verifyErr := this.integrity.Verify(manifest, absolute)
 		if verifyErr == nil {
 			log.Printf("Dependency already installed: %s", dependency.Title())
 			return
