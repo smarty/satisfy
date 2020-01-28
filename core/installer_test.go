@@ -187,13 +187,12 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 	})
 	_, _ = archiveWriter.Write([]byte("Goodbye World"))
 	_ = archiveWriter.WriteHeader(&tar.Header{
-		Typeflag:   tar.TypeSymlink,
-		Name:       "Link",
-		Linkname:   "Hello/World",
+		Typeflag: tar.TypeSymlink,
+		Name:     "Link",
+		Linkname: "Hello/World",
 	})
 	_ = archiveWriter.Close()
 	_ = compressor.Close()
-
 
 	this.Body = ioutil.NopCloser(bytes.NewReader(writer.Bytes()))
 

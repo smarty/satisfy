@@ -13,15 +13,15 @@ import (
 
 type DiskFileSystem struct{ root string }
 
+func NewDiskFileSystem(root string) *DiskFileSystem {
+	return &DiskFileSystem{root: filepath.Clean(root)}
+}
+
 func (this *DiskFileSystem) CreateSymlink(source, target string) {
 	err := os.Symlink(source, target)
 	if err != nil {
 		log.Panic(err)
 	}
-}
-
-func NewDiskFileSystem(root string) *DiskFileSystem {
-	return &DiskFileSystem{root: root}
 }
 
 func (this *DiskFileSystem) RootPath() string {
@@ -36,18 +36,14 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		if info.IsDir() {
 			return nil
 		}
-		relative, err := filepath.Rel(this.root, path)
-		if err != nil {
-			return err
-		}
 		fileInfo := FileInfo{
-			path: relative,
+			path: path,
 			size: info.Size(),
 			mod:  info.ModTime(),
 		}
 		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
 			fileInfo.symlink, err = os.Readlink(path)
-			if err == nil {
+			if err != nil {
 				return err
 			}
 		}
@@ -61,7 +57,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 }
 
 func (this *DiskFileSystem) Open(path string) io.ReadCloser {
-	reader, err := os.Open(this.absolute(path))
+	reader, err := os.Open(path)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -69,12 +65,11 @@ func (this *DiskFileSystem) Open(path string) io.ReadCloser {
 }
 
 func (this *DiskFileSystem) Create(path string) io.WriteCloser {
-	absolute := this.absolute(path)
-	err := os.MkdirAll(filepath.Dir(absolute), 0755)
+	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
 		log.Panic(err)
 	}
-	writer, err := os.Create(absolute)
+	writer, err := os.Create(path)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -82,7 +77,7 @@ func (this *DiskFileSystem) Create(path string) io.WriteCloser {
 }
 
 func (this *DiskFileSystem) ReadFile(path string) []byte {
-	raw, err := ioutil.ReadFile(this.absolute(path))
+	raw, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -90,7 +85,7 @@ func (this *DiskFileSystem) ReadFile(path string) []byte {
 }
 
 func (this *DiskFileSystem) WriteFile(path string, content []byte) {
-	err := ioutil.WriteFile(this.absolute(path), content, 0644)
+	err := ioutil.WriteFile(path, content, 0644)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -101,10 +96,6 @@ func (this *DiskFileSystem) Delete(path string) {
 	if err != nil {
 		log.Panic(err)
 	}
-}
-
-func (this *DiskFileSystem) absolute(path string) string {
-	return filepath.Join(this.root, path)
 }
 
 ////////////////////////////////////////
