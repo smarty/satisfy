@@ -21,6 +21,7 @@ import (
 type PackageInstallerFileSystem interface {
 	contracts.FileCreator
 	contracts.Deleter
+	contracts.SymlinkCreator
 }
 
 type PackageInstaller struct {
@@ -99,12 +100,17 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		path := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, path)
 		this.logger.Printf("Extracting archive item \"%s\" to \"%s\".", header.Name, path)
-		writer := this.filesystem.Create(path)
-		_, err = io.Copy(writer, tarReader)
-		if err != nil {
-			return paths, err
+
+		if header.Typeflag == tar.TypeSymlink {
+			this.filesystem.CreateSymlink(header.Linkname, path)
+		} else {
+			writer := this.filesystem.Create(path)
+			_, err = io.Copy(writer, tarReader)
+			if err != nil {
+				return paths, err
+			}
+			_ = writer.Close()
 		}
-		_ = writer.Close()
 	}
 	return paths, nil
 }

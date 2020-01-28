@@ -43,7 +43,7 @@ type FileInfo interface {
 	Path() string
 	Size() int64
 	ModTime() time.Time
-	Symlink() string // TODO SymlinkPath
+	Symlink() string
 }
 
 type RootPath interface {

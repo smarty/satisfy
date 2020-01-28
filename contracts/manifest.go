@@ -18,5 +18,4 @@ type ArchiveItem struct {
 	Path        string `json:"path"`
 	Size        int64  `json:"size"`
 	MD5Checksum []byte `json:"md5"`
-	// TODO: Symlink string (points to actual file)
 }

@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
@@ -50,9 +53,27 @@ func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
 func (this *InMemoryFileSystem) ReadFile(path string) []byte {
 	target := this.fileSystem[path]
 	if target.symlink != "" {
-		target = this.fileSystem[target.symlink]
+		target = this.resolveSymlink(target)
+
 	}
 	return target.contents
+}
+
+func (this *InMemoryFileSystem) resolveSymlink(target *file) *file {
+	source, found := this.fileSystem[target.symlink]
+	if found {
+		return source
+	}
+	parts := strings.Split(target.path, string(os.PathSeparator))
+	for part := 1; part < len(parts); part++ {
+		prepend := filepath.Join(parts[:part]...)
+		path := filepath.Join(prepend, target.symlink)
+		source, found := this.fileSystem[path]
+		if found {
+			return source
+		}
+	}
+	return nil
 }
 
 func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {

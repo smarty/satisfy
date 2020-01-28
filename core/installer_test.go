@@ -85,6 +85,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
 	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+	this.So(this.filesystem.ReadFile("local/path/Link"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
@@ -95,6 +96,7 @@ func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsin
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
 	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+	this.So(this.filesystem.ReadFile("local/path/Link"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
@@ -140,6 +142,7 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 			Contents: []contracts.ArchiveItem{
 				{Path: "Hello/World"},
 				{Path: "Goodbye/World"},
+				{Path: "Link"},
 			},
 			CompressionAlgorithm: compressionAlgorithm,
 		},
@@ -183,8 +186,14 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 		Size: int64(len("Goodbye World")),
 	})
 	_, _ = archiveWriter.Write([]byte("Goodbye World"))
+	_ = archiveWriter.WriteHeader(&tar.Header{
+		Typeflag:   tar.TypeSymlink,
+		Name:       "Link",
+		Linkname:   "Hello/World",
+	})
 	_ = archiveWriter.Close()
 	_ = compressor.Close()
+
 
 	this.Body = ioutil.NopCloser(bytes.NewReader(writer.Bytes()))
 
