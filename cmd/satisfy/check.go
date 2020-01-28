@@ -24,6 +24,10 @@ func NewCheckApp(config cmd.Config) *CheckApp {
 }
 
 func (this *CheckApp) Run() {
+	if this.config.ForceUpload {
+		log.Println("[INFO] Force upload enabled, skipping remote manifest check.")
+		return
+	}
 	if this.uploadedPreviously(cmd.RemoteManifestFilename) {
 		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
 	}

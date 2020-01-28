@@ -23,6 +23,7 @@ type Config struct {
 	MaxRetry             int             `json:"max_retry"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
+	ForceUpload          bool            `json:"force_upload"`
 }
 
 func (this Config) ComposeRemoteAddress(filename string) url.URL {
