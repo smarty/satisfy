@@ -13,6 +13,7 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
+// TODO: move to core
 type InMemoryFileSystem struct {
 	fileSystem map[string]*file
 	Root       string
