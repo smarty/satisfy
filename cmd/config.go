@@ -22,10 +22,10 @@ type Config struct {
 	PackageName          string          `json:"package_name"`
 	PackageVersion       string          `json:"package_version"`
 	RemoteAddressPrefix  URL             `json:"remote_address"`
-	MaxRetry             int             `json:"max_retry"`
+	MaxRetry             int             `json:"max_retry"` // TODO Move back to CLI
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
-	ForceUpload          bool            `json:"force_upload"`
+	ForceUpload          bool            `json:"force_upload"` // TODO Move back to CLI
 }
 
 func (this Config) ComposeRemoteAddress(filename string) url.URL {
