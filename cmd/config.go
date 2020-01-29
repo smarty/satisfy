@@ -37,17 +37,17 @@ const (
 
 func ParseConfig(name string, args []string) (config Config) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
-	flags.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.")
+	flags.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.") // TODO: default is "upload.json"
 	_ = flags.Parse(args)
 
 	raw, err := ioutil.ReadFile(config.JSONPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // TODO: emit sample json file
 	}
 
 	err = json.Unmarshal(raw, &config)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // TODO: emit sample json file
 	}
 
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
@@ -56,6 +56,7 @@ func ParseConfig(name string, args []string) (config Config) {
 }
 
 func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
+	// TODO: support for ADC? (https://cloud.google.com/docs/authentication/production)
 	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !found {
 		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")

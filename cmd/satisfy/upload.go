@@ -80,7 +80,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	this.InitializeCompressor(writer)
 
 	this.builder = core.NewPackageBuilder(
-		shell.NewDiskFileSystem(this.config.SourceDirectory),
+		shell.NewDiskFileSystem(this.config.SourceDirectory), // TODO: make absolute
 		shell.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
