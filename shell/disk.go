@@ -13,29 +13,8 @@ import (
 
 type DiskFileSystem struct{ root string }
 
-func (this *DiskFileSystem) Stat(path string) (contracts.FileInfo, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	fileInfo := FileInfo{
-		path: path,
-		size: info.Size(),
-		mod:  info.ModTime(),
-	}
-	return fileInfo, nil
-}
-
 func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: filepath.Clean(root)}
-}
-
-func (this *DiskFileSystem) CreateSymlink(source, target string) {
-	_ = os.Remove(target)
-	err := os.Symlink(source, target)
-	if err != nil {
-		log.Panic(err)
-	}
 }
 
 func (this *DiskFileSystem) RootPath() string {
@@ -56,7 +35,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 			mod:  info.ModTime(),
 		}
 		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-			fileInfo.symlink, err = os.Readlink(path)
+			fileInfo.symlink, err = os.Readlink(path) // TODO: support for absolute AND relative symlinks
 			if err != nil {
 				return err
 			}
@@ -68,6 +47,27 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		log.Panic(err)
 	}
 	return listing
+}
+
+func (this *DiskFileSystem) Stat(path string) (contracts.FileInfo, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	fileInfo := FileInfo{
+		path: path,
+		size: info.Size(),
+		mod:  info.ModTime(),
+	}
+	return fileInfo, nil
+}
+
+func (this *DiskFileSystem) CreateSymlink(source, target string) {
+	_ = os.Remove(target)
+	err := os.Symlink(source, target)
+	if err != nil {
+		log.Panic(err)
+	}
 }
 
 func (this *DiskFileSystem) Open(path string) io.ReadCloser {
