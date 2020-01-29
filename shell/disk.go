@@ -35,7 +35,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 			mod:  info.ModTime(),
 		}
 		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-			fileInfo.symlink, err = os.Readlink(path) // TODO: support for absolute AND relative symlinks
+			fileInfo.symlink, err = os.Readlink(path)
 			if err != nil {
 				return err
 			}

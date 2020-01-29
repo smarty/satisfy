@@ -90,17 +90,13 @@ func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
 	}
 }
 
-func (this *InMemoryFileSystem) WriteSymlink(target, source string) { // TODO delete me
+func (this *InMemoryFileSystem) CreateSymlink(source, target string) {
 	this.fileSystem[target] = &file{
 		path:     target,
 		contents: nil,
 		mod:      InMemoryModTime,
 		symlink:  source,
 	}
-}
-
-func (this *InMemoryFileSystem) CreateSymlink(source, target string) {
-	this.WriteSymlink(target, source)
 }
 
 func (this *InMemoryFileSystem) Delete(path string) {
