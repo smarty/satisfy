@@ -44,15 +44,9 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
 		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
-		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
-}
-
-func (this *PackageBuilderFixture) TestSymlinkOutOfBoundsNotAllowed() {
-	this.fileSystem.WriteSymlink("/in/link.txt", "/out/of-bounds.txt")
-	err := this.builder.Build()
-	this.So(err, should.NotBeNil)
 }
 
 func (this *PackageBuilderFixture) TestContentsAreArchived() {
@@ -84,13 +78,30 @@ func (this *PackageBuilderFixture) TestSimulatedArchiveCloseError() {
 	this.So(err, should.Equal, closeErr)
 }
 
-func (this *PackageBuilderFixture) TestSymlinkCannotBeMadeRelativeToRootPath() {
-	this.fileSystem.Root = ""
+func (this *PackageBuilderFixture) TestAbsoluteSymlinkOutOfBoundsNotAllowed() {
 	this.fileSystem.WriteSymlink("/in/link.txt", "/out/of-bounds.txt")
-
 	err := this.builder.Build()
-
 	this.So(err, should.NotBeNil)
+}
+
+func (this *PackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAllowed() {
+	this.fileSystem.WriteSymlink("/in/link.txt", "../../out/of-bounds.txt")
+	err := this.builder.Build()
+	this.So(err, should.NotBeNil)
+}
+
+func (this *PackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
+	this.fileSystem.WriteSymlink("/in/inner/link.txt", "../file0.txt")
+	err := this.builder.Build()
+	if !this.So(err, should.BeNil) {
+		return
+	}
+	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: contracts.ArchiveHeader{
+		Name:     "inner/link.txt",
+		LinkName: "../file0.txt",
+		Size:     0,
+		ModTime:  shell.InMemoryModTime,
+	}, contents: nil})
 }
 
 /////////////////////////

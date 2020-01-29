@@ -54,10 +54,12 @@ func (this *DiskFileSystem) Stat(path string) (contracts.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	source, _ := os.Readlink(path)
 	fileInfo := FileInfo{
-		path: path,
-		size: info.Size(),
-		mod:  info.ModTime(),
+		path:    path,
+		size:    info.Size(),
+		mod:     info.ModTime(),
+		symlink: source,
 	}
 	return fileInfo, nil
 }

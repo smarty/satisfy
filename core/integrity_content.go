@@ -11,13 +11,18 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
+type FileOpenChecker interface {
+	contracts.FileOpener
+	contracts.FileChecker
+}
+
 type FileContentIntegrityCheck struct {
 	hasher     func() hash.Hash
-	fileSystem contracts.FileOpener
+	fileSystem FileOpenChecker
 	enabled    bool
 }
 
-func NewFileContentIntegrityCheck(hasher func() hash.Hash, fileSystem contracts.FileOpener, enabled bool) *FileContentIntegrityCheck {
+func NewFileContentIntegrityCheck(hasher func() hash.Hash, fileSystem FileOpenChecker, enabled bool) *FileContentIntegrityCheck {
 	return &FileContentIntegrityCheck{hasher: hasher, fileSystem: fileSystem, enabled: enabled}
 }
 
@@ -26,21 +31,37 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 		return nil
 	}
 	for _, item := range manifest.Archive.Contents {
-		hasher := this.hasher()
-		reader := this.fileSystem.Open(filepath.Join(localPath, item.Path))
-		_, err := io.Copy(hasher, reader)
+		checksum, err := this.calculateChecksum(filepath.Join(localPath, item.Path))
 		if err != nil {
 			return err
 		}
-		err = reader.Close()
-		if err != nil {
-			return err
-		}
-		checksum := hasher.Sum(nil)
 		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
 			return fmt.Errorf("checksum mismatch for \"%s\"", item.Path)
 		}
 	}
 	log.Printf("Content integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
 	return nil
+}
+
+func (this *FileContentIntegrityCheck) calculateChecksum(path string) ([]byte, error) {
+	hasher := this.hasher()
+	info, _ := this.fileSystem.Stat(path)
+	if info.Symlink() != "" {
+		_, err := io.WriteString(hasher, info.Symlink())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		reader := this.fileSystem.Open(path)
+		_, err := io.Copy(hasher, reader)
+		if err != nil {
+			return nil, err
+		}
+		err = reader.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	checksum := hasher.Sum(nil)
+	return checksum, nil
 }

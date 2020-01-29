@@ -51,21 +51,22 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 		return err
 	}
 	this.archive.WriteHeader(header)
-	err = this.archiveContents(file)
+	err = this.archiveContents(file, header.LinkName)
 	if err != nil {
 		return err
 	}
-	this.contents = append(this.contents, this.buildArchiveEntry(file))
+	this.contents = append(this.contents, this.buildManifestEntry(file, header.LinkName))
 	return err
 }
 
-func (this *PackageBuilder) archiveContents(file contracts.FileInfo) error {
+func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSourcePath string) error {
+	if symlinkSourcePath != "" {
+		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
+		return nil
+	}
+	writer := io.MultiWriter(this.hasher, this.archive)
 	reader := this.storage.Open(file.Path())
 	defer func() { _ = reader.Close() }()
-	writer := io.MultiWriter(this.hasher, this.archive)
-	if file.Symlink() != "" {
-		writer = this.hasher
-	}
 	_, err := io.Copy(writer, reader)
 
 	return err
@@ -83,12 +84,18 @@ func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contrac
 	if this.outOfBounds(file) {
 		return header, this.symlinkOutOfBoundError(file)
 	}
-	header.LinkName, err = relativeLinkSourcePath(file)
+	header.LinkName, err = this.relativeLinkSourcePath(file)
 	return header, err
 }
 
-func relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
-	return filepath.Rel(filepath.Dir(file.Path()), file.Symlink())
+func (this *PackageBuilder) relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
+	path := file.Symlink()
+	if this.isAbsolute(path) {
+		return filepath.Rel(filepath.Dir(file.Path()), path)
+	}
+	joined := filepath.Join(filepath.Dir(file.Path()), path)
+	path = filepath.Clean(joined)
+	return filepath.Rel(filepath.Dir(file.Path()), path)
 }
 
 func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
@@ -99,22 +106,20 @@ func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) erro
 		this.storage.RootPath())
 }
 
-func (this *PackageBuilder) buildArchiveEntry(file contracts.FileInfo) contracts.ArchiveItem {
+func (this *PackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
 	defer this.hasher.Reset()
 	return contracts.ArchiveItem{
 		Path:        strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/"),
-		Size:        this.determineFileSize(file),
+		Size:        this.determineFileSize(file, symlinkSourcePath),
 		MD5Checksum: this.hasher.Sum(nil),
 	}
 }
 
-func (this *PackageBuilder) determineFileSize(file contracts.FileInfo) int64 {
-	size := file.Size()
-	if file.Symlink() == "" {
-		return size
+func (this *PackageBuilder) determineFileSize(file contracts.FileInfo, symlinkSourcePath string) int64 {
+	if symlinkSourcePath == "" {
+		return file.Size()
 	}
-	linkName, _ := relativeLinkSourcePath(file)
-	return int64(len(linkName))
+	return int64(len(symlinkSourcePath))
 }
 
 func (this *PackageBuilder) Contents() []contracts.ArchiveItem {
@@ -122,6 +127,13 @@ func (this *PackageBuilder) Contents() []contracts.ArchiveItem {
 }
 
 func (this *PackageBuilder) outOfBounds(info contracts.FileInfo) bool {
-	relative, err := filepath.Rel(this.storage.RootPath(), info.Symlink())
-	return err != nil || strings.HasPrefix(relative, "..")
+	if this.isAbsolute(info.Symlink()) {
+		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
+	}
+	cleaned := filepath.Clean(filepath.Join(filepath.Dir(info.Path()), info.Symlink()))
+	return !strings.HasPrefix(cleaned, this.storage.RootPath())
+}
+
+func (this *PackageBuilder) isAbsolute(path string) bool {
+	return strings.HasPrefix(path, "/")
 }

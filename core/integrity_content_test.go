@@ -31,6 +31,7 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 	this.fileSystem.WriteFile("/local/bb", []byte("bb"))
 	this.fileSystem.WriteFile("/local/cc/c", []byte("ccc"))
 	this.fileSystem.WriteFile("/local/dddd", []byte("dddd"))
+	this.fileSystem.CreateSymlink("cc/c", "/local/eeeee")
 
 	this.manifest = contracts.Manifest{
 		Archive: contracts.Archive{
@@ -39,6 +40,7 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 				{Path: "/bb", MD5Checksum: []byte("bb [HASHED]")},
 				{Path: "/cc/c", MD5Checksum: []byte("ccc [HASHED]")},
 				{Path: "/dddd", MD5Checksum: []byte("dddd [HASHED]")},
+				{Path: "/eeeee", MD5Checksum: []byte("cc/c [HASHED]")},
 			},
 		},
 	}
