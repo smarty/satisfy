@@ -137,7 +137,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	manifest, manifestErr := loadManifest(dependency)
 	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
-		absolute, _ := filepath.Abs(dependency.LocalDirectory)
+		absolute, _ := filepath.Abs(dependency.LocalDirectory) // TODO: handle err
 		verifyErr := this.integrity.Verify(manifest, absolute)
 		if verifyErr == nil {
 			log.Printf("Dependency already installed: %s", dependency.Title())
