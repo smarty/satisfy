@@ -11,6 +11,8 @@ import (
 	"bitbucket.org/smartystreets/satisfy/cmd"
 )
 
+// TODO: Rename to DownloadConfig
+// TODO: move to cmd directory? (or move UploadConfig into this directory)
 type Config struct {
 	MaxRetry          int
 	QuickVerification bool

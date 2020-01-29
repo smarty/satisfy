@@ -13,6 +13,8 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
+// TODO: rename to UploadConfig
+// TODO: move to cmd/satisfy directory, or move the DownloadConfig to this directory
 type Config struct {
 	CompressionAlgorithm string          `json:"compression_algorithm"`
 	CompressionLevel     int             `json:"compression_level"`

@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+// TODO: unit test
+// TODO: move to contracts or core
 type URL url.URL
 
 func (this *URL) MarshalJSON() ([]byte, error) {

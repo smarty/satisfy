@@ -8,6 +8,7 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
+// TODO: move to contracts or core
 type DependencyListing struct {
 	Dependencies []Dependency `json:"dependencies"`
 }

@@ -1,5 +1,6 @@
 package cmd
 
+// TODO: move to contracts or core
 func Filter(original []Dependency, filter []string) (filtered []Dependency) {
 	if len(filter) == 0 {
 		return original
