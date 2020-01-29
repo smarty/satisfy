@@ -137,7 +137,11 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	manifest, manifestErr := loadManifest(dependency)
 	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
-		absolute, _ := filepath.Abs(dependency.LocalDirectory) // TODO: handle err
+		absolute, err := filepath.Abs(dependency.LocalDirectory)
+		if err != nil {
+			this.results <- fmt.Errorf("could not resolve absolute path: %w", err)
+			return
+		}
 		verifyErr := this.integrity.Verify(manifest, absolute)
 		if verifyErr == nil {
 			log.Printf("Dependency already installed: %s", dependency.Title())
