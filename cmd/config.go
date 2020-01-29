@@ -13,8 +13,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-// TODO: rename to UploadConfig
-// TODO: move to cmd/satisfy directory, or move the DownloadConfig to this directory
 type Config struct {
 	CompressionAlgorithm string          `json:"compression_algorithm"`
 	CompressionLevel     int             `json:"compression_level"`
@@ -22,10 +20,10 @@ type Config struct {
 	PackageName          string          `json:"package_name"`
 	PackageVersion       string          `json:"package_version"`
 	RemoteAddressPrefix  URL             `json:"remote_address"`
-	MaxRetry             int             `json:"max_retry"` // TODO Move back to CLI
+	MaxRetry             int             `json:"-"`
 	GoogleCredentials    gcs.Credentials `json:"-"`
 	JSONPath             string          `json:"-"`
-	ForceUpload          bool            `json:"force_upload"` // TODO Move back to CLI
+	ForceUpload          bool            `json:"-"`
 }
 
 func (this Config) ComposeRemoteAddress(filename string) url.URL {
@@ -39,7 +37,10 @@ const (
 
 func ParseConfig(name string, args []string) (config Config) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
-	flags.StringVar(&config.JSONPath, "json", "config.json", "The path to the JSON config file.") // TODO: default is "upload.json"
+	flags.StringVar(&config.JSONPath, "json", "upload.json", "The path to the JSON config file.")
+	flags.IntVar(&config.MaxRetry, "max-retry", 5, "HTTP max retry.")
+	flags.BoolVar(&config.ForceUpload, "force-upload", false,
+		"When set, always upload package, even when it already exists at specified remote location.")
 	_ = flags.Parse(args)
 
 	raw, err := ioutil.ReadFile(config.JSONPath)
