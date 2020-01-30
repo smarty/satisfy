@@ -13,12 +13,12 @@ import (
 )
 
 type PackageConfig struct {
-	CompressionAlgorithm string `json:"compression_algorithm"`
-	CompressionLevel     int    `json:"compression_level"`
-	SourceDirectory      string `json:"source_directory"`
-	PackageName          string `json:"package_name"`
-	PackageVersion       string `json:"package_version"`
-	RemoteAddressPrefix  *URL   `json:"remote_address"`
+	CompressionAlgorithm string         `json:"compression_algorithm"`
+	CompressionLevel     int            `json:"compression_level"`
+	SourceDirectory      string         `json:"source_directory"`
+	PackageName          string         `json:"package_name"`
+	PackageVersion       string         `json:"package_version"`
+	RemoteAddressPrefix  *contracts.URL `json:"remote_address"`
 }
 
 type UploadConfig struct {
@@ -70,13 +70,13 @@ func emitExamplePackageConfig() {
 		SourceDirectory:      "src/dir",
 		PackageName:          "package-name",
 		PackageVersion:       "0.0.1",
-		RemoteAddressPrefix:  &URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 	}, "", "  ")
 	log.Println("Example JSON file:\n", string(raw))
 }
 
 func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
-	// TODO: support for ADC? (https://cloud.google.com/docs/authentication/production)
+	// FUTURE: support for ADC? (https://cloud.google.com/docs/authentication/production)
 	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !found {
 		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")

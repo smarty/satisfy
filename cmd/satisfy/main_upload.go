@@ -80,7 +80,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	this.InitializeCompressor(writer)
 
 	this.builder = core.NewPackageBuilder(
-		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory), // TODO: make absolute
+		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
 		shell.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
@@ -135,7 +135,7 @@ func (this *UploadApp) buildManifestUploadRequest() contracts.UploadRequest {
 }
 
 func (this *UploadApp) buildRemoteStorageClient() {
-	client := NewHTTPClient()
+	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

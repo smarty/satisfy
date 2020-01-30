@@ -36,7 +36,7 @@ func (this *CheckApp) uploadedPreviously(path string) bool {
 }
 
 func (this *CheckApp) buildRemoteStorageClient() {
-	client := NewHTTPClient()
+	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

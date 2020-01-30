@@ -1,23 +1,17 @@
-package main
+package contracts
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-// TODO: move to contracts or core
 type DependencyListing struct {
 	Dependencies []Dependency `json:"dependencies"`
 }
 
 func (this *DependencyListing) Validate() error {
-	// TODO: is there a risk of collisions on the downloaded manifest name? for example if two packages are named "data"
-	// and they're both downloaded from different locations to the same directory.
-
-	inventory := make(map[string]string)
+	inventory := make(map[string]struct{}) // map[PackageName+LocalDirectory]struct
 
 	for _, dependency := range this.Dependencies {
 
@@ -35,10 +29,10 @@ func (this *DependencyListing) Validate() error {
 		}
 
 		key := fmt.Sprintf("%s %s", dependency.PackageName, dependency.LocalDirectory)
-		if version, found := inventory[key]; found && version != dependency.PackageVersion {
+		if _, found := inventory[key]; found {
 			return errors.New("local directory conflict")
 		}
-		inventory[key] = dependency.PackageVersion
+		inventory[key] = struct{}{}
 	}
 	return nil
 }
@@ -51,7 +45,7 @@ type Dependency struct {
 }
 
 func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
-	return contracts.AppendRemotePath(
+	return AppendRemotePath(
 		url.URL(this.RemoteAddress),
 		this.PackageName,
 		this.PackageVersion,

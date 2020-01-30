@@ -8,7 +8,6 @@ import (
 	"github.com/smartystreets/gunit"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func TestFileContentIntegrityCheckFixture(t *testing.T) {
@@ -20,13 +19,13 @@ type FileContentIntegrityCheckFixture struct {
 
 	checker    *FileContentIntegrityCheck
 	fakeHasher *FakeHasher
-	fileSystem *shell.InMemoryFileSystem
+	fileSystem *inMemoryFileSystem
 	manifest   contracts.Manifest
 }
 
 func (this *FileContentIntegrityCheckFixture) Setup() {
 	this.fakeHasher = NewFakeHasher()
-	this.fileSystem = shell.NewInMemoryFileSystem()
+	this.fileSystem = newInMemoryFileSystem()
 	this.fileSystem.WriteFile("/local/a", []byte("a"))
 	this.fileSystem.WriteFile("/local/bb", []byte("bb"))
 	this.fileSystem.WriteFile("/local/cc/c", []byte("ccc"))

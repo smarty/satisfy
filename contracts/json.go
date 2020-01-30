@@ -1,12 +1,10 @@
-package main
+package contracts
 
 import (
 	"net/url"
 	"strings"
 )
 
-// TODO: unit test
-// TODO: move to contracts or core
 type URL url.URL
 
 func (this *URL) MarshalJSON() ([]byte, error) {

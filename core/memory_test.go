@@ -1,4 +1,4 @@
-package shell
+package core
 
 import (
 	"bytes"
@@ -16,11 +16,11 @@ func TestMemoryFixture(t *testing.T) {
 
 type MemoryFixture struct {
 	*gunit.Fixture
-	fileSystem *InMemoryFileSystem
+	fileSystem *inMemoryFileSystem
 }
 
 func (this *MemoryFixture) Setup() {
-	this.fileSystem = NewInMemoryFileSystem()
+	this.fileSystem = newInMemoryFileSystem()
 }
 
 func (this *MemoryFixture) TestWriteFileReadFile() {

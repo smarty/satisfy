@@ -9,7 +9,6 @@ import (
 	"github.com/smartystreets/logging"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func TestPackageBuilderFixture(t *testing.T) {
@@ -19,13 +18,13 @@ func TestPackageBuilderFixture(t *testing.T) {
 type PackageBuilderFixture struct {
 	*gunit.Fixture
 	builder    *PackageBuilder
-	fileSystem *shell.InMemoryFileSystem
+	fileSystem *inMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
 }
 
 func (this *PackageBuilderFixture) Setup() {
-	this.fileSystem = shell.NewInMemoryFileSystem()
+	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
 	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
@@ -54,10 +53,10 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: shell.InMemoryModTime}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: shell.InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: shell.InMemoryModTime}, contents: nil},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: shell.InMemoryModTime}, contents: []byte("ccc")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime}, contents: []byte("a")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -100,7 +99,7 @@ func (this *PackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
 		Name:     "inner/link.txt",
 		LinkName: "../file0.txt",
 		Size:     0,
-		ModTime:  shell.InMemoryModTime,
+		ModTime:  InMemoryModTime,
 	}, contents: nil})
 }
 

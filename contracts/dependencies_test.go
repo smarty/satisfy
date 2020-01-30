@@ -1,4 +1,4 @@
-package main
+package contracts
 
 import (
 	"testing"
@@ -61,9 +61,9 @@ func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveARemoteA
 	this.So(err, should.NotBeNil)
 }
 
-func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameAndDifferentVersionButInSamePlace() {
-	this.appendDependency("name", "1.2.3", "address", "local")
-	this.appendDependency("name", "3.2.1", "address", "local")
+func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameCannotBeInstalledToTheSamePlace() {
+	this.appendDependency("name", "1.2.3", "address1", "local")
+	this.appendDependency("name", "1.2.3", "address2", "local")
 
 	err := this.listing.Validate()
 

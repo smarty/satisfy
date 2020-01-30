@@ -1,7 +1,8 @@
-package main
+package core
 
-// TODO: move to contracts or core
-func Filter(original []Dependency, filter []string) (filtered []Dependency) {
+import "bitbucket.org/smartystreets/satisfy/contracts"
+
+func Filter(original []contracts.Dependency, filter []string) (filtered []contracts.Dependency) {
 	if len(filter) == 0 {
 		return original
 	}

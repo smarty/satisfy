@@ -1,4 +1,4 @@
-package shell
+package core
 
 import (
 	"bytes"
@@ -13,19 +13,18 @@ import (
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-// TODO: move to core
-type InMemoryFileSystem struct {
+type inMemoryFileSystem struct {
 	fileSystem map[string]*file
 	Root       string
 }
 
-func NewInMemoryFileSystem() *InMemoryFileSystem {
-	return &InMemoryFileSystem{
+func newInMemoryFileSystem() *inMemoryFileSystem {
+	return &inMemoryFileSystem{
 		fileSystem: make(map[string]*file),
 	}
 }
 
-func (this *InMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
+func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
 	file, found := this.fileSystem[path]
 	if found {
 		return file, nil
@@ -34,7 +33,7 @@ func (this *InMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
 	}
 }
 
-func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 	for _, file := range this.fileSystem {
 		files = append(files, file)
 	}
@@ -43,7 +42,7 @@ func (this *InMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 	return files
 }
 
-func (this *InMemoryFileSystem) Open(path string) io.ReadCloser {
+func (this *inMemoryFileSystem) Open(path string) io.ReadCloser {
 	target := this.fileSystem[path]
 	if target.symlink != "" {
 		target = this.fileSystem[target.symlink]
@@ -51,12 +50,12 @@ func (this *InMemoryFileSystem) Open(path string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader(target.contents))
 }
 
-func (this *InMemoryFileSystem) Create(path string) io.WriteCloser {
+func (this *inMemoryFileSystem) Create(path string) io.WriteCloser {
 	this.WriteFile(path, nil)
 	return this.fileSystem[path]
 }
 
-func (this *InMemoryFileSystem) ReadFile(path string) []byte {
+func (this *inMemoryFileSystem) ReadFile(path string) []byte {
 	target := this.fileSystem[path]
 	if target.symlink != "" {
 		target = this.resolveSymlink(target)
@@ -65,7 +64,7 @@ func (this *InMemoryFileSystem) ReadFile(path string) []byte {
 	return target.contents
 }
 
-func (this *InMemoryFileSystem) resolveSymlink(target *file) *file {
+func (this *inMemoryFileSystem) resolveSymlink(target *file) *file {
 	source, found := this.fileSystem[target.symlink]
 	if found {
 		return source
@@ -82,7 +81,7 @@ func (this *InMemoryFileSystem) resolveSymlink(target *file) *file {
 	return nil
 }
 
-func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
+func (this *inMemoryFileSystem) WriteFile(path string, content []byte) {
 	this.fileSystem[path] = &file{
 		path:     path,
 		contents: content,
@@ -90,7 +89,7 @@ func (this *InMemoryFileSystem) WriteFile(path string, content []byte) {
 	}
 }
 
-func (this *InMemoryFileSystem) CreateSymlink(source, target string) {
+func (this *inMemoryFileSystem) CreateSymlink(source, target string) {
 	this.fileSystem[target] = &file{
 		path:     target,
 		contents: nil,
@@ -99,12 +98,12 @@ func (this *InMemoryFileSystem) CreateSymlink(source, target string) {
 	}
 }
 
-func (this *InMemoryFileSystem) Delete(path string) {
+func (this *inMemoryFileSystem) Delete(path string) {
 	this.fileSystem[path] = nil
 	delete(this.fileSystem, path)
 }
 
-func (this *InMemoryFileSystem) RootPath() string {
+func (this *inMemoryFileSystem) RootPath() string {
 	return this.Root
 }
 
