@@ -29,10 +29,10 @@ func (this *UninstallationFixture) Test() {
 			},
 		},
 	}
-	Uninstall(manifest, this.delete)
+	Uninstall(manifest, this)
 	this.So(this.deleted, should.Resemble, []string{"a", "b", "c", "d"})
 }
 
-func (this *UninstallationFixture) delete(path string) {
+func (this *UninstallationFixture) Delete(path string) {
 	this.deleted = append(this.deleted, path)
 }

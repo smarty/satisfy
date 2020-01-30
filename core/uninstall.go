@@ -2,8 +2,8 @@ package core
 
 import "bitbucket.org/smartystreets/satisfy/contracts"
 
-func Uninstall(manifest contracts.Manifest, delete func(string)) {
+func Uninstall(manifest contracts.Manifest, deleter contracts.Deleter) {
 	for _, item := range manifest.Archive.Contents {
-		delete(item.Path)
+		deleter.Delete(item.Path)
 	}
 }

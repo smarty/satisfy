@@ -142,7 +142,7 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 		}
 	}
 
-	core.Uninstall(manifest, this.deleter.Delete)
+	core.Uninstall(manifest, this.deleter)
 
 	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
