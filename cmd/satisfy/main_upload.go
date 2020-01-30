@@ -19,12 +19,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
-func uploadMain(args []string) {
-	config := ParseUploadConfig("upload", args)
-	NewCheckApp(config).Run()
-	NewUploadApp(config).Run()
-}
-
 type UploadApp struct {
 	config        UploadConfig
 	packageConfig PackageConfig
@@ -37,6 +31,8 @@ type UploadApp struct {
 }
 
 func NewUploadApp(config UploadConfig) *UploadApp {
+	NewCheckApp(config).Run()
+
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 

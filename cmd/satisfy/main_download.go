@@ -18,34 +18,6 @@ import (
 	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
-func downloadMain(args []string) {
-	config := parseDownloadConfig(args)
-	listing := readDependencyListing(config.JSONPath)
-
-	err := listing.Validate()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	listing.Dependencies = core.Filter(listing.Dependencies, config.packageFilter)
-
-	working, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	disk := shell.NewDiskFileSystem(working)
-	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
-	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
-	integrity := core.NewCompoundIntegrityCheck(
-		core.NewFileListingIntegrityChecker(disk),
-		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
-	)
-
-	app := NewDownloadApp(listing, installer, integrity)
-	os.Exit(app.Run())
-}
-
 func readDependencyListing(path string) (listing contracts.DependencyListing) {
 	if path == "_STDIN_" {
 		return readFromReader(os.Stdin)
@@ -99,7 +71,23 @@ type DownloadApp struct {
 	results   chan error
 }
 
-func NewDownloadApp(listing contracts.DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *DownloadApp {
+func NewDownloadApp(config DownloadConfig) *DownloadApp {
+	listing := readDependencyListing(config.JSONPath)
+
+	err := listing.Validate()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	listing.Dependencies = core.Filter(listing.Dependencies, config.packageFilter)
+
+	disk := shell.NewDiskFileSystem("")
+	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
+	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
+	integrity := core.NewCompoundIntegrityCheck(
+		core.NewFileListingIntegrityChecker(disk),
+		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
+	)
 	waiter := new(sync.WaitGroup)
 	waiter.Add(len(listing.Dependencies))
 	results := make(chan error)

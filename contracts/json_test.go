@@ -9,11 +9,11 @@ import (
 )
 
 func TestURLFixture(t *testing.T) {
-    gunit.Run(new(URLFixture), t)
+	gunit.Run(new(URLFixture), t)
 }
 
 type URLFixture struct {
-    *gunit.Fixture
+	*gunit.Fixture
 }
 
 func (this *URLFixture) Setup() {

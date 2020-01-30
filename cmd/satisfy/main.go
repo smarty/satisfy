@@ -21,6 +21,14 @@ func isSubCommand(name string) bool {
 	return len(os.Args) > 1 && os.Args[1] == name
 }
 
+func uploadMain(args []string) {
+	NewUploadApp(ParseUploadConfig("upload", args)).Run()
+}
+
 func checkMain(args []string) {
 	NewCheckApp(ParseUploadConfig("check", args)).Run()
+}
+
+func downloadMain(args []string) {
+	os.Exit(NewDownloadApp(parseDownloadConfig(args)).Run())
 }
