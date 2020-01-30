@@ -14,12 +14,12 @@ import (
 )
 
 type PackageConfig struct {
-	CompressionAlgorithm string  `json:"compression_algorithm"`
-	CompressionLevel     int     `json:"compression_level"`
-	SourceDirectory      string  `json:"source_directory"`
-	PackageName          string  `json:"package_name"`
-	PackageVersion       string  `json:"package_version"`
-	RemoteAddressPrefix  cmd.URL `json:"remote_address"`
+	CompressionAlgorithm string   `json:"compression_algorithm"`
+	CompressionLevel     int      `json:"compression_level"`
+	SourceDirectory      string   `json:"source_directory"`
+	PackageName          string   `json:"package_name"`
+	PackageVersion       string   `json:"package_version"`
+	RemoteAddressPrefix  *cmd.URL `json:"remote_address"`
 }
 
 type UploadConfig struct {
@@ -31,7 +31,7 @@ type UploadConfig struct {
 }
 
 func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
-	return contracts.AppendRemotePath(url.URL(this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
+	return contracts.AppendRemotePath(url.URL(*this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
 }
 
 const (
@@ -49,17 +49,31 @@ func ParseUploadConfig(name string, args []string) (config UploadConfig) {
 
 	raw, err := ioutil.ReadFile(config.JSONPath)
 	if err != nil {
-		log.Fatal(err) // TODO: emit sample json file
+		emitExamplePackageConfig()
+		log.Fatal(err)
 	}
 
 	err = json.Unmarshal(raw, &config.PackageConfig)
 	if err != nil {
-		log.Fatal(err) // TODO: emit sample json file
+		emitExamplePackageConfig()
+		log.Fatal(err)
 	}
 
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
 
 	return config
+}
+
+func emitExamplePackageConfig() {
+	raw, _ := json.MarshalIndent(PackageConfig{
+		CompressionAlgorithm: "zstd",
+		CompressionLevel:     42,
+		SourceDirectory:      "src/dir",
+		PackageName:          "package-name",
+		PackageVersion:       "0.0.1",
+		RemoteAddressPrefix:  &cmd.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+	}, "", "  ")
+	log.Println("Example JSON file:\n", string(raw))
 }
 
 func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
