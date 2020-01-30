@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/shell"
@@ -37,7 +36,7 @@ func (this *CheckApp) uploadedPreviously(path string) bool {
 }
 
 func (this *CheckApp) buildRemoteStorageClient() {
-	client := cmd.NewHTTPClient()
+	client := NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

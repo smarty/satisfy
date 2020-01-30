@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/shell"
@@ -28,7 +27,7 @@ func downloadMain(args []string) {
 		log.Fatal(err)
 	}
 
-	listing.Dependencies = cmd.Filter(listing.Dependencies, config.packageFilter)
+	listing.Dependencies = Filter(listing.Dependencies, config.packageFilter)
 
 	working, err := os.Getwd()
 	if err != nil {
@@ -36,7 +35,7 @@ func downloadMain(args []string) {
 	}
 
 	disk := shell.NewDiskFileSystem(working)
-	client := shell.NewGoogleCloudStorageClient(cmd.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
+	client := shell.NewGoogleCloudStorageClient(NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
@@ -47,7 +46,7 @@ func downloadMain(args []string) {
 	os.Exit(app.Run())
 }
 
-func readDependencyListing(path string) (listing cmd.DependencyListing) {
+func readDependencyListing(path string) (listing DependencyListing) {
 	if path == "_STDIN_" {
 		return readFromReader(os.Stdin)
 	} else {
@@ -55,7 +54,7 @@ func readDependencyListing(path string) (listing cmd.DependencyListing) {
 	}
 }
 
-func readFromFile(fileName string) (listing cmd.DependencyListing) {
+func readFromFile(fileName string) (listing DependencyListing) {
 	file, err := os.Open(fileName)
 	if os.IsNotExist(err) {
 		emitExampleDependenciesFile()
@@ -69,11 +68,11 @@ func readFromFile(fileName string) (listing cmd.DependencyListing) {
 }
 
 func emitExampleDependenciesFile() {
-	var listing cmd.DependencyListing
-	listing.Dependencies = append(listing.Dependencies, cmd.Dependency{
+	var listing DependencyListing
+	listing.Dependencies = append(listing.Dependencies, Dependency{
 		PackageName:    "example_package_name",
 		PackageVersion: "0.0.1",
-		RemoteAddress:  cmd.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		RemoteAddress:  URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
 	raw, err := json.MarshalIndent(listing, "", "  ")
@@ -83,7 +82,7 @@ func emitExampleDependenciesFile() {
 	log.Print("Example json file:\n", string(raw))
 }
 
-func readFromReader(reader io.Reader) (listing cmd.DependencyListing) {
+func readFromReader(reader io.Reader) (listing DependencyListing) {
 	decoder := json.NewDecoder(reader)
 	err := decoder.Decode(&listing)
 	if err != nil {
@@ -93,14 +92,14 @@ func readFromReader(reader io.Reader) (listing cmd.DependencyListing) {
 }
 
 type DownloadApp struct {
-	listing   cmd.DependencyListing
+	listing   DependencyListing
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
 	waiter    *sync.WaitGroup
 	results   chan error
 }
 
-func NewDownloadApp(listing cmd.DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *DownloadApp {
+func NewDownloadApp(listing DependencyListing, installer *core.PackageInstaller, integrity contracts.IntegrityCheck) *DownloadApp {
 	waiter := new(sync.WaitGroup)
 	waiter.Add(len(listing.Dependencies))
 	results := make(chan error)
@@ -130,7 +129,7 @@ func (this *DownloadApp) awaitCompletion() {
 	close(this.results)
 }
 
-func (this *DownloadApp) install(dependency cmd.Dependency) {
+func (this *DownloadApp) install(dependency Dependency) {
 	defer this.waiter.Done()
 
 	log.Printf("Installing dependency: %s", dependency.Title())
@@ -173,7 +172,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 	log.Printf("Dependency installed: %s", dependency.Title())
 }
 
-func loadManifest(dependency cmd.Dependency) (manifest contracts.Manifest, err error) {
+func loadManifest(dependency Dependency) (manifest contracts.Manifest, err error) {
 	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.PackageName)
 
 	_, err = os.Stat(path)

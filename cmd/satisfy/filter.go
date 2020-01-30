@@ -1,4 +1,4 @@
-package cmd
+package main
 
 // TODO: move to contracts or core
 func Filter(original []Dependency, filter []string) (filtered []Dependency) {

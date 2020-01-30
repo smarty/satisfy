@@ -14,7 +14,6 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 
-	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
 	"bitbucket.org/smartystreets/satisfy/shell"
@@ -136,7 +135,7 @@ func (this *UploadApp) buildManifestUploadRequest() contracts.UploadRequest {
 }
 
 func (this *UploadApp) buildRemoteStorageClient() {
-	client := cmd.NewHTTPClient()
+	client := NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }
