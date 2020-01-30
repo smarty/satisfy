@@ -64,6 +64,7 @@ func readFromReader(reader io.Reader) (listing contracts.DependencyListing) {
 }
 
 type DownloadApp struct {
+	deleter   contracts.Deleter
 	listing   contracts.DependencyListing
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
@@ -92,6 +93,7 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	waiter.Add(len(listing.Dependencies))
 	results := make(chan error)
 	return &DownloadApp{
+		deleter:   disk,
 		listing:   listing,
 		installer: installer,
 		integrity: integrity,
@@ -137,6 +139,9 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 			log.Printf("%s in %s", verifyErr.Error(), dependency.Title())
 		}
 	}
+
+	core.Uninstall(manifest, this.deleter.Delete)
+
 	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
 
 	log.Printf("Downloading manifest for %s", dependency.Title())
