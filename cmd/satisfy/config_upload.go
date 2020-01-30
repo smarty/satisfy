@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"encoding/json"
@@ -8,25 +8,29 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/smartystreets/gcs"
-
+	"bitbucket.org/smartystreets/satisfy/cmd"
 	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/gcs"
 )
 
-type Config struct {
-	CompressionAlgorithm string          `json:"compression_algorithm"`
-	CompressionLevel     int             `json:"compression_level"`
-	SourceDirectory      string          `json:"source_directory"`
-	PackageName          string          `json:"package_name"`
-	PackageVersion       string          `json:"package_version"`
-	RemoteAddressPrefix  URL             `json:"remote_address"`
-	MaxRetry             int             `json:"-"`
-	GoogleCredentials    gcs.Credentials `json:"-"`
-	JSONPath             string          `json:"-"`
-	ForceUpload          bool            `json:"-"`
+type PackageConfig struct {
+	CompressionAlgorithm string  `json:"compression_algorithm"`
+	CompressionLevel     int     `json:"compression_level"`
+	SourceDirectory      string  `json:"source_directory"`
+	PackageName          string  `json:"package_name"`
+	PackageVersion       string  `json:"package_version"`
+	RemoteAddressPrefix  cmd.URL `json:"remote_address"`
 }
 
-func (this Config) ComposeRemoteAddress(filename string) url.URL {
+type UploadConfig struct {
+	MaxRetry          int
+	GoogleCredentials gcs.Credentials
+	JSONPath          string
+	ForceUpload       bool
+	PackageConfig     PackageConfig
+}
+
+func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
 	return contracts.AppendRemotePath(url.URL(this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
 }
 
@@ -35,7 +39,7 @@ const (
 	RemoteArchiveFilename  = "archive"
 )
 
-func ParseConfig(name string, args []string) (config Config) {
+func ParseUploadConfig(name string, args []string) (config UploadConfig) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
 	flags.StringVar(&config.JSONPath, "json", "upload.json", "The path to the JSON config file.")
 	flags.IntVar(&config.MaxRetry, "max-retry", 5, "HTTP max retry.")
@@ -48,7 +52,7 @@ func ParseConfig(name string, args []string) (config Config) {
 		log.Fatal(err) // TODO: emit sample json file
 	}
 
-	err = json.Unmarshal(raw, &config)
+	err = json.Unmarshal(raw, &config.PackageConfig)
 	if err != nil {
 		log.Fatal(err) // TODO: emit sample json file
 	}

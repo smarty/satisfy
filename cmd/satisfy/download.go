@@ -20,7 +20,7 @@ import (
 )
 
 func downloadMain(args []string) {
-	config := parseConfig(args)
+	config := parseDownloadConfig(args)
 	listing := readDependencyListing(config.JSONPath)
 
 	err := listing.Validate()
@@ -154,7 +154,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	log.Printf("Downloading manifest for %s", dependency.Title())
 
-	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteManifestFilename)
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(RemoteManifestFilename)
 	manifest, err := this.installer.InstallManifest(installation)
 	if err != nil {
 		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Title(), err)
@@ -163,7 +163,7 @@ func (this *DownloadApp) install(dependency cmd.Dependency) {
 
 	log.Printf("Downloading and extracting package contents for %s", dependency.Title())
 
-	installation.RemoteAddress = dependency.ComposeRemoteAddress(cmd.RemoteArchiveFilename)
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(RemoteArchiveFilename)
 	err = this.installer.InstallPackage(manifest, installation)
 	if err != nil {
 		this.results <- fmt.Errorf("failed to install package contents for %s: %v", dependency.Title(), err)

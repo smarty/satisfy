@@ -20,3 +20,7 @@ func main() {
 func isSubCommand(name string) bool {
 	return len(os.Args) > 1 && os.Args[1] == name
 }
+
+func checkMain(args []string) {
+	NewCheckApp(ParseUploadConfig("check", args)).Run()
+}

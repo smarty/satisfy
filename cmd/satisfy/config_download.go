@@ -7,12 +7,9 @@ import (
 	"os"
 
 	"github.com/smartystreets/gcs"
-
-	"bitbucket.org/smartystreets/satisfy/cmd"
 )
 
-// TODO: Merge with other config
-type Config struct {
+type DownloadConfig struct {
 	MaxRetry          int
 	QuickVerification bool
 	JSONPath          string
@@ -20,7 +17,7 @@ type Config struct {
 	packageFilter     []string
 }
 
-func parseConfig(args []string) (config Config) {
+func parseDownloadConfig(args []string) (config DownloadConfig) {
 	flags := flag.NewFlagSet("satisfy", flag.ExitOnError)
 	flags.IntVar(&config.MaxRetry,
 		"max-retry",
@@ -59,7 +56,7 @@ func parseConfig(args []string) (config Config) {
 
 	config.packageFilter = flags.Args()
 
-	config.GoogleCredentials = cmd.ParseGoogleCredentialsFromEnvironment()
+	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
 
 	return config
 }

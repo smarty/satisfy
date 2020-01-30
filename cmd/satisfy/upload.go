@@ -21,23 +21,24 @@ import (
 )
 
 func uploadMain(args []string) {
-	config := cmd.ParseConfig("upload", args)
+	config := ParseUploadConfig("upload", args)
 	NewCheckApp(config).Run()
 	NewUploadApp(config).Run()
 }
 
 type UploadApp struct {
-	config     cmd.Config
-	file       *os.File
-	hasher     hash.Hash
-	compressor io.WriteCloser
-	builder    *core.PackageBuilder
-	manifest   contracts.Manifest
-	client     contracts.RemoteStorage
+	config        UploadConfig
+	packageConfig PackageConfig
+	file          *os.File
+	hasher        hash.Hash
+	compressor    io.WriteCloser
+	builder       *core.PackageBuilder
+	manifest      contracts.Manifest
+	client        contracts.RemoteStorage
 }
 
-func NewUploadApp(config cmd.Config) *UploadApp {
-	return &UploadApp{config: config}
+func NewUploadApp(config UploadConfig) *UploadApp {
+	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
 func (this *UploadApp) Run() {
@@ -61,7 +62,7 @@ func (this *UploadApp) Run() {
 func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		RemoteAddress: this.config.ComposeRemoteAddress(cmd.RemoteArchiveFilename),
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(RemoteArchiveFilename),
 		Body:          NewFileWrapper(this.file),
 		Size:          int64(this.manifest.Archive.Size),
 		ContentType:   "application/zstd",
@@ -80,7 +81,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	this.InitializeCompressor(writer)
 
 	this.builder = core.NewPackageBuilder(
-		shell.NewDiskFileSystem(this.config.SourceDirectory), // TODO: make absolute
+		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory), // TODO: make absolute
 		shell.NewTarArchiveWriter(this.compressor),
 		md5.New(),
 	)
@@ -99,11 +100,11 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 }
 
 func (this *UploadApp) InitializeCompressor(writer io.Writer) {
-	factory, found := compression[this.config.CompressionAlgorithm]
+	factory, found := compression[this.packageConfig.CompressionAlgorithm]
 	if !found {
-		log.Fatalln("Unsupported compression algorithm:", this.config.CompressionAlgorithm)
+		log.Fatalln("Unsupported compression algorithm:", this.packageConfig.CompressionAlgorithm)
 	}
-	this.compressor = factory(writer, this.config.CompressionLevel)
+	this.compressor = factory(writer, this.packageConfig.CompressionLevel)
 }
 
 var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
@@ -126,7 +127,7 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 func (this *UploadApp) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		RemoteAddress: this.config.ComposeRemoteAddress(cmd.RemoteManifestFilename),
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(RemoteManifestFilename),
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
 		ContentType:   "application/json",
@@ -146,14 +147,14 @@ func (this *UploadApp) completeManifest() {
 		log.Fatal(err)
 	}
 	this.manifest = contracts.Manifest{
-		Name:    this.config.PackageName,
-		Version: this.config.PackageVersion,
+		Name:    this.packageConfig.PackageName,
+		Version: this.packageConfig.PackageVersion,
 		Archive: contracts.Archive{
-			Filename:             cmd.RemoteArchiveFilename,
+			Filename:             RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
-			CompressionAlgorithm: this.config.CompressionAlgorithm,
+			CompressionAlgorithm: this.packageConfig.CompressionAlgorithm,
 		},
 	}
 }
