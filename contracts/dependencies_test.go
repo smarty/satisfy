@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/smartystreets/assertions/should"
@@ -70,6 +71,27 @@ func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameCannotBeIn
 	this.So(err, should.NotBeNil)
 }
 
+func (this *DependencyListingFixture) TestAppendRemoteAddress() {
+	address, err := url.Parse("https://www.google.com")
+	this.So(err, should.BeNil)
+	dependency := Dependency{
+		PackageName:    "package-name",
+		PackageVersion: "1.2.3",
+		RemoteAddress:  URL(*address),
+	}
+	actual := dependency.ComposeRemoteAddress("filename")
+
+	this.So(actual.String(), should.Equal, "https://www.google.com/package-name/1.2.3/filename")
+}
+
+func (this *DependencyListingFixture) TestTitleString() {
+	dependency := Dependency{
+		PackageName:    "package-name",
+		PackageVersion: "1.2.3",
+	}
+
+	this.So(dependency.Title(), should.Equal, "[package-name @ 1.2.3]")
+}
 func (this *DependencyListingFixture) appendDependency(name, version, address, directory string) {
 	this.listing.Dependencies = append(this.listing.Dependencies, Dependency{
 		PackageName:    name,

@@ -4,85 +4,135 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
-	"testing"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 
-	"github.com/smartystreets/assertions/should"
-	"github.com/smartystreets/gunit"
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-func TestMemoryFixture(t *testing.T) {
-	gunit.Run(new(MemoryFixture), t)
+type inMemoryFileSystem struct {
+	fileSystem map[string]*file
+	Root       string
 }
 
-type MemoryFixture struct {
-	*gunit.Fixture
-	fileSystem *inMemoryFileSystem
+func newInMemoryFileSystem() *inMemoryFileSystem {
+	return &inMemoryFileSystem{
+		fileSystem: make(map[string]*file),
+	}
 }
 
-func (this *MemoryFixture) Setup() {
-	this.fileSystem = newInMemoryFileSystem()
+func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
+	file, found := this.fileSystem[path]
+	if found {
+		return file, nil
+	} else {
+		return file, os.ErrNotExist
+	}
 }
 
-func (this *MemoryFixture) TestWriteFileReadFile() {
-	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-	this.So(this.fileSystem.ReadFile("/file.txt"), should.Resemble, []byte("Hello World"))
+func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+	for _, file := range this.fileSystem {
+		files = append(files, file)
+	}
+
+	sort.Slice(files, func(i, j int) bool { return files[i].Path() < files[j].Path() })
+	return files
 }
 
-func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
-	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-	buffer := &bytes.Buffer{}
-	reader := this.fileSystem.Open("/file.txt")
-	io.Copy(buffer, reader)
-	this.So(this.fileSystem.Listing()[0].Size(), should.Equal, len([]byte("Hello World")))
+func (this *inMemoryFileSystem) Open(path string) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
 }
 
-func (this *MemoryFixture) TestReadFileNonExistingFile() {
-	this.So(func() { this.fileSystem.ReadFile("/file.txt") }, should.Panic)
+func (this *inMemoryFileSystem) Create(path string) io.WriteCloser {
+	this.WriteFile(path, nil)
+	return this.fileSystem[path]
 }
 
-func (this *MemoryFixture) TestOpenWrittenFile() {
-	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-	reader := this.fileSystem.Open("/file.txt")
-	raw, _ := ioutil.ReadAll(reader)
-	this.So(raw, should.Resemble, []byte("Hello World"))
+func (this *inMemoryFileSystem) ReadFile(path string) []byte {
+	target := this.fileSystem[path]
+	if target.symlink != "" {
+		target = this.resolveSymlink(target)
+
+	}
+	return target.contents
 }
 
-func (this *MemoryFixture) TestCreate() {
-	writer := this.fileSystem.Create("/file.txt")
-	_, _ = writer.Write([]byte("Hello World"))
-	_ = writer.Close()
-	this.So(this.fileSystem.ReadFile("/file.txt"), should.Resemble, []byte("Hello World"))
+func (this *inMemoryFileSystem) resolveSymlink(target *file) *file {
+	source, found := this.fileSystem[target.symlink]
+	if found {
+		return source
+	}
+	parts := strings.Split(target.path, string(os.PathSeparator))
+	for part := 1; part < len(parts); part++ {
+		prepend := filepath.Join(parts[:part]...)
+		path := filepath.Join(prepend, target.symlink)
+		source, found := this.fileSystem[path]
+		if found {
+			return source
+		}
+	}
+	return nil
 }
 
-func (this *MemoryFixture) TestListing() {
-	this.fileSystem.WriteFile("file0.txt", []byte(""))
-	this.fileSystem.WriteFile("file1.txt", []byte("1"))
-	this.fileSystem.WriteFile("sub/file0.txt", []byte("12"))
-
-	fileInfo := this.fileSystem.Listing()
-
-	this.So(fileInfo, should.HaveLength, 3)
-	this.So(fileInfo[0].Path(), should.Equal, "file0.txt")
-	this.So(fileInfo[0].Size(), should.Equal, 0)
-	this.So(fileInfo[1].Path(), should.Equal, "file1.txt")
-	this.So(fileInfo[1].Size(), should.Equal, 1)
-	this.So(fileInfo[2].Path(), should.Equal, "sub/file0.txt")
-	this.So(fileInfo[2].Size(), should.Equal, 2)
+func (this *inMemoryFileSystem) WriteFile(path string, content []byte) {
+	this.fileSystem[path] = &file{
+		path:     path,
+		contents: content,
+		mod:      InMemoryModTime,
+	}
 }
 
-func (this *MemoryFixture) TestDelete() {
-	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-
-	this.fileSystem.Delete("/file.txt")
-
-	this.So(this.fileSystem.Listing(), should.BeEmpty)
+func (this *inMemoryFileSystem) CreateSymlink(source, target string) {
+	this.fileSystem[target] = &file{
+		path:     target,
+		contents: nil,
+		mod:      InMemoryModTime,
+		symlink:  source,
+	}
 }
 
-func (this *MemoryFixture) TestCreateSymlink() {
-	this.fileSystem.WriteFile("/source.txt", []byte("Hello World"))
+func (this *inMemoryFileSystem) Delete(path string) {
+	this.fileSystem[path] = nil
+	delete(this.fileSystem, path)
+}
 
-	this.fileSystem.CreateSymlink("/source.txt", "/target.txt")
+func (this *inMemoryFileSystem) RootPath() string {
+	return this.Root
+}
 
-	this.So(this.fileSystem.Listing(), should.HaveLength, 2)
-	this.So(this.fileSystem.ReadFile("/target.txt"), should.Resemble, []byte("Hello World"))
+/////////////////////////////////////////////////
+
+type file struct {
+	path     string
+	contents []byte
+	mod      time.Time
+	symlink  string
+}
+
+func (this *file) Symlink() string { return this.symlink }
+
+var InMemoryModTime = time.Now()
+
+func (this *file) ModTime() time.Time {
+	return this.mod
+}
+
+func (this *file) Write(p []byte) (n int, err error) {
+	this.contents = append(this.contents, p...)
+	return len(p), nil
+}
+
+func (this *file) Close() error {
+	return nil
+}
+
+func (this *file) Path() string {
+	return this.path
+}
+
+func (this *file) Size() int64 {
+	return int64(len(this.contents))
 }
