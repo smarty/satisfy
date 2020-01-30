@@ -124,6 +124,8 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 
 	log.Printf("Installing dependency: %s", dependency.Title())
 
+	// TODO: the rest of this method really should be under unit test, in the core.
+
 	manifest, manifestErr := loadManifest(dependency)
 	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
 		absolute, err := filepath.Abs(dependency.LocalDirectory)
@@ -165,6 +167,7 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 	log.Printf("Dependency installed: %s", dependency.Title())
 }
 
+// TODO: this method really should be under unit test, in the core.
 func loadManifest(dependency contracts.Dependency) (manifest contracts.Manifest, err error) {
 	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.PackageName)
 
