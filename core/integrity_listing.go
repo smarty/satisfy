@@ -31,5 +31,3 @@ func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, loc
 	log.Printf("Listing integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
 	return nil
 }
-
-
