@@ -22,11 +22,11 @@ func isSubCommand(name string) bool {
 }
 
 func uploadMain(args []string) {
-	NewUploadApp(ParseUploadConfig("upload", args)).Run()
+	NewUploadApp(parseUploadConfig("upload", args)).Run()
 }
 
 func checkMain(args []string) {
-	NewCheckApp(ParseUploadConfig("check", args)).Run()
+	NewCheckApp(parseUploadConfig("check", args)).Run()
 }
 
 func downloadMain(args []string) {

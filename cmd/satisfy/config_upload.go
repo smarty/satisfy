@@ -38,21 +38,26 @@ const (
 	RemoteArchiveFilename  = "archive"
 )
 
-func ParseUploadConfig(name string, args []string) (config UploadConfig) {
+func parseUploadConfig(name string, args []string) (config UploadConfig) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
-	flags.StringVar(&config.JSONPath, "json", "upload.json", "The path to the JSON config file.")
-	flags.IntVar(&config.MaxRetry, "max-retry", 5, "HTTP max retry.")
-	flags.BoolVar(&config.ForceUpload, "force-upload", false,
-		"When set, always upload package, even when it already exists at specified remote location.")
+	flags.StringVar(&config.JSONPath,
+		"json",
+		"_STDIN_",
+		"Path to file with config file or, if equal to _STDIN_, read from stdin.",
+	)
+	flags.IntVar(&config.MaxRetry,
+		"max-retry",
+		5,
+		"HTTP max retry.",
+	)
+	flags.BoolVar(&config.ForceUpload,
+		"force-upload",
+		false,
+		"When set, always upload package, even when it already exists at specified remote location.",
+	)
 	_ = flags.Parse(args)
 
-	raw, err := ioutil.ReadFile(config.JSONPath)
-	if err != nil {
-		emitExamplePackageConfig()
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(raw, &config.PackageConfig)
+	err := json.Unmarshal(readConfigFile(config), &config.PackageConfig)
 	if err != nil {
 		emitExamplePackageConfig()
 		log.Fatal(err)
@@ -61,6 +66,20 @@ func ParseUploadConfig(name string, args []string) (config UploadConfig) {
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
 
 	return config
+}
+
+func readConfigFile(config UploadConfig) (raw []byte) {
+	var err error
+	if config.JSONPath == "_STDIN_" {
+		raw, err = ioutil.ReadAll(os.Stdin)
+	} else {
+		raw, err = ioutil.ReadFile(config.JSONPath)
+	}
+	if err != nil {
+		emitExamplePackageConfig()
+		log.Fatal(err)
+	}
+	return raw
 }
 
 func emitExamplePackageConfig() {
