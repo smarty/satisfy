@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"io"
 	"net/url"
 	"path"
@@ -31,3 +32,5 @@ func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url
 	prefix.Path = "/" + path.Join(prefix.Path, packageName, version, fileName)
 	return prefix
 }
+
+var RetryErr = errors.New("retry")

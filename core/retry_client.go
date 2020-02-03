@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"io"
 	"net/url"
 	"time"
@@ -28,6 +29,9 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 		if err == nil {
 			return nil
 		}
+		if !errors.Is(err, contracts.RetryErr) {
+			return err
+		}
 		if x < this.maxRetry {
 			this.logger.Println("[WARN] upload failed, retry imminent.")
 			this.sleeper.Sleep(time.Second * 3)
@@ -41,6 +45,9 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 		body, err = this.inner.Download(request)
 		if err == nil {
 			return body, nil
+		}
+		if !errors.Is(err, contracts.RetryErr) {
+			return nil, err
 		}
 		if x < this.maxRetry {
 			this.logger.Println("[WARN] download failed, retry imminent.")

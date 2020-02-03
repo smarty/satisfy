@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
@@ -44,11 +45,11 @@ func (this *RetryFixture) TestUploadCallsInner() {
 }
 
 func (this *RetryFixture) TestUploadRetryOnError() {
-	this.fakeClient.error = anError
+	this.fakeClient.error = aRetryError
 
 	err := this.client.Upload(contracts.UploadRequest{})
 
-	this.So(err, should.Equal, anError)
+	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
 	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
 		time.Second * 3,
@@ -56,6 +57,16 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 		time.Second * 3,
 		time.Second * 3,
 	})
+}
+
+func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
+	this.fakeClient.error = aRegularError
+
+	err := this.client.Upload(contracts.UploadRequest{})
+
+	this.So(err, should.Equal, aRegularError)
+	this.So(this.fakeClient.uploadAttempts, should.Equal, 1)
+	this.So(this.client.sleeper.Naps, should.BeEmpty)
 }
 
 func (this *RetryFixture) TestDownloadCallsInner() {
@@ -71,11 +82,11 @@ func (this *RetryFixture) TestDownloadCallsInner() {
 }
 
 func (this *RetryFixture) TestDownloadRetryOnError() {
-	this.fakeClient.error = anError
+	this.fakeClient.error = aRetryError
 
 	_, err := this.client.Download(url.URL{})
 
-	this.So(err, should.Equal, anError)
+	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.downloadAttempts, should.Equal, 5)
 	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
 		time.Second * 3,
@@ -84,8 +95,21 @@ func (this *RetryFixture) TestDownloadRetryOnError() {
 		time.Second * 3,
 	})
 }
+func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
+	this.fakeClient.error = aRegularError
 
-var anError = errors.New("this is an error")
+	body, err := this.client.Download(url.URL{})
+
+	this.So(body, should.BeNil)
+	this.So(err, should.Equal, aRegularError)
+	this.So(this.fakeClient.downloadAttempts, should.Equal, 1)
+	this.So(this.client.sleeper.Naps, should.BeEmpty)
+}
+
+var (
+	aRetryError   = fmt.Errorf("this is a retry error %w", contracts.RetryErr)
+	aRegularError = errors.New("this is a regular error")
+)
 
 /////////////////////////////////////////////////////////////////////////////////
 

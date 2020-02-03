@@ -38,7 +38,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
 		this.dump(gcsRequest, response)
@@ -58,7 +58,7 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
 		this.dump(gcsRequest, response)
