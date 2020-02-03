@@ -5,11 +5,11 @@ REPO  ?= $(or ${DOCKER_SERVER},smartystreets)
 IMAGE := $(REPO)/$(NAME):$(or ${VERSION},local)
 PKG   := bitbucket.org/smartystreets/$(NAME)/cmd/satisfy
 
-simple-test:
+test:
 	go fmt ./... && \
 		go test -timeout=1s -count=1 -short ./...
 
-test:
+cover:
 	go test -timeout=1s -race -coverprofile=coverage.txt -covermode=atomic -short ./...
 
 clean:
@@ -33,4 +33,4 @@ image: build
 publish: image
 	docker push "$(IMAGE)"
 
-.PHONY: simple-test test clean compile build install image publish
+.PHONY: test cover clean compile build install image publish
