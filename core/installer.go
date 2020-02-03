@@ -52,10 +52,10 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 func (this *PackageInstaller) writeLocalManifest(localPath string, manifest contracts.Manifest) {
 	// TODO: any particular reason to re-serialize the manifest?
 	file := this.filesystem.Create(ComposeManifestPath(localPath, manifest.Name))
+	defer func() { _ = file.Close() }()
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "   ")
 	_ = encoder.Encode(manifest)
-	_ = file.Close()
 }
 
 func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
@@ -106,10 +106,10 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		} else {
 			writer := this.filesystem.Create(path)
 			_, err = io.Copy(writer, tarReader)
+			_ = writer.Close()
 			if err != nil {
 				return paths, err
 			}
-			_ = writer.Close()
 		}
 	}
 	return paths, nil
