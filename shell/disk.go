@@ -101,7 +101,11 @@ func (this *DiskFileSystem) ReadFile(path string) []byte {
 }
 
 func (this *DiskFileSystem) WriteFile(path string, content []byte) {
-	err := ioutil.WriteFile(path, content, 0644)
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		log.Panic(err)
+	}
+	err = ioutil.WriteFile(path, content, 0644)
 	if err != nil {
 		log.Panic(err)
 	}
