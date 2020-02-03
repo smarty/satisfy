@@ -48,7 +48,7 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 		return contracts.Manifest{}, err
 	}
 
-	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), manifest)
+	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest)
 	return manifest, nil
 }
 
