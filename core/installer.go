@@ -65,7 +65,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	}
 	hashReader := NewHashReader(body, md5.New())
 
-	factory, found := decompression[manifest.Archive.CompressionAlgorithm]
+	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
 	if !found {
 		return errors.New("invalid compression algorithm")
 	}
@@ -97,14 +97,14 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		if err != nil {
 			return paths, err
 		}
-		path := filepath.Join(request.LocalPath, header.Name)
-		paths = append(paths, path)
-		this.logger.Printf("Extracting archive item \"%s\" to \"%s\".", header.Name, path)
+		pathItem := filepath.Join(request.LocalPath, header.Name)
+		paths = append(paths, pathItem)
+		this.logger.Printf("Extracting archive item \"%s\" to \"%s\".", header.Name, pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
-			this.filesystem.CreateSymlink(header.Linkname, path)
+			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
-			writer := this.filesystem.Create(path)
+			writer := this.filesystem.Create(pathItem)
 			_, err = io.Copy(writer, tarReader)
 			_ = writer.Close()
 			if err != nil {
@@ -127,7 +127,7 @@ func ComposeManifestPath(localPath, name string) string {
 	return filepath.Join(localPath, fileName)
 }
 
-var decompression = map[string]func(_ io.Reader) (io.Reader, error){
+var decompressors = map[string]func(_ io.Reader) (io.Reader, error){
 	"zstd": func(reader io.Reader) (io.Reader, error) { return zstd.NewReader(reader) },
 	"gzip": func(reader io.Reader) (io.Reader, error) { return gzip.NewReader(reader) },
 }
