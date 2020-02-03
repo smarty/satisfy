@@ -37,16 +37,15 @@ func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInst
 func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	body, err := this.downloader.Download(request.RemoteAddress)
 	if err != nil {
-		return manifest, err
+		return contracts.Manifest{}, err
 	}
 
 	err = json.NewDecoder(body).Decode(&manifest)
 	if err != nil {
-		return manifest, err
+		return contracts.Manifest{}, err
 	}
 
 	this.writeLocalManifest(request.LocalPath, manifest)
-
 	return manifest, nil
 }
 
