@@ -73,7 +73,7 @@ func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSour
 }
 
 func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contracts.ArchiveHeader, err error) {
-	header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+	header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/") // TODO: path.Join?
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
 
@@ -109,7 +109,7 @@ func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) erro
 func (this *PackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
 	defer this.hasher.Reset()
 	return contracts.ArchiveItem{
-		Path:        strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/"),
+		Path:        strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/"), // TODO: path.Join?
 		Size:        this.determineFileSize(file, symlinkSourcePath),
 		MD5Checksum: this.hasher.Sum(nil),
 	}

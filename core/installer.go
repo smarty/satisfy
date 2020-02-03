@@ -51,6 +51,7 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 }
 
 func (this *PackageInstaller) writeLocalManifest(localPath string, manifest contracts.Manifest) {
+	// TODO: any particular reason to re-serialize the manifest?
 	file := this.filesystem.Create(ComposeManifestPath(localPath, manifest.Name))
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "   ")
