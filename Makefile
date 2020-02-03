@@ -20,7 +20,7 @@ compile: clean
 build: coverage compile
 
 install: coverage
-	go install "$(PKG)"
+	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go install -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" "$(PKG)"
 
 ##########################################################
 

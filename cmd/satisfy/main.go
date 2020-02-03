@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 )
@@ -12,6 +13,8 @@ func main() {
 		uploadMain(os.Args[2:])
 	} else if isSubCommand("check") {
 		checkMain(os.Args[2:])
+	} else if isSubCommand("version") {
+		versionMain()
 	} else {
 		downloadMain(os.Args[1:])
 	}
@@ -32,3 +35,9 @@ func checkMain(args []string) {
 func downloadMain(args []string) {
 	os.Exit(NewDownloadApp(parseDownloadConfig(args)).Run())
 }
+
+func versionMain() {
+	fmt.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
+}
+
+var ldflagsSoftwareVersion string = "debug"
