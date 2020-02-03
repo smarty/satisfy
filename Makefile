@@ -34,6 +34,3 @@ publish: image
 	docker push "$(IMAGE)"
 
 .PHONY: simple-test test clean compile build install image publish
-
-
-.PHONY: simple-test test compile build
