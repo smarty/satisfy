@@ -6,21 +6,20 @@ IMAGE := $(REPO)/$(NAME):$(or ${VERSION},local)
 PKG   := bitbucket.org/smartystreets/$(NAME)/cmd/satisfy
 
 test:
-	go fmt ./... && \
-		go test -timeout=1s -count=1 -short ./...
+	go fmt ./... && go test -timeout=1s -count=1 -short ./...
 
-cover:
+coverage:
 	go test -timeout=1s -race -coverprofile=coverage.txt -covermode=atomic -short ./...
 
 clean:
-	rm -rf workspace/
+	rm -rf workspace/ coverage.txt
 
 compile: clean
 	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go build -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" -o workspace/app "$(PKG)"
 
-build: test compile
+build: coverage compile
 
-install: test
+install: coverage
 	go install "$(PKG)"
 
 ##########################################################
@@ -33,4 +32,4 @@ image: build
 publish: image
 	docker push "$(IMAGE)"
 
-.PHONY: test cover clean compile build install image publish
+.PHONY: test coverage clean compile build install image publish
