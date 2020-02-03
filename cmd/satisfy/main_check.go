@@ -19,8 +19,8 @@ func NewCheckApp(config UploadConfig) *CheckApp {
 }
 
 func (this *CheckApp) Run() {
-	if this.config.ForceUpload {
-		log.Println("[INFO] Force upload enabled, skipping remote manifest check.")
+	if this.config.Overwrite {
+		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return
 	}
 	if this.uploadedPreviously(contracts.RemoteManifestFilename) {

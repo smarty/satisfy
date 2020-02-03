@@ -26,7 +26,7 @@ type UploadConfig struct {
 	MaxRetry          int
 	GoogleCredentials gcs.Credentials
 	JSONPath          string
-	ForceUpload       bool
+	Overwrite         bool
 	PackageConfig     PackageConfig
 }
 
@@ -46,8 +46,8 @@ func parseUploadConfig(name string, args []string) (config UploadConfig) {
 		5,
 		"HTTP max retry.",
 	)
-	flags.BoolVar(&config.ForceUpload,
-		"force-upload",
+	flags.BoolVar(&config.Overwrite,
+		"overwrite",
 		false,
 		"When set, always upload package, even when it already exists at specified remote location.",
 	)
