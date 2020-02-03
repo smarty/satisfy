@@ -28,6 +28,6 @@ type Downloader interface {
 }
 
 func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
-	prefix.Path = path.Join(prefix.Path, packageName, version, fileName)
+	prefix.Path = "/" + path.Join(prefix.Path, packageName, version, fileName)
 	return prefix
 }

@@ -148,7 +148,7 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 
 	log.Printf("Downloading manifest for %s", dependency.Title())
 
-	installation.RemoteAddress = dependency.ComposeRemoteAddress(RemoteManifestFilename)
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename)
 	manifest, err := this.installer.InstallManifest(installation)
 	if err != nil {
 		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Title(), err)
@@ -157,7 +157,7 @@ func (this *DownloadApp) install(dependency contracts.Dependency) {
 
 	log.Printf("Downloading and extracting package contents for %s", dependency.Title())
 
-	installation.RemoteAddress = dependency.ComposeRemoteAddress(RemoteArchiveFilename)
+	installation.RemoteAddress = dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename)
 	err = this.installer.InstallPackage(manifest, installation)
 	if err != nil {
 		this.results <- fmt.Errorf("failed to install package contents for %s: %v", dependency.Title(), err)

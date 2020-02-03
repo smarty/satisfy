@@ -57,7 +57,7 @@ func (this *UploadApp) Run() {
 func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(RemoteArchiveFilename),
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		Body:          NewFileWrapper(this.file),
 		Size:          int64(this.manifest.Archive.Size),
 		ContentType:   "application/zstd",
@@ -122,7 +122,7 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 func (this *UploadApp) buildManifestUploadRequest() contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(RemoteManifestFilename),
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename),
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
 		ContentType:   "application/json",
@@ -145,7 +145,7 @@ func (this *UploadApp) completeManifest() {
 		Name:    this.packageConfig.PackageName,
 		Version: this.packageConfig.PackageVersion,
 		Archive: contracts.Archive{
-			Filename:             RemoteArchiveFilename,
+			Filename:             contracts.RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),

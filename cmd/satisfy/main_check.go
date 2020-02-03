@@ -23,7 +23,7 @@ func (this *CheckApp) Run() {
 		log.Println("[INFO] Force upload enabled, skipping remote manifest check.")
 		return
 	}
-	if this.uploadedPreviously(RemoteManifestFilename) {
+	if this.uploadedPreviously(contracts.RemoteManifestFilename) {
 		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
 	}
 }

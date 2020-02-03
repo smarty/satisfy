@@ -8,8 +8,9 @@ import (
 	"net/url"
 	"os"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/gcs"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type PackageConfig struct {
@@ -32,11 +33,6 @@ type UploadConfig struct {
 func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
 	return contracts.AppendRemotePath(url.URL(*this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
 }
-
-const (
-	RemoteManifestFilename = "manifest.json"
-	RemoteArchiveFilename  = "archive"
-)
 
 func parseUploadConfig(name string, args []string) (config UploadConfig) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
