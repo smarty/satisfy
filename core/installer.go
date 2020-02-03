@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -20,6 +21,7 @@ import (
 
 type PackageInstallerFileSystem interface {
 	contracts.FileCreator
+	contracts.FileWriter
 	contracts.Deleter
 	contracts.SymlinkCreator
 }
@@ -40,22 +42,14 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 		return contracts.Manifest{}, err
 	}
 
-	err = json.NewDecoder(body).Decode(&manifest)
+	rawManifest, err := ioutil.ReadAll(body)
+	err = json.Unmarshal(rawManifest, &manifest)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
 
-	this.writeLocalManifest(request.LocalPath, manifest)
+	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), manifest)
 	return manifest, nil
-}
-
-func (this *PackageInstaller) writeLocalManifest(localPath string, manifest contracts.Manifest) {
-	// TODO: any particular reason to re-serialize the manifest?
-	file := this.filesystem.Create(ComposeManifestPath(localPath, manifest.Name))
-	defer func() { _ = file.Close() }()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "   ")
-	_ = encoder.Encode(manifest)
 }
 
 func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
