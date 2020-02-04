@@ -82,6 +82,11 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 
 	listing.Dependencies = core.Filter(listing.Dependencies, config.packageFilter)
 
+	if len(listing.Dependencies) == 0 {
+		log.Println("[WARN] No dependencies provided. You can go about your business. Move along.")
+		emitExampleDependenciesFile()
+	}
+
 	disk := shell.NewDiskFileSystem("")
 	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
