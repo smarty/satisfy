@@ -10,3 +10,9 @@ type InstallationRequest struct {
 type IntegrityCheck interface {
 	Verify(manifest Manifest, localPath string) error
 }
+
+type PackageInstaller interface {
+	InstallManifest(request InstallationRequest) (manifest Manifest, err error)
+	InstallPackage(manifest Manifest, request InstallationRequest) error
+}
+

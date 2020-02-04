@@ -14,22 +14,17 @@ type DependencyResolverFileSystem interface {
 	contracts.Deleter
 }
 
-type packageInstaller interface {
-	InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error)
-	InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest)
-}
-
 type DependencyResolver struct {
 	fileSystem       DependencyResolverFileSystem
 	integrityChecker contracts.IntegrityCheck
-	packageInstaller packageInstaller
+	packageInstaller contracts.PackageInstaller
 	dependency       contracts.Dependency
 }
 
 func NewDependencyResolver(
 	fileSystem DependencyResolverFileSystem,
 	integrityChecker contracts.IntegrityCheck,
-	packageInstaller packageInstaller,
+	packageInstaller contracts.PackageInstaller,
 	dependency contracts.Dependency,
 ) *DependencyResolver {
 	return &DependencyResolver{
@@ -98,6 +93,7 @@ func (this *DependencyResolver) installPackage() error {
 	if err != nil {
 		return err
 	}
+	// TODO return err
 	this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
