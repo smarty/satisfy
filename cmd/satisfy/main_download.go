@@ -60,7 +60,6 @@ func readFromReader(reader io.Reader) (listing contracts.DependencyListing) {
 }
 
 type DownloadApp struct {
-	deleter   contracts.Deleter
 	listing   contracts.DependencyListing
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
@@ -94,7 +93,6 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	waiter.Add(len(listing.Dependencies))
 	results := make(chan error)
 	return &DownloadApp{
-		deleter:   disk,
 		listing:   listing,
 		installer: installer,
 		integrity: integrity,
@@ -123,78 +121,9 @@ func (this *DownloadApp) awaitCompletion() {
 func (this *DownloadApp) install(dependency contracts.Dependency) {
 	defer this.waiter.Done()
 
-	log.Printf("Installing dependency: %s", dependency.Title())
 	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
 	err := resolver.Resolve()
 	if err != nil {
 		this.results <- err
 	}
 }
-	// TODO: the rest of this method really should be under unit test, in the core.
-//
-//	manifest, manifestErr := loadManifest(dependency)
-//	if manifestErr == nil && manifest.Version == dependency.PackageVersion {
-//		absolute, err := filepath.Abs(dependency.LocalDirectory)
-//		if err != nil {
-//			this.results <- fmt.Errorf("could not resolve absolute path: %w", err)
-//			return
-//		}
-//		verifyErr := this.integrity.Verify(manifest, absolute)
-//		if verifyErr == nil {
-//			log.Printf("Dependency already installed: %s", dependency.Title())
-//			return
-//		} else {
-//			log.Printf("%s in %s", verifyErr.Error(), dependency.Title())
-//		}
-//	}
-//
-//	core.Uninstall(manifest, this.deleter)
-//
-//	installation := contracts.InstallationRequest{LocalPath: dependency.LocalDirectory}
-//
-//	log.Printf("Downloading manifest for %s", dependency.Title())
-//
-//	installation.RemoteAddress = dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename)
-//	manifest, err := this.installer.InstallManifest(installation)
-//	if err != nil {
-//		this.results <- fmt.Errorf("failed to install manifest for %s: %v", dependency.Title(), err)
-//		return
-//	}
-//
-//	log.Printf("Downloading and extracting package contents for %s", dependency.Title())
-//
-//	installation.RemoteAddress = dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename)
-//	err = this.installer.InstallPackage(manifest, installation)
-//	if err != nil {
-//		this.results <- fmt.Errorf("failed to install package contents for %s: %v", dependency.Title(), err)
-//		return
-//	}
-//
-//	log.Printf("Dependency installed: %s", dependency.Title())
-//}
-//
-//// TODO: this method really should be under unit test, in the core.
-//func loadManifest(dependency contracts.Dependency) (manifest contracts.Manifest, err error) {
-//	path := core.ComposeManifestPath(dependency.LocalDirectory, dependency.PackageName)
-//
-//	_, err = os.Stat(path)
-//	if os.IsNotExist(err) {
-//		return manifest, errNotInstalled
-//	}
-//
-//	raw, err := ioutil.ReadFile(path)
-//	if err != nil {
-//		return manifest, err
-//	}
-//
-//	err = json.Unmarshal(raw, &manifest)
-//	if err != nil {
-//		return manifest, err
-//	}
-//
-//	return manifest, nil
-//}
-//
-//var (
-//	errNotInstalled = errors.New("package not yet installed")
-//)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
+	"github.com/smartystreets/logging"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -36,6 +37,7 @@ func (this *DependencyResolverFixture) Setup() {
 		LocalDirectory: "local",
 	}
 	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency)
+	this.resolver.logger = logging.Capture()
 	this.fileSystem.WriteFile("local/manifest_B|C.json", []byte("{}"))
 }
 
@@ -54,11 +56,11 @@ func (this *DependencyResolverFixture) TestResolver() {
 
 func (this *DependencyResolverFixture) TestManifestInstallationFailure() {
 	manifestErr := errors.New("manifest failure")
-	this.packageInstaller.err = manifestErr
+	this.packageInstaller.installManifestErr = manifestErr
 
 	err := this.resolver.Resolve()
 
-	this.So(err, should.Resemble, manifestErr)
+	this.So(errors.Is(err, manifestErr), should.BeTrue)
 	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
 }
 
@@ -131,6 +133,15 @@ func (this *DependencyResolverFixture) TestNoPreviousInstallation() {
 	this.So(this.fileSystem.fileSystem, should.ContainKey, "contents3")
 }
 
+func (this *DependencyResolverFixture) TestFinalInstallationFailed() {
+	installError := errors.New("install package error")
+	this.packageInstaller.installPackageErr = installError
+
+	err := this.resolver.Resolve()
+
+	this.So(errors.Is(err, installError), should.BeTrue)
+}
+
 func (this *DependencyResolverFixture) assertNewPackageInstalled() {
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
 	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
@@ -182,7 +193,8 @@ type FakePackageInstaller struct {
 	installed              contracts.Manifest
 	manifestRequest        contracts.InstallationRequest
 	packageRequest         contracts.InstallationRequest
-	err                    error
+	installManifestErr     error
+	installPackageErr      error
 	installManifestCounter int
 	installPackageCounter  int
 }
@@ -190,11 +202,12 @@ type FakePackageInstaller struct {
 func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	this.installManifestCounter++
 	this.manifestRequest = request
-	return this.remote, this.err
+	return this.remote, this.installManifestErr
 }
 
-func (this *FakePackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) {
+func (this *FakePackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
 	this.installPackageCounter++
 	this.installed = manifest
 	this.packageRequest = request
+	return this.installPackageErr
 }

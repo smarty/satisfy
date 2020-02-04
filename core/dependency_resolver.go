@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/smartystreets/logging"
+
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
@@ -19,6 +21,7 @@ type DependencyResolver struct {
 	integrityChecker contracts.IntegrityCheck
 	packageInstaller contracts.PackageInstaller
 	dependency       contracts.Dependency
+	logger           *logging.Logger
 }
 
 func NewDependencyResolver(
@@ -36,6 +39,8 @@ func NewDependencyResolver(
 }
 
 func (this *DependencyResolver) Resolve() error {
+	this.logger.Printf("Installing dependency: %s", this.dependency.Title())
+
 	manifestPath := ComposeManifestPath(this.dependency.LocalDirectory, this.dependency.PackageName)
 	if !this.localManifestExists(manifestPath) {
 		return this.installPackage()
@@ -72,32 +77,46 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 
 func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Manifest) bool {
 	if localManifest.Name != this.dependency.PackageName {
+		this.logger.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
+			localManifest.Name, this.dependency.Title())
 		return false
 	}
 	if localManifest.Version != this.dependency.PackageVersion {
+		this.logger.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
+			localManifest.Version, this.dependency.Title())
 		return false
 	}
-	//log.Printf("%s in %s", verifyErr.Error(), dependency.Title())
+	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
 
-	if this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory) != nil {
+	if verifyErr != nil {
+		this.logger.Printf("%s in %s", verifyErr.Error(), this.dependency.Title())
 		return false
 	}
+	this.logger.Printf("Dependency already installed: %s", this.dependency.Title())
+
 	return true
 }
 
 func (this *DependencyResolver) installPackage() error {
+	this.logger.Printf("Downloading manifest for %s", this.dependency.Title())
 	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to install manifest for %s: %w", this.dependency.Title(), err)
 	}
-	// TODO return err
-	this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
+	this.logger.Printf("Downloading and extracting package contents for %s", this.dependency.Title())
+
+	err = this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
+	if err != nil {
+		return fmt.Errorf("failed to install package contents for %s: %w", this.dependency.Title(), err)
+	}
+
+	this.logger.Printf("Dependency installed: %s", this.dependency.Title())
 	return nil
 }
 
