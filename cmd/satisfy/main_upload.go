@@ -20,8 +20,8 @@ import (
 )
 
 type UploadApp struct {
-	config        UploadConfig
-	packageConfig PackageConfig
+	config        contracts.UploadConfig
+	packageConfig contracts.PackageConfig
 	file          *os.File
 	hasher        hash.Hash
 	compressor    io.WriteCloser
@@ -30,7 +30,7 @@ type UploadApp struct {
 	client        contracts.RemoteStorage
 }
 
-func NewUploadApp(config UploadConfig) *UploadApp {
+func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 	NewCheckApp(config).Run()
 
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}

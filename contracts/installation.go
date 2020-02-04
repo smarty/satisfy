@@ -15,4 +15,3 @@ type PackageInstaller interface {
 	InstallManifest(request InstallationRequest) (manifest Manifest, err error)
 	InstallPackage(manifest Manifest, request InstallationRequest) error
 }
-

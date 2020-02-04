@@ -5,36 +5,15 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"os"
+	"strings"
 
 	"github.com/smartystreets/gcs"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
-type PackageConfig struct {
-	CompressionAlgorithm string         `json:"compression_algorithm"`
-	CompressionLevel     int            `json:"compression_level"`
-	SourceDirectory      string         `json:"source_directory"`
-	PackageName          string         `json:"package_name"`
-	PackageVersion       string         `json:"package_version"`
-	RemoteAddressPrefix  *contracts.URL `json:"remote_address"`
-}
-
-type UploadConfig struct {
-	MaxRetry          int
-	GoogleCredentials gcs.Credentials
-	JSONPath          string
-	Overwrite         bool
-	PackageConfig     PackageConfig
-}
-
-func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
-	return contracts.AppendRemotePath(url.URL(*this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
-}
-
-func parseUploadConfig(name string, args []string) (config UploadConfig) {
+func parseUploadConfig(name string, args []string) (config contracts.UploadConfig) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ExitOnError)
 	flags.StringVar(&config.JSONPath,
 		"json",
@@ -59,12 +38,22 @@ func parseUploadConfig(name string, args []string) (config UploadConfig) {
 		log.Fatal(err)
 	}
 
+	if strings.Contains(config.PackageConfig.PackageVersion, "$(") {
+		// TODO: what if the environment variable doesn't exist, or is blank?
+		var found bool
+		variable := config.PackageConfig.PackageVersion[2 : len(config.PackageConfig.PackageVersion)-1]
+		config.PackageConfig.PackageVersion, found = os.LookupEnv(variable)
+		if !found {
+			log.Fatalf("[WARN] could not resolve version from environment variable: %q", variable)
+		}
+	}
+
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
 
 	return config
 }
 
-func readConfigFile(config UploadConfig) (raw []byte) {
+func readConfigFile(config contracts.UploadConfig) (raw []byte) {
 	var err error
 	if config.JSONPath == "_STDIN_" {
 		raw, err = ioutil.ReadAll(os.Stdin)
@@ -79,7 +68,7 @@ func readConfigFile(config UploadConfig) (raw []byte) {
 }
 
 func emitExamplePackageConfig() {
-	raw, _ := json.MarshalIndent(PackageConfig{
+	raw, _ := json.MarshalIndent(contracts.PackageConfig{
 		CompressionAlgorithm: "zstd",
 		CompressionLevel:     42,
 		SourceDirectory:      "src/dir",

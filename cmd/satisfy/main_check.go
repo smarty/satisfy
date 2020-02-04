@@ -10,11 +10,11 @@ import (
 )
 
 type CheckApp struct {
-	config UploadConfig
+	config contracts.UploadConfig
 	client contracts.RemoteStorage
 }
 
-func NewCheckApp(config UploadConfig) *CheckApp {
+func NewCheckApp(config contracts.UploadConfig) *CheckApp {
 	return &CheckApp{config: config}
 }
 
