@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"net/url"
 	"testing"
 
@@ -58,6 +59,15 @@ func (this *DependencyResolverFixture) TestResolver() {
 	})
 }
 
+func (this *DependencyResolverFixture) TestManifestInstallationFailure() {
+	manifestErr := errors.New("manifest failure")
+	this.packageInstaller.err = manifestErr
+
+	err := this.resolver.Resolve()
+
+	this.So(err, should.Resemble, manifestErr)
+}
+
 func (this *DependencyResolverFixture) URL(address string) url.URL {
 	parsed, err := url.Parse(address)
 	this.So(err, should.BeNil)
@@ -71,11 +81,12 @@ type FakePackageInstaller struct {
 	installed       contracts.Manifest
 	manifestRequest contracts.InstallationRequest
 	packageRequest  contracts.InstallationRequest
+	err             error
 }
 
 func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	this.manifestRequest = request
-	return this.remote, nil
+	return this.remote, this.err
 }
 
 func (this *FakePackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) {

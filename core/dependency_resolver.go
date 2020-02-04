@@ -36,10 +36,13 @@ func NewDependencyResolver(
 }
 
 func (this *DependencyResolver) Resolve() error {
-	manifest, _ := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
+	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
+	if err != nil {
+		return err
+	}
 	this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
