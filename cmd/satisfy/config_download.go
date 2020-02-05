@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -59,4 +60,24 @@ func parseDownloadConfig(args []string) (config DownloadConfig) {
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
 
 	return config
+}
+
+func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
+	// FUTURE: support for ADC? (https://cloud.google.com/docs/authentication/production)
+	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !found {
+		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
+	}
+
+	raw, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal("Could not open Google credentials file:", err)
+	}
+
+	credentials, err := gcs.ParseCredentialsFromJSON(raw)
+	if err != nil {
+		log.Fatal("Could not parse Google credentials file:", err)
+	}
+
+	return credentials
 }

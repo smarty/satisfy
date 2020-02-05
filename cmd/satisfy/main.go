@@ -28,7 +28,8 @@ func isSubCommand(name string) bool {
 }
 
 func uploadMain(args []string) {
-	config, err := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin).LoadConfig("upload", args)
+	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin)
+	config, err := loader.LoadConfig("upload", args)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,7 +37,12 @@ func uploadMain(args []string) {
 }
 
 func checkMain(args []string) {
-	NewCheckApp(parseUploadConfig("check", args)).Run()
+	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin)
+	config, err := loader.LoadConfig("check", args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	NewCheckApp(config).Run()
 }
 
 func downloadMain(args []string) {
