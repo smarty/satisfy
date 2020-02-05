@@ -24,7 +24,7 @@ type SymlinkCreator interface {
 }
 
 type FileReader interface {
-	ReadFile(path string) []byte
+	ReadFile(path string) ([]byte, error)
 }
 
 type FileWriter interface {

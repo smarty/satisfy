@@ -92,12 +92,8 @@ func (this *DiskFileSystem) Create(path string) io.WriteCloser {
 	return writer
 }
 
-func (this *DiskFileSystem) ReadFile(path string) []byte {
-	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Panic(err)
-	}
-	return raw
+func (this *DiskFileSystem) ReadFile(path string) ([]byte, error) {
+	return ioutil.ReadFile(path)
 }
 
 func (this *DiskFileSystem) WriteFile(path string, content []byte) {

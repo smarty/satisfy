@@ -25,7 +25,7 @@ func (this *MemoryFixture) Setup() {
 
 func (this *MemoryFixture) TestWriteFileReadFile() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-	this.So(this.fileSystem.ReadFile("/file.txt"), should.Resemble, []byte("Hello World"))
+	this.So(this.fileSystem.readFile("/file.txt"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
@@ -37,7 +37,7 @@ func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
 }
 
 func (this *MemoryFixture) TestReadFileNonExistingFile() {
-	this.So(func() { this.fileSystem.ReadFile("/file.txt") }, should.Panic)
+	this.So(func() { this.fileSystem.readFile("/file.txt") }, should.Panic)
 }
 
 func (this *MemoryFixture) TestOpenWrittenFile() {
@@ -51,7 +51,7 @@ func (this *MemoryFixture) TestCreate() {
 	writer := this.fileSystem.Create("/file.txt")
 	_, _ = writer.Write([]byte("Hello World"))
 	_ = writer.Close()
-	this.So(this.fileSystem.ReadFile("/file.txt"), should.Resemble, []byte("Hello World"))
+	this.So(this.fileSystem.readFile("/file.txt"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *MemoryFixture) TestListing() {
@@ -84,5 +84,5 @@ func (this *MemoryFixture) TestCreateSymlink() {
 	this.fileSystem.CreateSymlink("/source.txt", "/target.txt")
 
 	this.So(this.fileSystem.Listing(), should.HaveLength, 2)
-	this.So(this.fileSystem.ReadFile("/target.txt"), should.Resemble, []byte("Hello World"))
+	this.So(this.fileSystem.readFile("/target.txt"), should.Resemble, []byte("Hello World"))
 }

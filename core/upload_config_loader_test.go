@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 func TestUploadConfigLoaderFixture(t *testing.T) {
@@ -65,6 +66,45 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromSpecifiedFile() {
 		Overwrite:     true,
 		PackageConfig: packageConfig,
 	})
+}
+
+func (this *UploadConfigLoaderFixture) TestInValidJSONFromSpecifiedFile() {
+	this.storage.WriteFile("config.json", []byte("Invalid JSON"))
+	args := []string{"-json", "config.json"}
+
+	config, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.NotBeNil)
+	this.So(config.PackageConfig, should.BeZeroValue)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
+	packageConfig := contracts.PackageConfig{
+		CompressionAlgorithm: "algorithm",
+		CompressionLevel:     42,
+		SourceDirectory:      "source",
+		PackageName:          "package",
+		PackageVersion:       "version",
+		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+	}
+	raw, _ := json.Marshal(packageConfig)
+	this.stdin.Write(raw)
+	args := []string{"-json", "_STDIN_"}
+
+	config, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.BeNil)
+	this.So(config.PackageConfig, should.Resemble, packageConfig)
+}
+
+func (this *UploadConfigLoaderFixture) TestSpecifiedJSONFileNotFound() {
+	args := []string{"-json", "not-found.json"}
+
+	config, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.NotBeNil)
+	this.So(config.PackageConfig, should.BeZeroValue)
+
 }
 
 //////////////////////////////////////////////////////////

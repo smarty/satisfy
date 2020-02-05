@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+	"io/ioutil"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
@@ -50,8 +51,19 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 	}
 
 	path := config.JSONPath
-	data := this.storage.ReadFile(path)
-	json.Unmarshal(data, &config.PackageConfig)
+	data, err := this.readRawJSON(path)
+	if err != nil {
+		return contracts.UploadConfig{}, err
+	}
+	err = json.Unmarshal(data, &config.PackageConfig)
 
-	return config, nil
+	return config, err
+}
+
+func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error) {
+	if path == "_STDIN_" {
+		return ioutil.ReadAll(this.stdin)
+	} else {
+		return this.storage.ReadFile(path)
+	}
 }

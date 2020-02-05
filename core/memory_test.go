@@ -51,13 +51,20 @@ func (this *inMemoryFileSystem) Create(path string) io.WriteCloser {
 	return this.fileSystem[path]
 }
 
-func (this *inMemoryFileSystem) ReadFile(path string) []byte {
+func (this *inMemoryFileSystem) readFile(path string) []byte {
 	target := this.fileSystem[path]
 	if target.symlink != "" {
 		target = this.resolveSymlink(target)
-
 	}
 	return target.contents
+}
+
+func (this *inMemoryFileSystem) ReadFile(path string) ([]byte, error) {
+	_, found := this.fileSystem[path]
+	if !found {
+		return nil, os.ErrNotExist
+	}
+	return this.readFile(path), nil
 }
 
 func (this *inMemoryFileSystem) resolveSymlink(target *file) *file {

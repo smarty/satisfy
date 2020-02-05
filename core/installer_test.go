@@ -82,9 +82,9 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest())
 
 	this.So(err, should.BeNil)
-	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
-	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
-	this.So(this.filesystem.ReadFile("local/path/Link"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.readFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+	this.So(this.filesystem.readFile("local/path/Link"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
@@ -93,9 +93,9 @@ func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsin
 	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest())
 
 	this.So(err, should.BeNil)
-	this.So(this.filesystem.ReadFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
-	this.So(this.filesystem.ReadFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
-	this.So(this.filesystem.ReadFile("local/path/Link"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.readFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+	this.So(this.filesystem.readFile("local/path/Link"), should.Resemble, []byte("Hello World"))
 }
 
 func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
