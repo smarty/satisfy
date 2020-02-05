@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/smartystreets/gcs"
 
@@ -36,16 +35,6 @@ func parseUploadConfig(name string, args []string) (config contracts.UploadConfi
 	if err != nil {
 		emitExamplePackageConfig()
 		log.Fatal(err)
-	}
-
-	if strings.Contains(config.PackageConfig.PackageVersion, "$(") {
-		// TODO: what if the environment variable doesn't exist, or is blank?
-		var found bool
-		variable := config.PackageConfig.PackageVersion[2 : len(config.PackageConfig.PackageVersion)-1]
-		config.PackageConfig.PackageVersion, found = os.LookupEnv(variable)
-		if !found {
-			log.Fatalf("[WARN] could not resolve version from environment variable: %q", variable)
-		}
 	}
 
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
