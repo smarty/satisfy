@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"bitbucket.org/smartystreets/satisfy/core"
+	"bitbucket.org/smartystreets/satisfy/shell"
 )
 
 func main() {
@@ -25,7 +28,11 @@ func isSubCommand(name string) bool {
 }
 
 func uploadMain(args []string) {
-	NewUploadApp(parseUploadConfig("upload", args)).Run()
+	config, err := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin).LoadConfig("upload", args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	NewUploadApp(config).Run()
 }
 
 func checkMain(args []string) {

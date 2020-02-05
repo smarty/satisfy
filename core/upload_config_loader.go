@@ -21,8 +21,7 @@ type UploadConfigLoader struct {
 
 func NewUploadConfigLoader(
 	storage contracts.FileReader,
-	environment contracts.Environment,
-	stdin io.Reader,
+	environment contracts.Environment, stdin io.Reader,
 ) *UploadConfigLoader {
 	return &UploadConfigLoader{
 		storage:     storage,
@@ -43,6 +42,11 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 	}
 
 	config.GoogleCredentials, err = this.parseGoogleCredentials()
+	if err != nil {
+		return contracts.UploadConfig{}, err
+	}
+
+	err = this.validateConfigJsonValues(config)
 	if err != nil {
 		return contracts.UploadConfig{}, err
 	}
@@ -68,6 +72,7 @@ func (this *UploadConfigLoader) parseCLI(name string, args []string) (config con
 		"When set, always upload package, even when it already exists at specified remote location.",
 	)
 	err = flags.Parse(args)
+
 	return config, err
 }
 
@@ -76,7 +81,7 @@ func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.P
 	if err != nil {
 		return contracts.PackageConfig{}, err
 	}
-	return  config, json.Unmarshal(data, &config)
+	return config, json.Unmarshal(data, &config)
 }
 
 func (this *UploadConfigLoader) parseGoogleCredentials() (gcs.Credentials, error) {
@@ -97,9 +102,44 @@ func (this *UploadConfigLoader) parseGoogleCredentials() (gcs.Credentials, error
 }
 
 func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error) {
+	if path == "" {
+		return nil, blankJSONPathErr
+	}
 	if path == "_STDIN_" {
 		return ioutil.ReadAll(this.stdin)
 	} else {
 		return this.storage.ReadFile(path)
 	}
 }
+
+func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.UploadConfig) error {
+	if config.MaxRetry < 0 {
+		return maxRetryErr
+	}
+	if config.PackageConfig.CompressionAlgorithm == "" {
+		return blankCompressionAlgorithmErr
+	}
+	if config.PackageConfig.SourceDirectory == "" {
+		return blankSourceDirectoryErr
+	}
+	if config.PackageConfig.PackageName == "" {
+		return blankPackageNameErr
+	}
+	if config.PackageConfig.PackageVersion == "" {
+		return blankPackageVersionErr
+	}
+	if config.PackageConfig.RemoteAddressPrefix == nil {
+		return nilRemoteAddressPrefixErr
+	}
+	return nil
+}
+
+var (
+	maxRetryErr                  = errors.New("max-retry must be positive")
+	blankJSONPathErr             = errors.New("json flag must be populated")
+	blankCompressionAlgorithmErr = errors.New("compression algorithm should not be blank")
+	blankSourceDirectoryErr      = errors.New("source directory should not be blank")
+	blankPackageNameErr          = errors.New("package name should not be blank")
+	blankPackageVersionErr       = errors.New("package version should not be blank")
+	nilRemoteAddressPrefixErr    = errors.New("remote address prefix should not be nil")
+)

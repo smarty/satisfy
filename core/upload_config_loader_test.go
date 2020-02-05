@@ -24,6 +24,7 @@ type UploadConfigLoaderFixture struct {
 	storage     *inMemoryFileSystem
 	environment FakeEnvironment
 	stdin       *bytes.Buffer
+	pkgConfig   *FakePackageConfig
 }
 
 func (this *UploadConfigLoaderFixture) Setup() {
@@ -34,6 +35,7 @@ func (this *UploadConfigLoaderFixture) Setup() {
 	credentialsPath := "  /path/to/google-credentials.json  "
 	this.environment["GOOGLE_APPLICATION_CREDENTIALS"] = credentialsPath
 	this.storage.WriteFile(strings.TrimSpace(credentialsPath), []byte(googleCredentialsJSON))
+	this.pkgConfig = NewFakePackageConfig()
 }
 
 func (this *UploadConfigLoaderFixture) TestInvalidCLI() {
@@ -149,21 +151,115 @@ func (this *UploadConfigLoaderFixture) TestGoogleCredentialsFileIsMalformed() {
 	this.So(config.GoogleCredentials, should.BeZeroValue)
 }
 
-func (this *UploadConfigLoaderFixture) prepareValidJSONConfigFile() contracts.PackageConfig {
-	packageConfig := contracts.PackageConfig{
-		CompressionAlgorithm: "algorithm",
-		CompressionLevel:     42,
-		SourceDirectory:      "source",
-		PackageName:          "package",
-		PackageVersion:       "version",
-		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+func (this *UploadConfigLoaderFixture) TestValidateJSONNegativeMaxRetries() {
+	_ = this.prepareValidJSONConfigFile()
+	args := []string{
+		"-max-retry", "-10",
+		"-json", "config.json",
 	}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, maxRetryErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidateJSONPathIsNotBlank() {
+	_ = this.prepareValidJSONConfigFile()
+	_, err := this.loader.LoadConfig("upload", []string{"-json", ""})
+
+	this.So(err, should.Resemble, blankJSONPathErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsNotBlank() {
+	this.pkgConfig.CompressionAlgorithm = ""
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	_, err := this.loader.LoadConfig("upload", []string{"-json", "config.json"})
+
+	this.So(err, should.Resemble, blankCompressionAlgorithmErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
+	this.pkgConfig.SourceDirectory = ""
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, blankSourceDirectoryErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
+	this.pkgConfig.PackageName = ""
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, blankPackageNameErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
+	this.pkgConfig.PackageVersion = ""
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, blankPackageVersionErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil() {
+	this.pkgConfig.RemoteAddressPrefix = nil
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, nilRemoteAddressPrefixErr)
+}
+
+func (this *UploadConfigLoaderFixture) prepareValidJSONConfigFile() contracts.PackageConfig {
+	packageConfig := this.pkgConfig.configure()
 	raw, _ := json.Marshal(packageConfig)
 	this.storage.WriteFile("config.json", raw)
 	return packageConfig
 }
 
 //////////////////////////////////////////////////////////
+
+type FakePackageConfig struct {
+	CompressionAlgorithm string
+	SourceDirectory      string
+	PackageName          string
+	PackageVersion       string
+	RemoteAddressPrefix  *contracts.URL
+}
+
+func NewFakePackageConfig() *FakePackageConfig {
+	return &FakePackageConfig{
+		CompressionAlgorithm: "algorithm",
+		SourceDirectory:      "source",
+		PackageName:          "package",
+		PackageVersion:       "version",
+		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+	}
+}
+
+func (this *FakePackageConfig) configure() contracts.PackageConfig {
+	return contracts.PackageConfig{
+		CompressionAlgorithm: this.CompressionAlgorithm,
+		CompressionLevel:     42,
+		SourceDirectory:      this.SourceDirectory,
+		PackageName:          this.PackageName,
+		PackageVersion:       this.PackageVersion,
+		RemoteAddressPrefix:  this.RemoteAddressPrefix,
+	}
+}
 
 type FakeEnvironment map[string]string
 
