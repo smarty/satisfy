@@ -1,13 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 
+	"bitbucket.org/smartystreets/satisfy/core"
 	"github.com/smartystreets/gcs"
+
+	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type DownloadConfig struct {
@@ -15,7 +20,8 @@ type DownloadConfig struct {
 	QuickVerification bool
 	JSONPath          string
 	GoogleCredentials gcs.Credentials
-	packageFilter     []string
+	PackageFilter     []string
+	Dependencies      contracts.DependencyListing
 }
 
 func parseDownloadConfig(args []string) (config DownloadConfig) {
@@ -55,9 +61,23 @@ func parseDownloadConfig(args []string) (config DownloadConfig) {
 		log.Fatal(err)
 	}
 
-	config.packageFilter = flags.Args()
+	config.PackageFilter = flags.Args()
 
 	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
+
+	config.Dependencies = readDependencyListing(config.JSONPath)
+
+	err = config.Dependencies.Validate()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	config.Dependencies.Listing = core.Filter(config.Dependencies.Listing, config.PackageFilter)
+
+	if len(config.Dependencies.Listing) == 0 {
+		log.Println("[WARN] No dependencies provided. You can go about your business. Move along.")
+		emitExampleDependenciesFile()
+	}
 
 	return config
 }
@@ -80,4 +100,49 @@ func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
 	}
 
 	return credentials
+}
+
+func readDependencyListing(path string) (listing contracts.DependencyListing) {
+	if path == "_STDIN_" {
+		return readFromReader(os.Stdin)
+	} else {
+		return readFromFile(path)
+	}
+}
+
+func readFromFile(fileName string) (listing contracts.DependencyListing) {
+	file, err := os.Open(fileName)
+	if os.IsNotExist(err) {
+		emitExampleDependenciesFile()
+		log.Fatalln("Specified dependency file not found:", fileName)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	return readFromReader(file)
+}
+
+func emitExampleDependenciesFile() {
+	var listing contracts.DependencyListing
+	listing.Listing = append(listing.Listing, contracts.Dependency{
+		PackageName:    "example_package_name",
+		PackageVersion: "0.0.1",
+		RemoteAddress:  contracts.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		LocalDirectory: "local/path",
+	})
+	raw, err := json.MarshalIndent(listing, "", "  ")
+	if err != nil {
+		log.Print(err)
+	}
+	log.Print("Example json file:\n", string(raw))
+}
+
+func readFromReader(reader io.Reader) (listing contracts.DependencyListing) {
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&listing)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return listing
 }

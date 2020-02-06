@@ -7,13 +7,13 @@ import (
 )
 
 type DependencyListing struct {
-	Dependencies []Dependency `json:"dependencies"`
+	Listing []Dependency `json:"dependencies"`
 }
 
 func (this *DependencyListing) Validate() error {
 	inventory := make(map[string]struct{}) // map[PackageName+LocalDirectory]struct
 
-	for _, dependency := range this.Dependencies {
+	for _, dependency := range this.Listing {
 
 		if dependency.LocalDirectory == "" {
 			return errors.New("local directory is required")

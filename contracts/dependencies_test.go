@@ -93,7 +93,7 @@ func (this *DependencyListingFixture) TestTitleString() {
 	this.So(dependency.Title(), should.Equal, "[package-name @ 1.2.3]")
 }
 func (this *DependencyListingFixture) appendDependency(name, version, address, directory string) {
-	this.listing.Dependencies = append(this.listing.Dependencies, Dependency{
+	this.listing.Listing = append(this.listing.Listing, Dependency{
 		PackageName:    name,
 		PackageVersion: version,
 		RemoteAddress: URL{

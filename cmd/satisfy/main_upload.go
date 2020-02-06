@@ -32,7 +32,6 @@ type UploadApp struct {
 
 func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 	NewCheckApp(config).Run()
-
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
