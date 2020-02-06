@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -24,8 +25,8 @@ type DownloadConfig struct {
 	Dependencies      contracts.DependencyListing
 }
 
-func parseDownloadConfig(args []string) (config DownloadConfig) {
-	flags := flag.NewFlagSet("satisfy", flag.ExitOnError)
+func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
+	flags := flag.NewFlagSet("satisfy", flag.ContinueOnError)
 	flags.IntVar(&config.MaxRetry,
 		"max-retry",
 		5,
@@ -56,53 +57,65 @@ func parseDownloadConfig(args []string) (config DownloadConfig) {
 		_, _ = fmt.Fprintln(output)
 	}
 
-	err := flags.Parse(args)
+	err = flags.Parse(args)
 	if err != nil {
-		log.Fatal(err)
+		return DownloadConfig{}, err
 	}
 
-	config.PackageFilter = flags.Args()
-
-	config.GoogleCredentials = ParseGoogleCredentialsFromEnvironment()
-
-	config.Dependencies = readDependencyListing(config.JSONPath)
-
-	err = config.Dependencies.Validate()
+	config.GoogleCredentials, err = parseGoogleCredentialsFromEnvironment()
 	if err != nil {
-		log.Fatal(err)
+		return DownloadConfig{}, err
 	}
 
-	config.Dependencies.Listing = core.Filter(config.Dependencies.Listing, config.PackageFilter)
+	config.Dependencies, err = loadDependencyListing(config.JSONPath, flags.Args())
+	if err != nil {
+		return DownloadConfig{}, err
+	}
 
-	if len(config.Dependencies.Listing) == 0 {
+	return config, nil
+}
+
+func loadDependencyListing(path string, filter []string) (contracts.DependencyListing, error) {
+	dependencies, err := readDependencyListing(path)
+	if err != nil {
+		return contracts.DependencyListing{}, err
+	}
+
+	err = dependencies.Validate()
+	if err != nil {
+		return contracts.DependencyListing{}, err
+	}
+
+	dependencies.Listing = core.Filter(dependencies.Listing, filter)
+
+	if len(dependencies.Listing) == 0 {
 		log.Println("[WARN] No dependencies provided. You can go about your business. Move along.")
 		emitExampleDependenciesFile()
 	}
-
-	return config
+	return dependencies, nil
 }
 
-func ParseGoogleCredentialsFromEnvironment() gcs.Credentials {
+func parseGoogleCredentialsFromEnvironment() (gcs.Credentials, error) {
 	// FUTURE: support for ADC? (https://cloud.google.com/docs/authentication/production)
 	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !found {
-		log.Fatal("Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
+		return gcs.Credentials{}, errors.New("the GOOGLE_APPLICATION_CREDENTIALS environment variable is required")
 	}
 
 	raw, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Fatal("Could not open Google credentials file:", err)
+		return gcs.Credentials{}, fmt.Errorf("could not open Google credentials file: %w", err)
 	}
 
 	credentials, err := gcs.ParseCredentialsFromJSON(raw)
 	if err != nil {
-		log.Fatal("Could not parse Google credentials file:", err)
+		return gcs.Credentials{}, fmt.Errorf("could not parse Google credentials file: %w", err)
 	}
 
-	return credentials
+	return credentials, nil
 }
 
-func readDependencyListing(path string) (listing contracts.DependencyListing) {
+func readDependencyListing(path string) (contracts.DependencyListing, error) {
 	if path == "_STDIN_" {
 		return readFromReader(os.Stdin)
 	} else {
@@ -110,14 +123,14 @@ func readDependencyListing(path string) (listing contracts.DependencyListing) {
 	}
 }
 
-func readFromFile(fileName string) (listing contracts.DependencyListing) {
+func readFromFile(fileName string) (listing contracts.DependencyListing, err error) {
 	file, err := os.Open(fileName)
 	if os.IsNotExist(err) {
 		emitExampleDependenciesFile()
-		log.Fatalln("Specified dependency file not found:", fileName)
+		return listing, fmt.Errorf("specified dependency file (%q) not found: %w", fileName, err)
 	}
 	if err != nil {
-		log.Fatal(err)
+		return listing, fmt.Errorf("could not open specified dependency file (%q): %w", fileName, err)
 	}
 	defer func() { _ = file.Close() }()
 	return readFromReader(file)
@@ -138,11 +151,8 @@ func emitExampleDependenciesFile() {
 	log.Print("Example json file:\n", string(raw))
 }
 
-func readFromReader(reader io.Reader) (listing contracts.DependencyListing) {
+func readFromReader(reader io.Reader) (listing contracts.DependencyListing, err error) {
 	decoder := json.NewDecoder(reader)
-	err := decoder.Decode(&listing)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return listing
+	err = decoder.Decode(&listing)
+	return listing, err
 }

@@ -46,11 +46,15 @@ func checkMain(args []string) {
 }
 
 func downloadMain(args []string) {
-	os.Exit(NewDownloadApp(parseDownloadConfig(args)).Run())
+	config, err := parseDownloadConfig(args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(NewDownloadApp(config).Run())
 }
 
 func versionMain() {
 	fmt.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
 }
 
-var ldflagsSoftwareVersion string = "debug"
+var ldflagsSoftwareVersion = "debug"
