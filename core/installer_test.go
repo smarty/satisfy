@@ -49,7 +49,7 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 	this.So(this.downloader.request, should.Resemble, this.installationRequest().RemoteAddress)
 	this.So(manifest, should.Resemble, originalManifest)
 	this.So(err, should.BeNil)
-	fileName := "local/path/manifest_Package|Name.json"
+	fileName := "local/path/manifest_Package___Name.json"
 	this.So(this.loadLocalManifest(fileName), should.Resemble, originalManifest)
 }
 

@@ -65,7 +65,7 @@ func (this *DependencyResolverFixture) TestManifestInstallationFailure() {
 }
 
 func (this *DependencyResolverFixture) TestManifestPresentButMalformed() {
-	this.fileSystem.WriteFile("local/manifest_B|C.json", []byte("malformed json"))
+	this.fileSystem.WriteFile("local/manifest_B___C.json", []byte("malformed json"))
 
 	err := this.resolver.Resolve()
 
@@ -122,7 +122,7 @@ func (this *DependencyResolverFixture) TestItsAllGood() {
 
 func (this *DependencyResolverFixture) TestNoPreviousInstallation() {
 	this.prepareLocalPackageAndManifest("bogus", "bogus")
-	this.fileSystem.Delete("local/manifest_B|C.json")
+	this.fileSystem.Delete("local/manifest_B___C.json")
 
 	err := this.resolver.Resolve()
 
@@ -167,7 +167,7 @@ func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(packageNam
 		},
 	}
 	raw, _ := json.Marshal(manifest)
-	this.fileSystem.WriteFile("local/manifest_B|C.json", raw)
+	this.fileSystem.WriteFile("local/manifest_B___C.json", raw)
 	this.fileSystem.WriteFile("contents1", []byte("contents1"))
 	this.fileSystem.WriteFile("contents2", []byte("contents2"))
 	this.fileSystem.WriteFile("contents3", []byte("contents3"))
