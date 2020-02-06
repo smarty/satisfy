@@ -14,13 +14,15 @@ import (
 )
 
 type inMemoryFileSystem struct {
-	fileSystem map[string]*file
-	Root       string
+	fileSystem  map[string]*file
+	Root        string
+	errReadFile map[string]error
 }
 
 func newInMemoryFileSystem() *inMemoryFileSystem {
 	return &inMemoryFileSystem{
-		fileSystem: make(map[string]*file),
+		fileSystem:  make(map[string]*file),
+		errReadFile: make(map[string]error),
 	}
 }
 
@@ -64,7 +66,7 @@ func (this *inMemoryFileSystem) ReadFile(path string) ([]byte, error) {
 	if !found {
 		return nil, os.ErrNotExist
 	}
-	return this.readFile(path), nil
+	return this.readFile(path), this.errReadFile[path]
 }
 
 func (this *inMemoryFileSystem) resolveSymlink(target *file) *file {

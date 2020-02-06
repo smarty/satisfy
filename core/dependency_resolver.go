@@ -58,7 +58,10 @@ func (this *DependencyResolver) Resolve() error {
 }
 
 func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest contracts.Manifest, err error) {
-	file, _ := this.fileSystem.ReadFile(manifestPath) // TODO test error condition later
+	file, err := this.fileSystem.ReadFile(manifestPath)
+	if err != nil {
+		return localManifest, err
+	}
 	err = json.Unmarshal(file, &localManifest)
 	if err == nil {
 		return localManifest, nil

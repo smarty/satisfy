@@ -64,6 +64,18 @@ func (this *DependencyResolverFixture) TestManifestInstallationFailure() {
 	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
 }
 
+func (this *DependencyResolverFixture) TestManifestFileCannotBeRead() {
+	readFileErr := errors.New("manifest file cannot be read")
+	this.fileSystem.WriteFile("local/manifest_B___C.json", []byte("malformed json"))
+	this.fileSystem.errReadFile["local/manifest_B___C.json"] = readFileErr
+
+	err := this.resolver.Resolve()
+
+	this.So(err, should.Resemble, readFileErr)
+	this.So(this.packageInstaller.installManifestCounter, should.Equal, 0)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+}
+
 func (this *DependencyResolverFixture) TestManifestPresentButMalformed() {
 	this.fileSystem.WriteFile("local/manifest_B___C.json", []byte("malformed json"))
 
