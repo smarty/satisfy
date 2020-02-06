@@ -19,10 +19,9 @@ import (
 type DownloadConfig struct {
 	MaxRetry          int
 	QuickVerification bool
-	JSONPath          string
 	GoogleCredentials gcs.Credentials
-	PackageFilter     []string
 	Dependencies      contracts.DependencyListing
+	jsonPath          string
 }
 
 func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
@@ -37,7 +36,7 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		true,
 		"When set to false, perform full file content validation on installed packages.",
 	)
-	flags.StringVar(&config.JSONPath,
+	flags.StringVar(&config.jsonPath,
 		"json",
 		"_STDIN_",
 		"Path to file with dependency listing or, if equal to _STDIN_, read from stdin.",
@@ -67,7 +66,7 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		return DownloadConfig{}, err
 	}
 
-	config.Dependencies, err = loadDependencyListing(config.JSONPath, flags.Args())
+	config.Dependencies, err = loadDependencyListing(config.jsonPath, flags.Args())
 	if err != nil {
 		return DownloadConfig{}, err
 	}
