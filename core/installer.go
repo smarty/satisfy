@@ -116,7 +116,7 @@ func (this *PackageInstaller) revertFileSystem(paths []string) {
 }
 
 func ComposeManifestPath(localPath, packageName string) string {
-	cleanPackageName := strings.ReplaceAll(packageName, "/", "|")
+	cleanPackageName := strings.ReplaceAll(packageName, "/", "|") // TODO: Use ___ instead of |
 	fileName := fmt.Sprintf("manifest_%s.json", cleanPackageName)
 	return filepath.Join(localPath, fileName)
 }
