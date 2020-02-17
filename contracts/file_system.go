@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"io"
+	"os"
 	"time"
 )
 
@@ -44,6 +45,7 @@ type FileInfo interface {
 	Size() int64
 	ModTime() time.Time
 	Symlink() string
+	Mode() os.FileMode
 }
 
 type RootPath interface {

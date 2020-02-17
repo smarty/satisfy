@@ -119,14 +119,7 @@ type file struct {
 	contents []byte
 	mod      time.Time
 	symlink  string
-}
-
-func (this *file) Symlink() string { return this.symlink }
-
-var InMemoryModTime = time.Now()
-
-func (this *file) ModTime() time.Time {
-	return this.mod
+	mode     os.FileMode
 }
 
 func (this *file) Write(p []byte) (n int, err error) {
@@ -134,14 +127,11 @@ func (this *file) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (this *file) Close() error {
-	return nil
-}
+var InMemoryModTime = time.Now()
 
-func (this *file) Path() string {
-	return this.path
-}
-
-func (this *file) Size() int64 {
-	return int64(len(this.contents))
-}
+func (this *file) ModTime() time.Time { return this.mod }
+func (this *file) Symlink() string    { return this.symlink }
+func (this *file) Close() error       { return nil }
+func (this *file) Path() string       { return this.path }
+func (this *file) Size() int64        { return int64(len(this.contents)) }
+func (this *file) Mode() os.FileMode  { return this.mode }

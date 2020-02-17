@@ -121,9 +121,11 @@ type FileInfo struct {
 	size    int64
 	mod     time.Time
 	symlink string
+	mode    os.FileMode
 }
 
 func (this FileInfo) Path() string       { return this.path }
 func (this FileInfo) Size() int64        { return this.size }
 func (this FileInfo) ModTime() time.Time { return this.mod }
 func (this FileInfo) Symlink() string    { return this.symlink }
+func (this FileInfo) Mode() os.FileMode  { return this.mode }
