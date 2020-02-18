@@ -18,6 +18,8 @@ func main() {
 		checkMain(os.Args[2:])
 	} else if isSubCommand("version") {
 		versionMain()
+	} else if isSubCommand("download") {
+		log.Fatal("there is no need to supply 'download' as a sub-command")
 	} else {
 		downloadMain(os.Args[1:])
 	}
