@@ -85,6 +85,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
 	this.So(this.filesystem.readFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
 	this.So(this.filesystem.readFile("local/path/Link"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.fileSystem["local/path/Goodbye/World"].Mode(), should.Equal, 0755)
 }
 
 func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
@@ -183,6 +184,7 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 	_ = archiveWriter.WriteHeader(&tar.Header{
 		Name: "Goodbye/World",
 		Size: int64(len("Goodbye World")),
+		Mode: 0755,
 	})
 	_, _ = archiveWriter.Write([]byte("Goodbye World"))
 	_ = archiveWriter.WriteHeader(&tar.Header{

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -24,6 +25,7 @@ type PackageInstallerFileSystem interface {
 	contracts.FileWriter
 	contracts.Deleter
 	contracts.SymlinkCreator
+	contracts.Chmod
 }
 
 type PackageInstaller struct {
@@ -101,6 +103,13 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 			writer := this.filesystem.Create(pathItem)
 			_, err = io.Copy(writer, tarReader)
 			_ = writer.Close()
+			if err != nil {
+				return paths, err
+			}
+			if !contracts.IsExecutable(os.FileMode(header.Mode)) {
+				continue
+			}
+			err := this.filesystem.Chmod(pathItem, 0755)
 			if err != nil {
 				return paths, err
 			}

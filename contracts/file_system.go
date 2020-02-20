@@ -51,3 +51,11 @@ type FileInfo interface {
 type RootPath interface {
 	RootPath() string
 }
+
+type Chmod interface {
+	Chmod(name string, mode os.FileMode) error
+}
+
+func IsExecutable(mode os.FileMode) bool {
+	return mode.Perm() & 0111 > 0
+}

@@ -17,13 +17,20 @@ type inMemoryFileSystem struct {
 	fileSystem  map[string]*file
 	Root        string
 	errReadFile map[string]error
+	errChmodFile map[string]error
 }
 
 func newInMemoryFileSystem() *inMemoryFileSystem {
 	return &inMemoryFileSystem{
 		fileSystem:  make(map[string]*file),
 		errReadFile: make(map[string]error),
+		errChmodFile: make(map[string]error),
 	}
+}
+
+func (this *inMemoryFileSystem) Chmod(name string, mode os.FileMode) error {
+	this.fileSystem[name].mode = mode
+	return this.errChmodFile[name]
 }
 
 func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {

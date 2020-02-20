@@ -27,6 +27,9 @@ func (this *TarArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
 		tarHeader.Linkname = header.LinkName
 		tarHeader.Typeflag = tar.TypeSymlink
 	}
+	if header.Executable {
+		tarHeader.Mode = 0755
+	}
 	err := this.Writer.WriteHeader(tarHeader)
 	if err != nil {
 		log.Panic(err)

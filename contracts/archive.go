@@ -13,4 +13,5 @@ type ArchiveHeader struct {
 	Size     int64
 	ModTime  time.Time
 	LinkName string
+	Executable bool
 }

@@ -17,6 +17,10 @@ func NewDiskFileSystem(root string) *DiskFileSystem {
 	return &DiskFileSystem{root: filepath.Clean(root)}
 }
 
+func (this *DiskFileSystem) Chmod(name string, mode os.FileMode) error {
+	return os.Chmod(name, mode)
+}
+
 func (this *DiskFileSystem) RootPath() string {
 	return this.root
 }

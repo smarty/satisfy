@@ -76,7 +76,7 @@ func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contrac
 	header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
-
+	header.Executable = contracts.IsExecutable(file.Mode())
 	if file.Symlink() == "" {
 		return header, nil
 	}
