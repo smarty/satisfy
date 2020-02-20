@@ -37,6 +37,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 			path: path,
 			size: info.Size(),
 			mod:  info.ModTime(),
+			mode: info.Mode(),
 		}
 		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
 			fileInfo.symlink, err = os.Readlink(path)
