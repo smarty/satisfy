@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	log.SetFlags(log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	if isSubCommand("upload") {
 		uploadMain(os.Args[2:])
