@@ -32,6 +32,7 @@ func (this *CheckApp) uploadedPreviously(path string) bool {
 	this.buildRemoteStorageClient()
 
 	_, err := this.client.Download(this.config.PackageConfig.ComposeRemoteAddress(path))
+	// TODO: inspect this error: the response is HTTP 200 (file exists), exit with return code 1; if general failure, exit with return code 2
 	return err != nil
 }
 
