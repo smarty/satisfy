@@ -3,9 +3,7 @@ package shell
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 
 	"github.com/smartystreets/gcs"
@@ -41,7 +39,6 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 		return fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
-		this.dump(gcsRequest, response)
 		return fmt.Errorf("unexpected status code: %s", response.Status)
 	}
 	return nil
@@ -61,14 +58,7 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
-		this.dump(gcsRequest, response)
 		return nil, fmt.Errorf("unexpected status code: %s", response.Status)
 	}
 	return response.Body, nil
-}
-
-func (this *GoogleCloudStorageClient) dump(request *http.Request, response *http.Response) {
-	requestDump, _ := httputil.DumpRequestOut(request, false)
-	responseDump, _ := httputil.DumpResponse(response, true)
-	log.Printf("unexpected status code: \nrequest: \n%s\nresponse:\n%s", requestDump, responseDump)
 }
