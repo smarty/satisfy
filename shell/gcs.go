@@ -57,6 +57,9 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 	if err != nil {
 		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
+	if response.StatusCode == http.StatusOK {
+		return nil, fmt.Errorf("file exists")
+	}
 	if response.StatusCode != this.expectedStatus {
 		return nil, fmt.Errorf("unexpected status code: %s", response.Status)
 	}

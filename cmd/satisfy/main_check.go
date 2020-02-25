@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
@@ -23,17 +24,28 @@ func (this *CheckApp) Run() {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return
 	}
-	if this.uploadedPreviously(contracts.RemoteManifestFilename) {
-		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
+	if returnCode, success := this.sanityCheck(contracts.RemoteManifestFilename) ; !success {
+		log.Fatal("[INFO] Sanity check failed.", returnCode)
 	}
 }
 
-func (this *CheckApp) uploadedPreviously(path string) bool {
+func (this *CheckApp) sanityCheck(path string) (string, bool) {
 	this.buildRemoteStorageClient()
 
 	_, err := this.client.Download(this.config.PackageConfig.ComposeRemoteAddress(path))
-	// TODO: inspect this error: the response is HTTP 200 (file exists), exit with return code 1; if general failure, exit with return code 2
-	return err != nil
+	// TODO: inspect this error: if the response is HTTP 200 (file exists), exit with return code 1; if general failure, exit with return code 2
+	if err != nil {
+		return gatherReturnCode(err), false
+	}
+	return "", true
+}
+
+func gatherReturnCode(err error) string {
+	if strings.Contains(err.Error(), "file exists") {
+		return "return code 1"
+	}
+
+	return "return code 2"
 }
 
 func (this *CheckApp) buildRemoteStorageClient() {
