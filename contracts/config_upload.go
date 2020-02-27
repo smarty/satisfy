@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"net/url"
+	"path"
 
 	"github.com/smartystreets/gcs"
 )
@@ -25,4 +26,10 @@ type PackageConfig struct {
 
 func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
 	return AppendRemotePath(url.URL(*this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
+}
+
+func (this PackageConfig) ComposeLatestManifestRemoteAddress() url.URL {
+	address := url.URL(*this.RemoteAddressPrefix)
+	address.Path = path.Join(address.Path, this.PackageName, RemoteManifestFilename)
+	return address
 }

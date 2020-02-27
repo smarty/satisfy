@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/klauspost/compress/zstd"
@@ -50,7 +51,8 @@ func (this *UploadApp) Run() {
 	this.deleteLocalArchiveFile()
 
 	log.Println("Uploading the manifest...")
-	this.upload(this.buildManifestUploadRequest())
+	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
+	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
 
 	// TODO: add the concept of "latest" whereby the version that's built will also create/overwrite
 	// the "latest" version. The manifest of latest is almost identical to the version that's built.
@@ -122,10 +124,10 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 	},
 }
 
-func (this *UploadApp) buildManifestUploadRequest() contracts.UploadRequest {
+func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
 	return contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename),
+		RemoteAddress: remoteAddress,
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
 		ContentType:   "application/json",
