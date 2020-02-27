@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"strings"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
@@ -12,44 +11,37 @@ import (
 
 type CheckApp struct {
 	config contracts.UploadConfig
-	client contracts.RemoteStorage
 }
 
 func NewCheckApp(config contracts.UploadConfig) *CheckApp {
 	return &CheckApp{config: config}
 }
 
-func (this *CheckApp) Run() {
+func (this *CheckApp) Run() int {
 	if this.config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
-		return
+		return 0
 	}
-	if returnCode, success := this.sanityCheck(contracts.RemoteManifestFilename) ; !success {
-		log.Fatal("[INFO] Sanity check failed.", returnCode)
+
+	client := this.buildRemoteStorageClient()
+	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+	_, err := client.Download(address)
+	if err == nil {
+		return 0
 	}
+
+	statusError, ok := err.(*contracts.StatusCodeError)
+	if ok && statusError.StatusCode() == http.StatusOK {
+		log.Println("[INFO] Package already exists on remote storage.")
+		return 1
+	}
+
+	log.Println("[WARN] Sanity check failed:", err)
+	return 2
 }
 
-func (this *CheckApp) sanityCheck(path string) (string, bool) {
-	this.buildRemoteStorageClient()
-
-	_, err := this.client.Download(this.config.PackageConfig.ComposeRemoteAddress(path))
-	// TODO: inspect this error: if the response is HTTP 200 (file exists), exit with return code 1; if general failure, exit with return code 2
-	if err != nil {
-		return gatherReturnCode(err), false
-	}
-	return "", true
-}
-
-func gatherReturnCode(err error) string {
-	if strings.Contains(err.Error(), "file exists") {
-		return "return code 1"
-	}
-
-	return "return code 2"
-}
-
-func (this *CheckApp) buildRemoteStorageClient() {
+func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {
 	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
+	return core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }
