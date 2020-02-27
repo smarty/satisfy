@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -56,7 +55,7 @@ func downloadMain(args []string) {
 }
 
 func versionMain() {
-	fmt.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
+	log.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
 }
 
 var ldflagsSoftwareVersion = "debug"
