@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 )
 
 type DependencyListing struct {
@@ -52,7 +53,20 @@ func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
 		fileName,
 	)
 }
-
+func (this Dependency) ComposeLatestManifestRemoteAddress() url.URL {
+	address := url.URL(this.RemoteAddress)
+	address.Path = path.Join(this.PackageName, RemoteManifestFilename)
+	return address
+}
 func (this Dependency) Title() string {
 	return fmt.Sprintf("[%s @ %s]", this.PackageName, this.PackageVersion)
 }
+
+func (this Dependency) ComposeRemoteManifestAddress() url.URL {
+	if this.PackageVersion == "latest" {
+		return this.ComposeLatestManifestRemoteAddress()
+	} else {
+		return this.ComposeRemoteAddress(RemoteManifestFilename)
+	}
+}
+

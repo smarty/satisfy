@@ -39,16 +39,17 @@ var RetryErr = errors.New("retry")
 type StatusCodeError struct {
 	actualStatusCode   int
 	expectedStatusCode int
+	remoteAddress      url.URL
 }
 
-func NewStatusCodeError(actual int, expected int) *StatusCodeError {
-	return &StatusCodeError{actualStatusCode: actual, expectedStatusCode: expected}
+func NewStatusCodeError(actual int, expected int, remoteAddress url.URL) *StatusCodeError {
+	return &StatusCodeError{actualStatusCode: actual, expectedStatusCode: expected, remoteAddress: remoteAddress}
 }
 
 func (this *StatusCodeError) Error() string {
 	return fmt.Sprintf(
-		"expected status code: [%d] actual status code: [%d]",
-		this.expectedStatusCode, this.actualStatusCode,
+		"expected status code: [%d] actual status code: [%d] remote address: [%s]",
+		this.expectedStatusCode, this.actualStatusCode, this.remoteAddress.String(),
 	)
 }
 

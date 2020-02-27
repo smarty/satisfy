@@ -115,7 +115,7 @@ func (this *DiskFileSystem) WriteFile(path string, content []byte) {
 func (this *DiskFileSystem) Delete(path string) {
 	err := os.Remove(path)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
 	}
 }
 

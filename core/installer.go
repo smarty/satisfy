@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,18 +39,27 @@ func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInst
 	return &PackageInstaller{downloader: downloader, filesystem: filesystem}
 }
 
-func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
-	body, err := this.downloader.Download(request.RemoteAddress)
+func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest contracts.Manifest, err error) {
+	body, err := this.downloader.Download(remoteAddress)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
 
 	rawManifest, err := ioutil.ReadAll(body)
 	err = json.Unmarshal(rawManifest, &manifest)
+
+	return manifest, err
+}
+
+func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
+	manifest, err = this.DownloadManifest(request.RemoteAddress)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
-
+	rawManifest, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return contracts.Manifest{}, err
+	}
 	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest)
 	return manifest, nil
 }

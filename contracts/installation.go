@@ -12,6 +12,7 @@ type IntegrityCheck interface {
 }
 
 type PackageInstaller interface {
+	DownloadManifest(remoteAddress url.URL) (manifest Manifest, err error)
 	InstallManifest(request InstallationRequest) (manifest Manifest, err error)
 	InstallPackage(manifest Manifest, request InstallationRequest) error
 }

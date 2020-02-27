@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/smartystreets/logging"
 
@@ -84,26 +85,30 @@ func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Man
 			localManifest.Name, this.dependency.Title())
 		return false
 	}
-	if localManifest.Version != this.dependency.PackageVersion {
+	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(localManifest) {
+		this.logger.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
+			localManifest.Version, this.dependency.Title())
+		return false
+	} else if this.dependency.PackageVersion != "latest" && localManifest.Version != this.dependency.PackageVersion {
 		this.logger.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
 			localManifest.Version, this.dependency.Title())
 		return false
 	}
-	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
 
+	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
 	if verifyErr != nil {
 		this.logger.Printf("%s in %s", verifyErr.Error(), this.dependency.Title())
 		return false
 	}
-	this.logger.Printf("Dependency already installed: %s", this.dependency.Title())
 
+	this.logger.Printf("Dependency already installed: %s", this.dependency.Title())
 	return true
 }
 
 func (this *DependencyResolver) installPackage() error {
 	this.logger.Printf("Downloading manifest for %s", this.dependency.Title())
 	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
-		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename),
+		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
 	if err != nil {
@@ -125,6 +130,16 @@ func (this *DependencyResolver) installPackage() error {
 
 func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) {
 	for _, item := range manifest.Archive.Contents {
-		this.fileSystem.Delete(item.Path)
+		this.fileSystem.Delete(filepath.Join(this.dependency.LocalDirectory, item.Path))
 	}
+}
+
+func (this *DependencyResolver) localManifestIsLatest(manifest contracts.Manifest) bool {
+	remoteManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteManifestAddress())
+	if err != nil {
+		this.logger.Println("Failed to download the latest manifest file:", err)
+		return false
+	}
+	this.dependency.PackageVersion = remoteManifest.Version
+	return remoteManifest.Version == manifest.Version
 }
