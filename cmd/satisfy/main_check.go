@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
@@ -17,27 +18,26 @@ func NewCheckApp(config contracts.UploadConfig) *CheckApp {
 	return &CheckApp{config: config}
 }
 
-func (this *CheckApp) Run() int {
+func (this *CheckApp) Run() {
 	if this.config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
-		return 0
+		return
 	}
 
 	client := this.buildRemoteStorageClient()
 	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
 	_, err := client.Download(address)
 	if err == nil {
-		return 0
+		return
 	}
 
 	statusError, ok := err.(*contracts.StatusCodeError)
 	if ok && statusError.StatusCode() == http.StatusOK {
 		log.Println("[INFO] Package already exists on remote storage.")
-		return 1
+		os.Exit(2)
 	}
 
-	log.Println("[WARN] Sanity check failed:", err)
-	return 2
+	log.Fatalln("[WARN] Sanity check failed:", err)
 }
 
 func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {

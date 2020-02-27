@@ -14,7 +14,7 @@ func main() {
 	if isSubCommand("upload") {
 		uploadMain(os.Args[2:])
 	} else if isSubCommand("check") {
-		os.Exit(checkMain(os.Args[2:]))
+		checkMain(os.Args[2:])
 	} else if isSubCommand("version") {
 		versionMain()
 	} else if isSubCommand("download") {
@@ -37,14 +37,13 @@ func uploadMain(args []string) {
 	NewUploadApp(config).Run()
 }
 
-func checkMain(args []string) int {
+func checkMain(args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin)
 	config, err := loader.LoadConfig("check", args)
 	if err != nil {
-		log.Println(err)
-		return 2
+		log.Fatalln(err)
 	}
-	return NewCheckApp(config).Run()
+	NewCheckApp(config).Run()
 }
 
 func downloadMain(args []string) {
