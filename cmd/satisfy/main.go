@@ -20,7 +20,7 @@ func main() {
 	} else if isSubCommand("download") {
 		log.Fatal("there is no need to supply 'download' as a sub-command")
 	} else {
-		os.Exit(downloadMain(os.Args[1:]))
+		downloadMain(os.Args[1:])
 	}
 }
 
@@ -41,17 +41,18 @@ func checkMain(args []string) int {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin)
 	config, err := loader.LoadConfig("check", args)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return 2
 	}
 	return NewCheckApp(config).Run()
 }
 
-func downloadMain(args []string) int {
+func downloadMain(args []string) {
 	config, err := parseDownloadConfig(args)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return NewDownloadApp(config).Run()
+	NewDownloadApp(config).Run()
 }
 
 func versionMain() {
