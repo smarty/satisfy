@@ -20,7 +20,7 @@ func main() {
 	} else if isSubCommand("download") {
 		log.Fatal("there is no need to supply 'download' as a sub-command")
 	} else {
-		downloadMain(os.Args[1:])
+		os.Exit(downloadMain(os.Args[1:]))
 	}
 }
 
@@ -46,12 +46,12 @@ func checkMain(args []string) int {
 	return NewCheckApp(config).Run()
 }
 
-func downloadMain(args []string) {
+func downloadMain(args []string) int {
 	config, err := parseDownloadConfig(args)
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(NewDownloadApp(config).Run())
+	return NewDownloadApp(config).Run()
 }
 
 func versionMain() {
