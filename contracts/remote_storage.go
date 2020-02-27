@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"path"
@@ -34,3 +35,23 @@ func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url
 }
 
 var RetryErr = errors.New("retry")
+
+type StatusCodeError struct {
+	actualStatusCode   int
+	expectedStatusCode int
+}
+
+func NewStatusCodeError(actual int, expected int) *StatusCodeError {
+	return &StatusCodeError{actualStatusCode: actual, expectedStatusCode: expected}
+}
+
+func (this *StatusCodeError) Error() string {
+	return fmt.Sprintf(
+		"expected status code: [%d] actual status code: [%d]",
+		this.expectedStatusCode, this.actualStatusCode,
+	)
+}
+
+func (this *StatusCodeError) StatusCode() int {
+	return this.actualStatusCode
+}

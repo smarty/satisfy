@@ -39,7 +39,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 		return fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
-		return fmt.Errorf("unexpected status code: %s", response.Status)
+		return contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus)
 	}
 	return nil
 }
@@ -58,7 +58,7 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
-		return nil, fmt.Errorf("unexpected status code: %s", response.Status)
+		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus)
 	}
 	return response.Body, nil
 }

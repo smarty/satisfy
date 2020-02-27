@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -42,7 +41,7 @@ func checkMain(args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin)
 	config, err := loader.LoadConfig("check", args)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	NewCheckApp(config).Run()
 }
@@ -52,11 +51,11 @@ func downloadMain(args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(NewDownloadApp(config).Run())
+	NewDownloadApp(config).Run()
 }
 
 func versionMain() {
-	fmt.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
+	log.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
 }
 
 var ldflagsSoftwareVersion = "debug"

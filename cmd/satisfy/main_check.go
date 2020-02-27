@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 	"bitbucket.org/smartystreets/satisfy/core"
@@ -11,7 +12,6 @@ import (
 
 type CheckApp struct {
 	config contracts.UploadConfig
-	client contracts.RemoteStorage
 }
 
 func NewCheckApp(config contracts.UploadConfig) *CheckApp {
@@ -23,21 +23,25 @@ func (this *CheckApp) Run() {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return
 	}
-	if this.uploadedPreviously(contracts.RemoteManifestFilename) {
-		log.Fatal("[INFO] Package manifest already present on remote storage. You can go about your business. Move along.")
+
+	client := this.buildRemoteStorageClient()
+	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+	_, err := client.Download(address)
+	if err == nil {
+		return
 	}
+
+	statusError, ok := err.(*contracts.StatusCodeError)
+	if ok && statusError.StatusCode() == http.StatusOK {
+		log.Println("[INFO] Package already exists on remote storage.")
+		os.Exit(2)
+	}
+
+	log.Fatalln("[WARN] Sanity check failed:", err)
 }
 
-func (this *CheckApp) uploadedPreviously(path string) bool {
-	this.buildRemoteStorageClient()
-
-	_, err := this.client.Download(this.config.PackageConfig.ComposeRemoteAddress(path))
-	// TODO: inspect this error: the response is HTTP 200 (file exists), exit with return code 1; if general failure, exit with return code 2
-	return err != nil
-}
-
-func (this *CheckApp) buildRemoteStorageClient() {
+func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {
 	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
+	return core.NewRetryClient(gcsClient, this.config.MaxRetry)
 }

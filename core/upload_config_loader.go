@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/smartystreets/gcs"
@@ -71,6 +73,14 @@ func (this *UploadConfigLoader) parseCLI(name string, args []string) (config con
 		false,
 		"When set, always upload package, even when it already exists at specified remote location.",
 	)
+	flags.Usage = func() {
+		_, _ = fmt.Fprintf(os.Stderr, "Usage of satisfy %s:", name)
+		flags.PrintDefaults()
+		_, _ = fmt.Fprintln(os.Stderr, `
+exit code 0: success
+exit code 1: general failure (see stderr for details)
+exit code 2: package has already been uploaded`)
+	}
 	err = flags.Parse(args)
 
 	return config, err

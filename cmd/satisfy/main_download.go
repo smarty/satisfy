@@ -38,16 +38,19 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	}
 }
 
-func (this *DownloadApp) Run() (failed int) {
+func (this *DownloadApp) Run() {
 	for _, dependency := range this.listing.Listing {
 		go this.install(dependency)
 	}
 	go this.awaitCompletion()
+	failed := 0
 	for err := range this.results {
 		failed++
 		log.Println("[WARN]", err)
 	}
-	return failed
+	if failed > 0 {
+		log.Fatalf("[WARN] %d packages failed to install.", failed)
+	}
 }
 
 func (this *DownloadApp) awaitCompletion() {
