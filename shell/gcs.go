@@ -39,7 +39,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 		return fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
 	}
 	if response.StatusCode != this.expectedStatus {
-		return fmt.Errorf("unexpected status code: %s", response.Status)
+		return contracts.NewStatusCodeError(this.expectedStatus, response.StatusCode)
 	}
 	return nil
 }
