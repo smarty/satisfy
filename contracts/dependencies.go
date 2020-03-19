@@ -69,4 +69,3 @@ func (this Dependency) ComposeRemoteManifestAddress() url.URL {
 		return this.ComposeRemoteAddress(RemoteManifestFilename)
 	}
 }
-

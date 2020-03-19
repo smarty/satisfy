@@ -14,16 +14,16 @@ import (
 )
 
 type inMemoryFileSystem struct {
-	fileSystem  map[string]*file
-	Root        string
-	errReadFile map[string]error
+	fileSystem   map[string]*file
+	Root         string
+	errReadFile  map[string]error
 	errChmodFile map[string]error
 }
 
 func newInMemoryFileSystem() *inMemoryFileSystem {
 	return &inMemoryFileSystem{
-		fileSystem:  make(map[string]*file),
-		errReadFile: make(map[string]error),
+		fileSystem:   make(map[string]*file),
+		errReadFile:  make(map[string]error),
 		errChmodFile: make(map[string]error),
 	}
 }

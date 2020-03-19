@@ -55,7 +55,7 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb") },
+		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
 		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
 	})

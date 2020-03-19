@@ -57,5 +57,5 @@ type Chmod interface {
 }
 
 func IsExecutable(mode os.FileMode) bool {
-	return mode.Perm() & 0111 > 0
+	return mode.Perm()&0111 > 0
 }
