@@ -1,0 +1,22 @@
+Optional command line argument for download behavior:
+  -manifest=(local|remote) where local is the default value.
+  This would allow manifest files to be checked on the cloud side
+  but then never downloaded locally. During each run, the cloud version
+  would be considered canonical.
+
+Allow loading of Google credentials file as base64 encoded value.
+  In other words, have something that puts the credentials file into
+  an environment variable (as base64 encoded?) and then check if that
+  value exists and can be base64 decoded. If so, use it, e.g.
+  GOOGLE_CREDENTIALS=(base64 value here)...
+  This scenario would allow the credentials to become an env variable
+  so that it doesn't have to be written to a file first, thus helping
+  things like bitbucket-piplines when it needs to pull some private
+  dependendencies such as C headers, etc.
+
+Allow packages to be signed. In other words, allow a non-interactive
+  GPG agent to sign the contents of a package and to add that signature
+  to...the manifest? (e.g. inline signatures). As long as a signature
+  cannot be forged, then it can safely live anywhere. This specifically
+  is for things such as "locally installed" packages that are end-user
+  accessible, e.g. local downloads for APIs and data.

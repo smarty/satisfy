@@ -95,7 +95,6 @@ func loadDependencyListing(path string, filter []string) (contracts.DependencyLi
 }
 
 func parseGoogleCredentialsFromEnvironment() (gcs.Credentials, error) {
-	// FUTURE: support for ADC? (https://cloud.google.com/docs/authentication/production)
 	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !found {
 		return gcs.Credentials{}, errors.New("the GOOGLE_APPLICATION_CREDENTIALS environment variable is required")
