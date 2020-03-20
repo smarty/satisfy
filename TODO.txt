@@ -20,3 +20,5 @@ Allow packages to be signed. In other words, allow a non-interactive
   cannot be forged, then it can safely live anywhere. This specifically
   is for things such as "locally installed" packages that are end-user
   accessible, e.g. local downloads for APIs and data.
+
+Include empty directories in packages. (Loqate has some kind of weird requirement where they have a trLogs (empty directory) and if it's not present, the whole thing dies.)
