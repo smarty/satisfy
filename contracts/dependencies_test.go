@@ -72,7 +72,7 @@ func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameCannotBeIn
 }
 
 func (this *DependencyListingFixture) TestAppendRemoteAddress() {
-	address, err := url.Parse("https://www.google.com")
+	address, err := url.Parse("https://www.google.com/folder")
 	this.So(err, should.BeNil)
 	dependency := Dependency{
 		PackageName:    "package-name",
@@ -81,7 +81,20 @@ func (this *DependencyListingFixture) TestAppendRemoteAddress() {
 	}
 	actual := dependency.ComposeRemoteAddress("filename")
 
-	this.So(actual.String(), should.Equal, "https://www.google.com/package-name/1.2.3/filename")
+	this.So(actual.String(), should.Equal, "https://www.google.com/folder/package-name/1.2.3/filename")
+}
+
+func (this *DependencyListingFixture) TestAppendRemoteAddressLatest() {
+	address, err := url.Parse("https://www.google.com/folder")
+	this.So(err, should.BeNil)
+	dependency := Dependency{
+		PackageName:    "package-name",
+		PackageVersion: "latest",
+		RemoteAddress:  URL(*address),
+	}
+	actual := dependency.ComposeRemoteAddress("manifest")
+
+	this.So(actual.String(), should.Equal, "https://www.google.com/folder/package-name/manifest")
 }
 
 func (this *DependencyListingFixture) TestTitleString() {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"strings"
 )
 
 type RemoteStorage interface {
@@ -30,7 +31,14 @@ type Downloader interface {
 }
 
 func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
-	prefix.Path = "/" + path.Join(prefix.Path, packageName, version, fileName)
+	if version == "latest" {
+		prefix.Path = path.Join(prefix.Path, packageName, fileName)
+	} else {
+		prefix.Path = path.Join(prefix.Path, packageName, version, fileName)
+	}
+	if !strings.HasPrefix(prefix.Path, "/") {
+		prefix.Path = "/" + prefix.Path
+	}
 	return prefix
 }
 
