@@ -79,7 +79,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	if err != nil {
 		return err
 	}
-	paths, err := this.extractArchive(decompressor, request)
+	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
 	if err != nil {
 		this.revertFileSystem(paths)
 		return err
@@ -93,9 +93,9 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest) (paths []string, err error) {
+func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
 	tarReader := tar.NewReader(decompressor)
-	for {
+	for i := 0; ; i++ {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
@@ -105,8 +105,8 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		}
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
-		this.logger.Printf("Extracting archive item \"%s\" [%s] to \"%s\".",
-			header.Name, byteCountToString(header.Size), pathItem)
+		this.logger.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
+			i, itemCount, header.Name, byteCountToString(header.Size), pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
