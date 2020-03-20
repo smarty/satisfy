@@ -106,7 +106,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
 		this.logger.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
-			i, itemCount, header.Name, byteCountToString(header.Size), pathItem)
+			i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
