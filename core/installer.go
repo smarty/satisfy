@@ -105,7 +105,8 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		}
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
-		this.logger.Printf("Extracting archive item \"%s\" to \"%s\".", header.Name, pathItem)
+		this.logger.Printf("Extracting archive item \"%s\" [%s] to \"%s\".",
+			header.Name, byteCountToString(header.Size), pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
@@ -126,6 +127,19 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 		}
 	}
 	return paths, nil
+}
+
+func byteCountToString(size int64) string {
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%d bytes", size)
+	}
+	div, exp := int64(unit), 0
+	for i := size / unit; i >= unit; i /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
 func (this *PackageInstaller) revertFileSystem(paths []string) {
