@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/smartystreets/assertions/should"
@@ -60,6 +61,24 @@ func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveARemoteA
 	err := this.listing.Validate()
 
 	this.So(err, should.NotBeNil)
+}
+
+func (this *DependencyListingFixture) TestValidateResolvesLocalDirectory() {
+	this.appendDependency("name", "1.2.3", "address", "~/")
+	this.appendDependency("name", "1.2.3", "address", "~/path1")
+	this.appendDependency("name", "1.2.3", "address", "$HOME/path2")
+	this.appendDependency("name", "1.2.3", "address", "${HOME}/path3")
+
+	err := this.listing.Validate()
+	home := os.Getenv("HOME")
+
+	this.So(err, should.BeNil)
+	this.So(this.listing.Listing, should.Resemble, []Dependency{
+		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home},
+		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path1"},
+		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path2"},
+		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path3"},
+	})
 }
 
 func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameCannotBeInstalledToTheSamePlace() {
