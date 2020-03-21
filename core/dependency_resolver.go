@@ -116,6 +116,14 @@ func (this *DependencyResolver) installPackage() error {
 	}
 	this.logger.Printf("Downloading and extracting package contents for %s", this.dependency.Title())
 
+	// TODO:
+	// 1. this.dependency.PackageVersion can value "latest", manifest will have correct value in manifest.PackageVersion
+	//    this.dependency.PackageVersion = manifest.PackageVersion
+	// 2. Manifest archive should always be used during download/install instead of contracts.RemoteArchiveFilename.
+	//    The contracts.RemoteArchiveFilename is to be used during the creation of a manifest, but once the manifest
+	//    exists, we can change the archive filename in the contracts and all previously uploaded manifests using the
+	//    older name are still recognized and understood.
+
 	err = this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
