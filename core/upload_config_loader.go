@@ -8,27 +8,21 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
-
-	"github.com/smartystreets/gcs"
 
 	"bitbucket.org/smartystreets/satisfy/contracts"
 )
 
 type UploadConfigLoader struct {
-	storage     contracts.FileReader
-	environment contracts.Environment
-	stdin       io.Reader
+	storage contracts.FileReader
+	stdin   io.Reader
+	parser  CredentialParser
 }
 
-func NewUploadConfigLoader(
-	storage contracts.FileReader,
-	environment contracts.Environment, stdin io.Reader,
-) *UploadConfigLoader {
+func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader) *UploadConfigLoader {
 	return &UploadConfigLoader{
-		storage:     storage,
-		environment: environment,
-		stdin:       stdin,
+		storage: storage,
+		stdin:   stdin,
+		parser:  NewGoogleCredentialParser(storage, env),
 	}
 }
 
@@ -43,7 +37,7 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 		return contracts.UploadConfig{}, err
 	}
 
-	config.GoogleCredentials, err = this.parseGoogleCredentialsFromEnvironment()
+	config.GoogleCredentials, err = this.parser.Parse()
 	if err != nil {
 		return contracts.UploadConfig{}, err
 	}
@@ -92,23 +86,6 @@ func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.P
 		return contracts.PackageConfig{}, err
 	}
 	return config, json.Unmarshal(data, &config)
-}
-
-func (this *UploadConfigLoader) parseGoogleCredentialsFromEnvironment() (gcs.Credentials, error) {
-	googleCredentialsPath, found := this.environment.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	googleCredentialsPath = strings.TrimSpace(googleCredentialsPath)
-	if !found || googleCredentialsPath == "" {
-		return gcs.Credentials{}, errors.New("the GOOGLE_APPLICATION_CREDENTIALS is required")
-	}
-	data, err := this.storage.ReadFile(googleCredentialsPath)
-	if err != nil {
-		return gcs.Credentials{}, err
-	}
-	credentials, err := gcs.ParseCredentialsFromJSON(data)
-	if err != nil {
-		return gcs.Credentials{}, err
-	}
-	return credentials, nil
 }
 
 func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error) {
