@@ -43,7 +43,7 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 		return contracts.UploadConfig{}, err
 	}
 
-	config.GoogleCredentials, err = this.parseGoogleCredentials()
+	config.GoogleCredentials, err = this.parseGoogleCredentialsFromEnvironment()
 	if err != nil {
 		return contracts.UploadConfig{}, err
 	}
@@ -94,7 +94,7 @@ func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.P
 	return config, json.Unmarshal(data, &config)
 }
 
-func (this *UploadConfigLoader) parseGoogleCredentials() (gcs.Credentials, error) {
+func (this *UploadConfigLoader) parseGoogleCredentialsFromEnvironment() (gcs.Credentials, error) {
 	googleCredentialsPath, found := this.environment.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	googleCredentialsPath = strings.TrimSpace(googleCredentialsPath)
 	if !found || googleCredentialsPath == "" {
