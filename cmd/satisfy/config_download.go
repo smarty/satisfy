@@ -2,18 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 
-	"bitbucket.org/smartystreets/satisfy/core"
-	"github.com/smartystreets/gcs"
-
 	"bitbucket.org/smartystreets/satisfy/contracts"
+	"bitbucket.org/smartystreets/satisfy/core"
+	"bitbucket.org/smartystreets/satisfy/shell"
+	"github.com/smartystreets/gcs"
 )
 
 type DownloadConfig struct {
@@ -61,7 +59,8 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		return DownloadConfig{}, err
 	}
 
-	config.GoogleCredentials, err = parseGoogleCredentialsFromEnvironment()
+	parser := core.NewGoogleCredentialParser(shell.NewDiskFileSystem(""), shell.NewEnvironment())
+	config.GoogleCredentials, err = parser.Parse()
 	if err != nil {
 		return DownloadConfig{}, err
 	}
@@ -92,25 +91,6 @@ func loadDependencyListing(path string, filter []string) (contracts.DependencyLi
 		emitExampleDependenciesFile()
 	}
 	return dependencies, nil
-}
-
-func parseGoogleCredentialsFromEnvironment() (gcs.Credentials, error) {
-	path, found := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
-	if !found {
-		return gcs.Credentials{}, errors.New("the GOOGLE_APPLICATION_CREDENTIALS environment variable is required")
-	}
-
-	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		return gcs.Credentials{}, fmt.Errorf("could not open Google credentials file: %w", err)
-	}
-
-	credentials, err := gcs.ParseCredentialsFromJSON(raw)
-	if err != nil {
-		return gcs.Credentials{}, fmt.Errorf("could not parse Google credentials file: %w", err)
-	}
-
-	return credentials, nil
 }
 
 func readDependencyListing(path string) (contracts.DependencyListing, error) {
