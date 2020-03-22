@@ -53,10 +53,6 @@ func (this *UploadApp) Run() {
 	log.Println("Uploading the manifest...")
 	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
 	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
-
-	// TODO: add the concept of "latest" whereby the version that's built will also create/overwrite
-	// the "latest" version. The manifest of latest is almost identical to the version that's built.
-	// it would simply point to the archive file in the directory where it was uploaded, e.g. archive: "../1.2.3/archive"
 }
 
 func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
