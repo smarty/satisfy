@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/base64"
 	"errors"
 	"strings"
 
@@ -18,18 +19,19 @@ func NewGoogleCredentialParser(storage contracts.FileReader, environment contrac
 }
 
 func (this CredentialParser) Parse() (gcs.Credentials, error) {
+	if inlineCredential, found := this.environment.LookupEnv("GOOGLE_CREDENTIALS"); found {
+		return parseCredential(base64.StdEncoding.DecodeString(inlineCredential))
+	}
+
 	googleCredentialsPath, found := this.environment.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	googleCredentialsPath = strings.TrimSpace(googleCredentialsPath)
 	if !found || googleCredentialsPath == "" {
 		return gcs.Credentials{}, errors.New("the GOOGLE_APPLICATION_CREDENTIALS is required")
 	}
-	data, err := this.storage.ReadFile(googleCredentialsPath)
-	if err != nil {
-		return gcs.Credentials{}, err
-	}
-	credentials, err := gcs.ParseCredentialsFromJSON(data)
-	if err != nil {
-		return gcs.Credentials{}, err
-	}
-	return credentials, nil
+
+	return parseCredential(this.storage.ReadFile(googleCredentialsPath))
+}
+
+func parseCredential(value []byte, err error) (gcs.Credentials, error) {
+	return gcs.ParseCredentialsFromJSON(value)
 }
