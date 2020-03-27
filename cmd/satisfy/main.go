@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"bitbucket.org/smartystreets/satisfy/core"
-	"bitbucket.org/smartystreets/satisfy/shell"
+	"github.com/smartystreets/satisfy/core"
+	"github.com/smartystreets/satisfy/shell"
 )
 
 func main() {

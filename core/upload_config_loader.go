@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type UploadConfigLoader struct {

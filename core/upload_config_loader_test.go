@@ -9,8 +9,7 @@ import (
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gcs"
 	"github.com/smartystreets/gunit"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 func TestUploadConfigLoaderFixture(t *testing.T) {

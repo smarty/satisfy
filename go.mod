@@ -1,4 +1,4 @@
-module bitbucket.org/smartystreets/satisfy
+module github.com/smartystreets/satisfy
 
 go 1.13
 

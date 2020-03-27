@@ -6,8 +6,7 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 func TestCompoundIntegrityCheckFixture(t *testing.T) {

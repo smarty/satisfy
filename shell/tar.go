@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type TarArchiveWriter struct {

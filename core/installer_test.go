@@ -18,8 +18,7 @@ import (
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
 	"github.com/smartystreets/logging"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 func TestPackageInstallerFixture(t *testing.T) {

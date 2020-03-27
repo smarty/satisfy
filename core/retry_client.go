@@ -8,8 +8,7 @@ import (
 
 	"github.com/smartystreets/clock"
 	"github.com/smartystreets/logging"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type RetryClient struct {

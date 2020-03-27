@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/logging"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type FileListingIntegrityChecker struct {

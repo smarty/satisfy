@@ -8,10 +8,10 @@ import (
 	"log"
 	"os"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
-	"bitbucket.org/smartystreets/satisfy/core"
-	"bitbucket.org/smartystreets/satisfy/shell"
 	"github.com/smartystreets/gcs"
+	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/core"
+	"github.com/smartystreets/satisfy/shell"
 )
 
 type DownloadConfig struct {

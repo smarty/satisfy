@@ -3,9 +3,9 @@ package core
 import (
 	"testing"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 func TestFilterFixture(t *testing.T) {

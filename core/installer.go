@@ -17,8 +17,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/logging"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type PackageInstallerFileSystem interface {

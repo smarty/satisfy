@@ -1,6 +1,6 @@
 package core
 
-import "bitbucket.org/smartystreets/satisfy/contracts"
+import "github.com/smartystreets/satisfy/contracts"
 
 type CompoundIntegrityCheck struct {
 	inners []contracts.IntegrityCheck

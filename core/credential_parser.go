@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"bitbucket.org/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/gcs"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type CredentialParser struct {

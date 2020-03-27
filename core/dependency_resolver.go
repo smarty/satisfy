@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/smartystreets/logging"
-
-	"bitbucket.org/smartystreets/satisfy/contracts"
+	"github.com/smartystreets/satisfy/contracts"
 )
 
 type DependencyResolverFileSystem interface {
