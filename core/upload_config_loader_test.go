@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func (this *UploadConfigLoaderFixture) Setup() {
 	this.stdin = new(bytes.Buffer)
 	this.storage = newInMemoryFileSystem()
 	this.environment = make(FakeEnvironment)
-	this.loader = NewUploadConfigLoader(this.storage, this.environment, this.stdin)
+	this.loader = NewUploadConfigLoader(this.storage, this.environment, this.stdin, ioutil.Discard)
 	credentialsPath := "  /path/to/google-credentials.json  "
 	this.environment["GOOGLE_APPLICATION_CREDENTIALS"] = credentialsPath
 	this.storage.WriteFile(strings.TrimSpace(credentialsPath), []byte(googleCredentialsJSON))

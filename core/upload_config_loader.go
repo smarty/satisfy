@@ -7,22 +7,23 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 
 	"github.com/smartystreets/satisfy/contracts"
 )
 
 type UploadConfigLoader struct {
+	parser  CredentialParser
 	storage contracts.FileReader
 	stdin   io.Reader
-	parser  CredentialParser
+	stderr  io.Writer
 }
 
-func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader) *UploadConfigLoader {
+func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
 	return &UploadConfigLoader{
+		parser:  NewGoogleCredentialParser(storage, env),
 		storage: storage,
 		stdin:   stdin,
-		parser:  NewGoogleCredentialParser(storage, env),
+		stderr:  stderr,
 	}
 }
 
@@ -52,6 +53,7 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 
 func (this *UploadConfigLoader) parseCLI(name string, args []string) (config contracts.UploadConfig, err error) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ContinueOnError)
+	flags.SetOutput(this.stderr)
 	flags.StringVar(&config.JSONPath,
 		"json",
 		"_STDIN_",
@@ -68,9 +70,9 @@ func (this *UploadConfigLoader) parseCLI(name string, args []string) (config con
 		"When set, always upload package, even when it already exists at specified remote location.",
 	)
 	flags.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage of satisfy %s:", name)
+		_, _ = fmt.Fprintf(this.stderr, "Usage of satisfy %s:", name)
 		flags.PrintDefaults()
-		_, _ = fmt.Fprintln(os.Stderr, `
+		_, _ = fmt.Fprintln(this.stderr, `
 exit code 0: success
 exit code 1: general failure (see stderr for details)
 exit code 2: package has already been uploaded`)
