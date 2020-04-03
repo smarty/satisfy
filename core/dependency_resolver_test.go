@@ -209,7 +209,9 @@ func (this *DependencyResolverFixture) assertNewPackageInstalled(version string)
 	})
 }
 
-func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(packageName string, packageVersion string) contracts.Manifest {
+func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
+	packageName string, packageVersion string,
+) contracts.Manifest {
 	manifest := contracts.Manifest{
 		Name:    packageName,
 		Version: packageVersion,
