@@ -60,7 +60,7 @@ func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
 		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		Body:          NewFileWrapper(this.file),
 		Size:          int64(this.manifest.Archive.Size),
-		ContentType:   "application/zstd",
+		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
 		Checksum:      this.manifest.Archive.MD5Checksum,
 	}
 }
@@ -117,6 +117,11 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 		}
 		return compressor
 	},
+}
+var contentType = map[string]string{
+	"zstd": "application/zstd",
+	"gzip": "application/gzip",
+	"zip":  "application/zip",
 }
 
 func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contracts.UploadRequest {
