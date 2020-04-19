@@ -93,7 +93,13 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 }
 
 func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
-	reader := archiveFormats[""](decompressor)
+	var reader ArchiveReader
+	if reader1, ok := decompressor.(ArchiveReader); ok {
+		reader = reader1
+	} else {
+		reader = archiveFormats[""](decompressor)
+	}
+
 	for i := 0; ; i++ {
 		header, err := reader.Next()
 		if err == io.EOF {

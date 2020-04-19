@@ -77,7 +77,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 
 	this.builder = core.NewPackageBuilder(
 		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
-		shell.NewTarArchiveWriter(this.compressor),
+		shell.NewSwitchArchiveWriter(this.compressor),
 		md5.New(),
 	)
 
@@ -116,6 +116,9 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 			log.Panicln(err)
 		}
 		return compressor
+	},
+	"zip": func(writer io.Writer, level int) io.WriteCloser {
+		return shell.NewZipArchiveWriter(writer, level)
 	},
 }
 var contentType = map[string]string{

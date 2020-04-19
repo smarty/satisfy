@@ -12,6 +12,14 @@ type TarArchiveWriter struct {
 	*tar.Writer
 }
 
+func NewSwitchArchiveWriter(writer io.Writer) contracts.ArchiveWriter {
+	if writer, ok := writer.(contracts.ArchiveWriter); ok {
+		return writer
+	} else {
+		return NewTarArchiveWriter(writer)
+	}
+}
+
 func NewTarArchiveWriter(writer io.Writer) *TarArchiveWriter {
 	return &TarArchiveWriter{Writer: tar.NewWriter(writer)}
 }
