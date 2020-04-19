@@ -30,6 +30,7 @@ func (this *ZipArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
 		Name:               header.Name,
 		Modified:           header.ModTime,
 		UncompressedSize64: uint64(header.Size),
+		Method:             zip.Deflate,
 	})
 
 	if err != nil {
