@@ -93,9 +93,9 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 }
 
 func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
-	tarReader := tar.NewReader(decompressor)
+	reader := archiveFormats[""](decompressor)
 	for i := 0; ; i++ {
-		header, err := tarReader.Next()
+		header, err := reader.Next()
 		if err == io.EOF {
 			break
 		}
@@ -111,7 +111,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.Reader, request con
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
 			writer := this.filesystem.Create(pathItem)
-			_, err = io.Copy(writer, tarReader)
+			_, err = io.Copy(writer, reader)
 			_ = writer.Close()
 			if err != nil {
 				return paths, err
@@ -156,4 +156,13 @@ func ComposeManifestPath(localPath, packageName string) string {
 var decompressors = map[string]func(_ io.Reader) (io.Reader, error){
 	"zstd": func(reader io.Reader) (io.Reader, error) { return zstd.NewReader(reader) },
 	"gzip": func(reader io.Reader) (io.Reader, error) { return gzip.NewReader(reader) },
+}
+
+type ArchiveReader interface {
+	Next() (*tar.Header, error)
+	io.Reader
+}
+
+var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
+	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
 }
