@@ -10,3 +10,14 @@ Allow packages to be signed. In other words, allow a non-interactive
   cannot be forged, then it can safely live anywhere. This specifically
   is for things such as "locally installed" packages that are end-user
   accessible, e.g. local downloads for APIs and data.
+
+Consider using a package pool to separate archives from the manifest.
+  the theoretical advantage of this is that you can now separate
+  the location of the archive and upload multiple manifests which
+  all point to the same archive. The archive itself would be named
+  using a hash for the contents to prevent any collisions. Further,
+  if the archive already exists remotely, it would skip the need to
+  re-upload it. The biggest potential advantage, again, comes from
+  the concept of putting simple manifest files in various directories
+  to have things like package aliases all while maintaining a single
+  location for the archive files.
