@@ -49,6 +49,7 @@ func (this *DependencyResolverFixture) TestFreshInstallation() {
 	manifest := contracts.Manifest{
 		Name:    "B/C",
 		Version: "D",
+		Archive: contracts.Archive{Filename: "archive-name"},
 	}
 	this.packageInstaller.remote = manifest
 
@@ -216,6 +217,7 @@ func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
 		Name:    packageName,
 		Version: packageVersion,
 		Archive: contracts.Archive{
+			Filename: "archive",
 			Contents: []contracts.ArchiveItem{
 				{Path: "contents1"},
 				{Path: "contents2"},
