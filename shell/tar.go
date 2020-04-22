@@ -13,8 +13,8 @@ type TarArchiveWriter struct {
 }
 
 func NewSwitchArchiveWriter(writer io.Writer) contracts.ArchiveWriter {
-	if writer, ok := writer.(contracts.ArchiveWriter); ok {
-		return writer
+	if inner, ok := writer.(contracts.ArchiveWriter); ok {
+		return inner
 	} else {
 		return NewTarArchiveWriter(writer)
 	}
