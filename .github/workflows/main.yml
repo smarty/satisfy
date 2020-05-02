@@ -22,16 +22,26 @@ jobs:
 
     - name: Build
       run: make build
-    
-    - name: Cache results
-      uses: actions/cache@v1
-      with:
-       path: ~/go/pkg/mod
-       key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-       restore-keys: |
-         ${{ runner.os }}-go-
 
-    - uses: actions/upload-artifact@v2
+    # - name: Cache results
+    #   uses: actions/cache@v1
+    #   with:
+    #    path: ~/go/pkg/mod
+    #    key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+    #    restore-keys: |
+    #      ${{ runner.os }}-go-
+
+    - name: Create Release
+      uses: actions/create-release@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by Actions
       with:
-        name: latest
-        path: workspace/satisfy
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: true
+
+    # - uses: actions/upload-artifact@v2
+    #   with:
+    #     name: latest
+    #     path: workspace/satisfy
