@@ -22,3 +22,11 @@ jobs:
 
     - name: Build
       run: make build
+    
+    - name: Cache results
+      uses: actions/cache@v1
+      with:
+       path: ~/go/pkg/mod
+       key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+       restore-keys: |
+         ${{ runner.os }}-go-
