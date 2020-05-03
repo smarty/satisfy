@@ -9,7 +9,7 @@ test:
 	go fmt ./... && go test -timeout=1s -count=1 -short -cover ./...
 
 coverage:
-	CGO_ENABLED="1" go test -timeout=1s -race -covermode=atomic -short ./...
+	go test -timeout=1s -race -covermode=atomic -short ./...
 
 clean:
 	rm -rf workspace/ coverage.txt
@@ -17,7 +17,7 @@ clean:
 compile: clean
 	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go build -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" -o workspace/satisfy "$(PKG)"
 
-build: coverage compile
+build: test compile
 
 install: coverage
 	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go install -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" "$(PKG)"
