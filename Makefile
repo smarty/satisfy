@@ -17,7 +17,7 @@ clean:
 compile: clean
 	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go build -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" -o workspace/satisfy "$(PKG)"
 
-build: test compile
+build: coverage compile
 
 install: coverage
 	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go install -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" "$(PKG)"
