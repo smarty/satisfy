@@ -1,39 +1,26 @@
-name: Go
+name: Publish
 
 on:
   push:
-    branches: [ master ]
+    tags:
+    - 'v*'
 
 jobs:
-
   build:
-    name: Build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
-
-    - name: Docker Login
-      run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username '${{ secrets.DOCKER_USERNAME }}' --password-stdin
-
-    - name: Build
-      if: github.ref != 'refs/tags/v*'
-      run: |
-        make build
-
-    - name: Publish
-      if: github.ref == 'refs/tags/v*'
-      run: |
+    - run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username '${{ secrets.DOCKER_USERNAME }}' --password-stdin
+    - run: |
         VERSION="${{ github.sha }}" make build OS=darwin CPU=amd64
         tar -czvf satisfy_darwin-amd64.tar.gz workspace/*
 
         VERSION="${{ github.sha }}" make publish OS=linux CPU=amd64
         tar -czvf satisfy_linux-amd64.tar.gz workspace/*
 
-    - name: Create Release
-      id: create_release
+    - id: create_release
       uses: actions/create-release@v1
-      if: github.ref == 'refs/tags/v*'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -42,9 +29,7 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Upload Release Asset (Linux)
-      uses: actions/upload-release-asset@v1
-      if: github.ref == 'refs/tags/v*'
+    - uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -53,9 +38,7 @@ jobs:
         asset_name: satisfy_linux-amd64.tar.gz
         asset_content_type: application/tar+gzip
 
-    - name: Upload Release Asset (Darwin)
-      uses: actions/upload-release-asset@v1
-      if: github.ref == 'refs/tags/v*'
+    - uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
