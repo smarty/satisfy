@@ -24,12 +24,11 @@ jobs:
 
     - name: Build
       run: |
+        GOOS=darwin GOARCH=amd64 make compile
+        tar -czvf satisfy_darwin-amd64.tar.gz workspace/*
 
         GOOS=linux GOARCH=amd64 make compile
         tar -czvf satisfy_linux-amd64.tar.gz workspace/*
-
-        GOOS=darwin GOARCH=amd64 make compile
-        tar -czvf satisfy_darwin-amd64.tar.gz workspace/*
 
     - name: Create Release
       id: create_release
@@ -38,7 +37,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: release-${{ github.sha }}
-        release_name: Release ${{ github.ref }}
+        release_name: Release release-${{ github.sha }}
         draft: false
         prerelease: true
 
@@ -61,3 +60,12 @@ jobs:
         asset_path: satisfy_darwin-amd64.tar.gz
         asset_name: satisfy_darwin-amd64.tar.gz
         asset_content_type: application/tar+gzip
+
+    - name: Push to Docker
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: smartystreets/satisfy
+        tag_with_ref: true
+        tag_with_sha: true
