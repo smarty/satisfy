@@ -11,37 +11,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go 1.x
+    - name: Install Go
       uses: actions/setup-go@v2
       with:
         go-version: ^1.14
-      id: go
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    - name: Build
-      run: make build
+    - name: Test
+      run: make test
 
-    # - name: Cache results
-    #   uses: actions/cache@v1
-    #   with:
-    #    path: ~/go/pkg/mod
-    #    key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-    #    restore-keys: |
-    #      ${{ runner.os }}-go-
+    - name: Build
+      run: |
+
+        GOOS=linux GOARCH=amd64 make compile
+        tar -czvf satisfy_linux-amd64.tar.gz workspace/*
+
+        GOOS=darwin GOARCH=amd64 make compile
+        tar -czvf satisfy_darwin-amd64.tar.gz workspace/*
 
     - name: Create Release
-      uses: actions/create-release@latest
+      id: create_release
+      uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by Actions
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
+        #tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: true
 
-    # - uses: actions/upload-artifact@v2
-    #   with:
-    #     name: latest
-    #     path: workspace/satisfy
+    - name: Upload Release Asset (Linux)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: satisfy_linux-amd64.tar.gz
+        asset_name: satisfy_linux-amd64.tar.gz
+        asset_content_type: application/tar+gzip
+
+    - name: Upload Release Asset (Darwin)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: satisfy_darwin-amd64.tar.gz
+        asset_name: satisfy_darwin-amd64.tar.gz
+        asset_content_type: application/tar+gzip
