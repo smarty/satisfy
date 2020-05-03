@@ -12,14 +12,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
-    - uses: codecov/codecov-action@v1
+    - run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username '${{ secrets.DOCKER_USERNAME }}' --password-stdin
     - name: Build
       run: |
-        make test 
-        GOOS=darwin GOARCH=amd64 make compile
+        make test
+        GOOS=darwin GOARCH=amd64 VERSION="${{ github.sha }}" make compile
         tar -czvf satisfy_darwin-amd64.tar.gz workspace/*
 
-        GOOS=linux GOARCH=amd64 make compile
+        GOOS=darwin GOARCH=amd64 VERSION="${{ github.sha }}" make publish
         tar -czvf satisfy_linux-amd64.tar.gz workspace/*
 
     # - name: Create Release
