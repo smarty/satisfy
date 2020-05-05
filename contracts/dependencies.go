@@ -78,7 +78,7 @@ func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
 }
 func (this Dependency) ComposeLatestManifestRemoteAddress() url.URL {
 	address := url.URL(this.RemoteAddress)
-	address.Path = path.Join(strings.TrimPrefix(address.Path, "/"), this.PackageName, RemoteManifestFilename)
+	address.Path = "/" + path.Join(address.Path, this.PackageName, RemoteManifestFilename)
 	return address
 }
 func (this Dependency) Title() string {

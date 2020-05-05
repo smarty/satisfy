@@ -182,6 +182,33 @@ func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
 	this.assertNewPackageInstalled("E")
 }
 
+func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
+	manifest := contracts.Manifest{
+		Name:    "B/C",
+		Version: "D",
+		Archive: contracts.Archive{Filename: "archive-name"},
+	}
+	this.packageInstaller.remote = manifest
+	this.dependency.PackageVersion = "latest"
+	version := manifest.Version
+
+	err := this.Resolve()
+
+	this.assertLatestPackageInstalled(err, version)
+}
+
+func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, version string) {
+	this.So(err, should.BeNil)
+	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
+	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
+		RemoteAddress: this.URL("gcs://A/B/C/manifest.json"),
+		LocalPath:     "local",
+	})
+	this.So(this.packageInstaller.packageRequest, should.Resemble, contracts.InstallationRequest{
+		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
+		LocalPath:     "local",
+	})
+}
 func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
 	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
 	this.dependency.PackageVersion = "latest"
