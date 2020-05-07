@@ -11,6 +11,13 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
+    - uses: actions/cache@v1
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
     - run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username '${{ secrets.DOCKER_USERNAME }}' --password-stdin
     - run: |
         make build OS=darwin CPU=amd64
