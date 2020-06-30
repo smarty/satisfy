@@ -98,8 +98,8 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 
 func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
 	var reader ArchiveReader
-	if reader1, ok := decompressor.(ArchiveReader); ok {
-		reader = reader1
+	if archiveReader, ok := decompressor.(ArchiveReader); ok {
+		reader = archiveReader
 	} else {
 		reader = archiveFormats[""](decompressor)
 	}
