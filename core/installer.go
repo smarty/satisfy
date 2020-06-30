@@ -72,13 +72,13 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	}
 
 	defer func() { _ = body.Close() }()
-	hashReader := NewHashReader(body, md5.New())
+	checksumReader := NewHashReader(body, md5.New())
 
 	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
 	if !found {
 		return errors.New("invalid compression algorithm")
 	}
-	decompressor, err := factory(hashReader)
+	decompressor, err := factory(checksumReader)
 	if err != nil {
 		return err
 	}
@@ -87,10 +87,10 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 		this.revertFileSystem(paths)
 		return err
 	}
-	actualChecksum := hashReader.Sum(nil)
+	actualChecksum := checksumReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
 		this.revertFileSystem(paths)
-		return fmt.Errorf("checksum mismatch: %x != %x", actualChecksum, manifest.Archive.MD5Checksum)
+		return fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)
 	}
 
 	return nil
