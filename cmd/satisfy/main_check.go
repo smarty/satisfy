@@ -26,8 +26,9 @@ func (this *CheckApp) Run() {
 
 	client := this.buildRemoteStorageClient()
 	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
-	_, err := client.Download(address)
+	body, err := client.Download(address)
 	if err == nil {
+		defer func() { _ = body.Close() }()
 		return
 	}
 

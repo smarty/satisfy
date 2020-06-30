@@ -44,6 +44,8 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 		return contracts.Manifest{}, err
 	}
 
+	defer func() { _ = body.Close() }()
+
 	rawManifest, err := ioutil.ReadAll(body)
 	err = json.Unmarshal(rawManifest, &manifest)
 
@@ -68,6 +70,8 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	if err != nil {
 		return err
 	}
+
+	defer func() { _ = body.Close() }()
 	hashReader := NewHashReader(body, md5.New())
 
 	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
