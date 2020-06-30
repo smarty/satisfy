@@ -65,7 +65,7 @@ func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSour
 	}
 	writer := io.MultiWriter(this.hasher, this.archive)
 	reader := this.storage.Open(file.Path())
-	defer func() { _ = reader.Close() }()
+	defer closeResource(reader)
 	_, err := io.Copy(writer, reader)
 
 	return err

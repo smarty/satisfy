@@ -44,7 +44,7 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 		return contracts.Manifest{}, err
 	}
 
-	defer func() { _ = body.Close() }()
+	defer closeResource(body)
 
 	rawManifest, err := ioutil.ReadAll(body)
 	err = json.Unmarshal(rawManifest, &manifest)
@@ -71,7 +71,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 		return err
 	}
 
-	defer func() { _ = body.Close() }()
+	defer closeResource(body)
 	checksumReader := NewHashReader(body, md5.New())
 
 	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
@@ -97,7 +97,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 }
 
 func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
-	defer func() { _ = decompressor.Close() }()
+	defer closeResource(decompressor)
 	var reader ArchiveReader
 	if archiveReader, ok := decompressor.(ArchiveReader); ok {
 		reader = archiveReader
@@ -191,4 +191,12 @@ type ArchiveReader interface {
 
 var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
 	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func closeResource(closer io.Closer) {
+	if closer != nil {
+		_ = closer.Close()
+	}
 }
