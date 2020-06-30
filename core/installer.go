@@ -96,7 +96,8 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.Reader, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
+func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
+	defer func() { _ = decompressor.Close() }()
 	var reader ArchiveReader
 	if archiveReader, ok := decompressor.(ArchiveReader); ok {
 		reader = archiveReader
@@ -163,10 +164,25 @@ func ComposeManifestPath(localPath, packageName string) string {
 	return filepath.Join(localPath, fileName)
 }
 
-var decompressors = map[string]func(_ io.Reader) (io.Reader, error){
-	"zstd": func(reader io.Reader) (io.Reader, error) { return zstd.NewReader(reader) },
-	"gzip": func(reader io.Reader) (io.Reader, error) { return gzip.NewReader(reader) },
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var decompressors = map[string]func(_ io.Reader) (io.ReadCloser, error){
+	"zstd": newZStdReader,
+	"gzip": newGZipReader,
 }
+
+func newZStdReader(source io.Reader) (io.ReadCloser, error) {
+	if reader, err := zstd.NewReader(source); err != nil {
+		return nil, err
+	} else {
+		return reader.IOReadCloser(), nil
+	}
+}
+func newGZipReader(source io.Reader) (io.ReadCloser, error) {
+	return gzip.NewReader(source)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type ArchiveReader interface {
 	Next() (*tar.Header, error)
