@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/satisfy/core"
@@ -22,7 +23,7 @@ type DownloadApp struct {
 func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	disk := shell.NewDiskFileSystem("")
 	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
-	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry), disk)
+	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),

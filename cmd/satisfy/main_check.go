@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/satisfy/core"
@@ -44,5 +45,5 @@ func (this *CheckApp) Run() {
 func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {
 	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
-	return core.NewRetryClient(gcsClient, this.config.MaxRetry)
+	return core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/smartystreets/assertions/should"
-	"github.com/smartystreets/clock"
 	"github.com/smartystreets/gunit"
 	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
@@ -25,12 +24,14 @@ type RetryFixture struct {
 	*gunit.Fixture
 	client     *RetryClient
 	fakeClient *FakeClient
+	naps       []time.Duration
 }
 
 func (this *RetryFixture) Setup() {
 	this.fakeClient = &FakeClient{}
-	this.client = NewRetryClient(this.fakeClient, 4)
-	this.client.sleeper = clock.StayAwake()
+	this.client = NewRetryClient(this.fakeClient, 4, func(duration time.Duration) {
+		this.naps = append(this.naps, duration)
+	})
 	this.client.logger = logging.Capture()
 }
 
@@ -50,7 +51,7 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
-	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
+	this.So(this.naps, should.Resemble, []time.Duration{
 		time.Second * 3,
 		time.Second * 3,
 		time.Second * 3,
@@ -65,7 +66,7 @@ func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
 
 	this.So(err, should.Equal, aRegularError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 1)
-	this.So(this.client.sleeper.Naps, should.BeEmpty)
+	this.So(this.naps, should.BeEmpty)
 }
 
 func (this *RetryFixture) TestDownloadCallsInner() {
@@ -87,7 +88,7 @@ func (this *RetryFixture) TestDownloadRetryOnError() {
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.downloadAttempts, should.Equal, 5)
-	this.So(this.client.sleeper.Naps, should.Resemble, []time.Duration{
+	this.So(this.naps, should.Resemble, []time.Duration{
 		time.Second * 3,
 		time.Second * 3,
 		time.Second * 3,
@@ -102,7 +103,7 @@ func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
 	this.So(body, should.BeNil)
 	this.So(err, should.Equal, aRegularError)
 	this.So(this.fakeClient.downloadAttempts, should.Equal, 1)
-	this.So(this.client.sleeper.Naps, should.BeEmpty)
+	this.So(this.naps, should.BeEmpty)
 }
 
 var (

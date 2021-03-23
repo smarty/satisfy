@@ -6,20 +6,19 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/smartystreets/clock"
 	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
 type RetryClient struct {
-	sleeper  *clock.Sleeper
 	logger   *logging.Logger
 	inner    contracts.RemoteStorage
 	maxRetry int
+	sleep    func(duration time.Duration)
 }
 
-func NewRetryClient(inner contracts.RemoteStorage, maxRetry int) *RetryClient {
-	return &RetryClient{inner: inner, maxRetry: maxRetry}
+func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, sleep func(duration time.Duration)) *RetryClient {
+	return &RetryClient{inner: inner, maxRetry: maxRetry, sleep: sleep}
 }
 
 func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
@@ -33,7 +32,7 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 		}
 		if x < this.maxRetry {
 			this.logger.Println("[WARN] upload failed, retry imminent.")
-			this.sleeper.Sleep(time.Second * 3)
+			this.sleep(time.Second * 3)
 		}
 	}
 	return err
@@ -50,7 +49,7 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 		}
 		if x < this.maxRetry {
 			this.logger.Println("[WARN] download failed, retry imminent.")
-			this.sleeper.Sleep(time.Second * 3)
+			this.sleep(time.Second * 3)
 		}
 	}
 	return nil, err

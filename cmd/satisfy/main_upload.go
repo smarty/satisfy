@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/satisfy/contracts"
@@ -141,7 +142,7 @@ func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contrac
 func (this *UploadApp) buildRemoteStorageClient() {
 	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }
 
 func (this *UploadApp) completeManifest() {
