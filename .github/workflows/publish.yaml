@@ -23,10 +23,10 @@ jobs:
         export VERSION="${GITHUB_REF/refs\/tags\//}"
 
         make build OS=darwin CPU=amd64
-        GZIP=-9 tar -C workspace/ -cvf satisfy_darwin-amd64.tar.gz . --owner=0 --group=0
+        GZIP=-9 tar -C workspace/ -czvf satisfy_darwin-amd64.tar.gz . --owner=0 --group=0
 
         make publish OS=linux CPU=amd64
-        GZIP=-9 tar -C workspace/ -cvf satisfy_linux-amd64.tar.gz . --owner=0 --group=0
+        GZIP=-9 tar -C workspace/ -czvf satisfy_linux-amd64.tar.gz . --owner=0 --group=0
 
     - id: create_release
       uses: actions/create-release@v1
