@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"path/filepath"
 
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -20,7 +20,6 @@ type FileContentIntegrityCheck struct {
 	hasher     func() hash.Hash
 	fileSystem FileOpenChecker
 	enabled    bool
-	logger     *logging.Logger
 }
 
 func NewFileContentIntegrityCheck(hasher func() hash.Hash, fileSystem FileOpenChecker, enabled bool) *FileContentIntegrityCheck {
@@ -40,7 +39,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 			return fmt.Errorf("checksum mismatch for \"%s\"", item.Path)
 		}
 	}
-	this.logger.Printf("Content integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
+	log.Printf("Content integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
 	return nil
 }
 

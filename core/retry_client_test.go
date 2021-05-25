@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -32,7 +31,6 @@ func (this *RetryFixture) Setup() {
 	this.client = NewRetryClient(this.fakeClient, 4, func(duration time.Duration) {
 		this.naps = append(this.naps, duration)
 	})
-	this.client.logger = logging.Capture()
 }
 
 func (this *RetryFixture) TestUploadCallsInner() {

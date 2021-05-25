@@ -9,7 +9,6 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -41,7 +40,6 @@ func (this *DependencyResolverFixture) Setup() {
 
 func (this *DependencyResolverFixture) Resolve() error {
 	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency)
-	this.resolver.logger = logging.Capture()
 	return this.resolver.Resolve()
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -36,7 +35,6 @@ func (this *PackageInstallerFixture) Setup() {
 	this.downloader = &FakeDownloader{}
 	this.filesystem = newInMemoryFileSystem()
 	this.installer = NewPackageInstaller(this.downloader, this.filesystem)
-	this.installer.logger = logging.Capture()
 }
 
 func (this *PackageInstallerFixture) TestInstallManifest() {

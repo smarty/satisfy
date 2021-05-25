@@ -5,7 +5,6 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -24,7 +23,6 @@ type IntegrityListingFixture struct {
 func (this *IntegrityListingFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.checker = NewFileListingIntegrityChecker(this.fileSystem)
-	this.checker.logger = logging.Capture()
 	this.manifest = contracts.Manifest{
 		Archive: contracts.Archive{
 			Contents: []contracts.ArchiveItem{

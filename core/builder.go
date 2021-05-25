@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"path/filepath"
 	"strings"
 
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -18,7 +18,6 @@ type PackageBuilderFileSystem interface {
 }
 
 type PackageBuilder struct {
-	logger   *logging.Logger
 	storage  PackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
@@ -44,7 +43,7 @@ func (this *PackageBuilder) Build() error {
 }
 
 func (this *PackageBuilder) add(file contracts.FileInfo) error {
-	this.logger.Printf("Adding \"%s\" to archive.", file.Path())
+	log.Printf("Adding \"%s\" to archive.", file.Path())
 	header, err := this.buildHeader(file)
 	if err != nil {
 		return err

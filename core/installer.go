@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -29,7 +29,6 @@ type PackageInstallerFileSystem interface {
 }
 
 type PackageInstaller struct {
-	logger     *logging.Logger
 	downloader contracts.Downloader
 	filesystem PackageInstallerFileSystem
 }
@@ -115,7 +114,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		}
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
-		this.logger.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
+		log.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
 			i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {

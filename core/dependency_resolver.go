@@ -3,10 +3,10 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -21,7 +21,6 @@ type DependencyResolver struct {
 	integrityChecker contracts.IntegrityCheck
 	packageInstaller contracts.PackageInstaller
 	dependency       contracts.Dependency
-	logger           *logging.Logger
 }
 
 func NewDependencyResolver(
@@ -39,7 +38,7 @@ func NewDependencyResolver(
 }
 
 func (this *DependencyResolver) Resolve() error {
-	this.logger.Printf("Installing dependency: %s", this.dependency.Title())
+	log.Printf("Installing dependency: %s", this.dependency.Title())
 
 	manifestPath := ComposeManifestPath(this.dependency.LocalDirectory, this.dependency.PackageName)
 	if !this.localManifestExists(manifestPath) {
@@ -82,32 +81,32 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 
 func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Manifest) bool {
 	if localManifest.Name != this.dependency.PackageName {
-		this.logger.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
+		log.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
 			localManifest.Name, this.dependency.Title())
 		return false
 	}
 	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(localManifest) {
-		this.logger.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
+		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
 			localManifest.Version, this.dependency.Title())
 		return false
 	} else if this.dependency.PackageVersion != "latest" && localManifest.Version != this.dependency.PackageVersion {
-		this.logger.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
+		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
 			localManifest.Version, this.dependency.Title())
 		return false
 	}
 
 	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
 	if verifyErr != nil {
-		this.logger.Printf("%s in %s", verifyErr.Error(), this.dependency.Title())
+		log.Printf("%s in %s", verifyErr.Error(), this.dependency.Title())
 		return false
 	}
 
-	this.logger.Printf("Dependency already installed: %s", this.dependency.Title())
+	log.Printf("Dependency already installed: %s", this.dependency.Title())
 	return true
 }
 
 func (this *DependencyResolver) installPackage() error {
-	this.logger.Printf("Downloading manifest for %s", this.dependency.Title())
+	log.Printf("Downloading manifest for %s", this.dependency.Title())
 	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
@@ -115,7 +114,7 @@ func (this *DependencyResolver) installPackage() error {
 	if err != nil {
 		return fmt.Errorf("failed to install manifest for %s: %w", this.dependency.Title(), err)
 	}
-	this.logger.Printf("Downloading and extracting package contents for %s", this.dependency.Title())
+	log.Printf("Downloading and extracting package contents for %s", this.dependency.Title())
 
 	if this.dependency.PackageVersion == "latest" {
 		this.dependency.PackageVersion = manifest.Version
@@ -135,7 +134,7 @@ func (this *DependencyResolver) installPackage() error {
 		return fmt.Errorf("failed to install package contents for %s: %w", this.dependency.Title(), err)
 	}
 
-	this.logger.Printf("Dependency installed: %s", this.dependency.Title())
+	log.Printf("Dependency installed: %s", this.dependency.Title())
 	return nil
 }
 
@@ -148,7 +147,7 @@ func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) {
 func (this *DependencyResolver) localManifestIsLatest(manifest contracts.Manifest) bool {
 	remoteManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteManifestAddress())
 	if err != nil {
-		this.logger.Println("Failed to download the latest manifest file:", err)
+		log.Println("Failed to download the latest manifest file:", err)
 		return false
 	}
 	this.dependency.PackageVersion = remoteManifest.Version

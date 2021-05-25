@@ -3,15 +3,14 @@ package core
 import (
 	"errors"
 	"io"
+	"log"
 	"net/url"
 	"time"
 
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
 type RetryClient struct {
-	logger   *logging.Logger
 	inner    contracts.RemoteStorage
 	maxRetry int
 	sleep    func(duration time.Duration)
@@ -31,7 +30,7 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 			return err
 		}
 		if x < this.maxRetry {
-			this.logger.Println("[WARN] upload failed, retry imminent.")
+			log.Println("[WARN] upload failed, retry imminent.")
 			this.sleep(time.Second * 3)
 		}
 	}
@@ -48,7 +47,7 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 			return nil, err
 		}
 		if x < this.maxRetry {
-			this.logger.Println("[WARN] download failed, retry imminent.")
+			log.Println("[WARN] download failed, retry imminent.")
 			this.sleep(time.Second * 3)
 		}
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/smartystreets/assertions/should"
 	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/logging"
 	"github.com/smartystreets/satisfy/contracts"
 )
 
@@ -45,7 +44,6 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 	}
 
 	this.checker = NewFileContentIntegrityCheck(this.newHasher, this.fileSystem, false)
-	this.checker.logger = logging.Capture()
 }
 
 func (this *FileContentIntegrityCheckFixture) newHasher() hash.Hash {

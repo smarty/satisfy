@@ -6,5 +6,3 @@ github.com/smartystreets/gcs v1.1.2 h1:+4nvKKeQkpEwDEmPxIGxmTvHIWjGkaRmbCdQeIp7K
 github.com/smartystreets/gcs v1.1.2/go.mod h1:QAKDU1rhqhLbQxe0h9ch6Hk8RhroiFpKlptTSqDgC8g=
 github.com/smartystreets/gunit v1.4.2 h1:tyWYZffdPhQPfK5VsMQXfauwnJkqg7Tv5DLuQVYxq3Q=
 github.com/smartystreets/gunit v1.4.2/go.mod h1:ZjM1ozSIMJlAz/ay4SG8PeKF00ckUp+zMHZXV9/bvak=
-github.com/smartystreets/logging v1.1.1 h1:4UlnyYWB7LDd216NTuP3zTVvMQZREtPrDnJbsz0zftI=
-github.com/smartystreets/logging v1.1.1/go.mod h1:NwFCEPbtiTIug+UCtTbDVjgcJNfandE3brDx0x7QEY8=
