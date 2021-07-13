@@ -2,7 +2,7 @@
 
 NAME  := satisfy
 REPO  ?= $(or ${DOCKER_SERVER},smartystreets)
-IMAGE := $(REPO)/$(NAME):$(or ${VERSION},local)
+IMAGE := $(REPO)/$(NAME):$(or ${VERSION},current)
 PKG   := github.com/smartystreets/$(NAME)/cmd/satisfy
 
 test:
