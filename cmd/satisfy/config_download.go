@@ -56,17 +56,20 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 
 	err = flags.Parse(args)
 	if err != nil {
+		log.Println("[WARN] Unable to parse command line flags:", err)
 		return DownloadConfig{}, err
 	}
 
 	parser := core.NewGoogleCredentialParser(shell.NewDiskFileSystem(""), shell.NewEnvironment())
 	config.GoogleCredentials, err = parser.Parse()
 	if err != nil {
+		log.Println("[WARN] Unable to load Google Credentials:", err)
 		return DownloadConfig{}, err
 	}
 
 	config.Dependencies, err = loadDependencyListing(config.jsonPath, flags.Args())
 	if err != nil {
+		log.Println("[WARN] Unable to load dependency listing:", err)
 		return DownloadConfig{}, err
 	}
 
