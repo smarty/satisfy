@@ -60,19 +60,24 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		return DownloadConfig{}, err
 	}
 
-	parser := core.NewGoogleCredentialParser(shell.NewDiskFileSystem(""), shell.NewEnvironment())
-	config.GoogleCredentials, err = parser.Parse()
-	if err != nil {
-		log.Println("[WARN] Unable to load Google Credentials:", err)
-		return DownloadConfig{}, err
-	}
-
 	config.Dependencies, err = loadDependencyListing(config.jsonPath, flags.Args())
 	if err != nil {
 		log.Println("[WARN] Unable to load dependency listing:", err)
 		return DownloadConfig{}, err
 	}
 
+	parser := core.NewGoogleCredentialParser(shell.NewDiskFileSystem(""), shell.NewEnvironment())
+	config.GoogleCredentials, err = parser.Parse()
+	if err == nil {
+		return config, nil
+	}
+
+	if len(config.Dependencies.Credentials) == 0 {
+		log.Println("[WARN] Unable to load Google Credentials:", err)
+		return DownloadConfig{}, err
+	}
+
+	config.GoogleCredentials = gcs.Credentials{BearerToken: "Bearer " + config.Dependencies.Credentials}
 	return config, nil
 }
 

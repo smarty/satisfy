@@ -11,7 +11,8 @@ import (
 )
 
 type DependencyListing struct {
-	Listing []Dependency `json:"dependencies"`
+	Credentials string       `json:"credentials"`
+	Listing     []Dependency `json:"dependencies"`
 }
 
 func (this *DependencyListing) Validate() error {
