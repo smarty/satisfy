@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/smartystreets/gcs"
 	"github.com/smartystreets/satisfy/contracts"
@@ -77,7 +78,16 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		return DownloadConfig{}, err
 	}
 
-	config.GoogleCredentials = gcs.Credentials{BearerToken: "Bearer " + config.Dependencies.Credentials}
+	if strings.HasPrefix(config.Dependencies.Credentials, "Bearer ") {
+		config.GoogleCredentials = gcs.Credentials{BearerToken: strings.TrimRight(config.Dependencies.Credentials, ".")}
+		return config, nil
+	}
+
+	config.GoogleCredentials, err = core.ParseCredential([]byte(config.Dependencies.Credentials), nil)
+	if err != nil {
+		return DownloadConfig{}, nil
+	}
+
 	return config, nil
 }
 
