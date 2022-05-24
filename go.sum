@@ -1,9 +1,8 @@
 github.com/klauspost/compress v1.15.4 h1:1kn4/7MepF/CHmYub99/nNX8az0IJjfSOU/jbnTVfqQ=
 github.com/klauspost/compress v1.15.4/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHUDtV4Yw2GlzU=
-github.com/smartystreets/assertions v1.2.1/go.mod h1:wDmR7qL282YbGsPy6H/yAsesrxfxaaSlJazyFLYVFx8=
 github.com/smartystreets/assertions v1.13.0 h1:Dx1kYM01xsSqKPno3aqLnrwac2LetPvN23diwyr69Qs=
 github.com/smartystreets/assertions v1.13.0/go.mod h1:wDmR7qL282YbGsPy6H/yAsesrxfxaaSlJazyFLYVFx8=
-github.com/smartystreets/gcs v1.1.3 h1:+ifZLiFWdIDzOaJxCBhU7WLBsDDNFFGY8e5O9U8KSDc=
-github.com/smartystreets/gcs v1.1.3/go.mod h1:5qcsoQ7uEG+XxQ6FD4RT115ulDE0qjYvDS4khlWD6Ng=
+github.com/smartystreets/gcs v1.2.0 h1:xf5griyTIv5Rh3aTFVToFF/roZwtMysocw2CSC2/rEI=
+github.com/smartystreets/gcs v1.2.0/go.mod h1:y48LEfvdP3/qBYGCQRSjKSAJZVNbGPxfVoG5wSUmNvM=
 github.com/smartystreets/gunit v1.4.3 h1:yhnYXSXKK/R5vaUVGZD1zw4CQZqwtor7pp0VXBbMDrc=
 github.com/smartystreets/gunit v1.4.3/go.mod h1:ciyZ4dVTN2S8npQ4g9lMdARLX5XboUpcq5O7N6GlQmw=

@@ -19,6 +19,10 @@ func NewGoogleCredentialParser(storage contracts.FileReader, environment contrac
 }
 
 func (this CredentialParser) Parse() (gcs.Credentials, error) {
+	if value, found := this.environment.LookupEnv("GOOGLE_OAUTH_ACCESS_TOKEN"); found {
+		return gcs.Credentials{BearerToken: "Bearer " + strings.TrimSuffix(value, ".")}, nil
+	}
+
 	if inlineCredential, found := this.environment.LookupEnv("GOOGLE_CREDENTIALS"); found {
 		return parseCredential(base64.StdEncoding.DecodeString(inlineCredential))
 	}
@@ -32,6 +36,6 @@ func (this CredentialParser) Parse() (gcs.Credentials, error) {
 	return parseCredential(this.storage.ReadFile(googleCredentialsPath))
 }
 
-func parseCredential(value []byte, err error) (gcs.Credentials, error) {
+func parseCredential(value []byte, _ error) (gcs.Credentials, error) {
 	return gcs.ParseCredentialsFromJSON(value)
 }
