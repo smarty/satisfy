@@ -62,14 +62,14 @@ func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSour
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressReader := newArchiveProgressCounter(file.Size(), func(archived, total string) {
+	progressWriter := newArchiveProgressCounter(file.Size(), func(archived, total string) {
 		fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
 	})
 	defer func() {
 		fmt.Printf("\n")
 	}()
-	defer closeResource(progressReader)
-	writer := io.MultiWriter(this.hasher, this.archive, progressReader)
+	defer closeResource(progressWriter)
+	writer := io.MultiWriter(this.hasher, this.archive, progressWriter)
 	reader := this.storage.Open(file.Path())
 	defer closeResource(reader)
 	_, err := io.Copy(writer, reader)

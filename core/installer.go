@@ -121,8 +121,13 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
 			writer := this.filesystem.Create(pathItem)
-			_, err = io.Copy(writer, reader)
+			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string) {
+				fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
+			})
+			multiWriter := io.MultiWriter(writer, progressReader)
+			_, err = io.Copy(multiWriter, reader)
 			_ = writer.Close()
+			_ = progressReader.Close()
 			if err != nil {
 				return paths, err
 			}

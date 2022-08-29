@@ -49,6 +49,12 @@ func (this *archiveProgressCounter) Write(p []byte) (n int, e error) {
 	return
 }
 
+func (this *archiveProgressCounter) Read(p []byte) (n int, err error) {
+	n = len(p)
+	this.written += int64(n)
+	return
+}
+
 func (this *archiveProgressCounter) Close() error {
 	this.reportProgress()
 	this.printTimer.Stop()
