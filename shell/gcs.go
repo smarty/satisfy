@@ -40,6 +40,9 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != this.expectedStatus {
+		if this.isSafeRetryStatus(response.StatusCode) {
+			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.RetryErr)
+		}
 		return contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
 	}
 	return nil
@@ -62,4 +65,18 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
 	}
 	return response.Body, nil
+}
+
+func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
+	switch statusCode {
+	case http.StatusUnauthorized,
+		http.StatusRequestTimeout,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
