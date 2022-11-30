@@ -1,18 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/smartystreets/gcs"
+
 	"github.com/smartystreets/satisfy/contracts"
 	"github.com/smartystreets/satisfy/core"
-	"github.com/smartystreets/satisfy/shell"
 )
 
 type DownloadConfig struct {
@@ -67,27 +67,8 @@ func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		return DownloadConfig{}, err
 	}
 
-	parser := core.NewGoogleCredentialParser(shell.NewDiskFileSystem(""), shell.NewEnvironment())
-	config.GoogleCredentials, err = parser.Parse()
-	if err == nil {
-		return config, nil
-	}
-
-	if len(config.Dependencies.Credentials) == 0 {
-		log.Println("[WARN] Unable to load Google Credentials:", err)
-		return DownloadConfig{}, err
-	}
-
-	if strings.HasPrefix(config.Dependencies.Credentials, "Bearer ") {
-		config.GoogleCredentials = gcs.Credentials{BearerToken: strings.TrimRight(config.Dependencies.Credentials, ".")}
-		return config, nil
-	}
-
-	config.GoogleCredentials, err = core.ParseCredential([]byte(config.Dependencies.Credentials), nil)
-	if err != nil {
-		return DownloadConfig{}, nil
-	}
-
+	reader := gcs.NewCredentialsReader()
+	config.GoogleCredentials, err = reader.Read(context.Background(), config.Dependencies.Credentials)
 	return config, nil
 }
 

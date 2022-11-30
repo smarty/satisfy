@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -8,19 +9,29 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/smartystreets/gcs"
+
 	"github.com/smartystreets/satisfy/contracts"
 )
 
 type UploadConfigLoader struct {
-	parser  CredentialParser
+	reader  gcs.CredentialsReader
 	storage contracts.FileReader
 	stdin   io.Reader
 	stderr  io.Writer
 }
 
 func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
+	vaultAddress, _ := env.LookupEnv("VAULT_ADDR")
+	vaultToken, _ := env.LookupEnv("VAULT_TOKEN")
+
+	reader := gcs.NewCredentialsReader(
+		gcs.CredentialOptions.VaultServer(vaultAddress, vaultToken),
+		gcs.CredentialOptions.EnvironmentReader(env),
+		gcs.CredentialOptions.FileReader(storage))
+
 	return &UploadConfigLoader{
-		parser:  NewGoogleCredentialParser(storage, env),
+		reader:  reader,
 		storage: storage,
 		stdin:   stdin,
 		stderr:  stderr,
@@ -38,7 +49,7 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 		return contracts.UploadConfig{}, err
 	}
 
-	config.GoogleCredentials, err = this.parser.Parse()
+	config.GoogleCredentials, err = this.reader.Read(context.Background(), "")
 	if err != nil {
 		return contracts.UploadConfig{}, err
 	}
