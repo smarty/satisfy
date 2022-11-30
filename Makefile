@@ -5,8 +5,12 @@ REPO  ?= $(or ${DOCKER_SERVER},smartystreets)
 IMAGE := $(REPO)/$(NAME):$(or ${VERSION},current)
 PKG   := github.com/smartystreets/$(NAME)/cmd/satisfy
 
-test:
-	go fmt ./... && go test -timeout=1s -count=1 -short -cover ./...
+test: fmt
+	go test -timeout=1s -count=1 -short -cover ./...
+
+fmt:
+	go mod tidy
+	go fmt ./...
 
 coverage:
 	go test -timeout=1s -race -covermode=atomic -short ./...
@@ -32,4 +36,4 @@ image: build
 publish: image
 	docker push "$(IMAGE)"
 
-.PHONY: test coverage clean compile build install image publish
+.PHONY: test fmt coverage clean compile build install image publish
