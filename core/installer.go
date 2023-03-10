@@ -55,6 +55,8 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
+
+	manifest.Name = request.PackageName
 	rawManifest, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return contracts.Manifest{}, err

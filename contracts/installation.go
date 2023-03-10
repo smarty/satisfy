@@ -5,6 +5,7 @@ import "net/url"
 type InstallationRequest struct {
 	RemoteAddress url.URL
 	LocalPath     string
+	PackageName   string
 }
 
 type IntegrityCheck interface {

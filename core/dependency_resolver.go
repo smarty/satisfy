@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/smartystreets/satisfy/contracts"
 )
@@ -81,9 +82,13 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 
 func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Manifest) bool {
 	if localManifest.Name != this.dependency.PackageName {
-		log.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
-			localManifest.Name, this.dependency.Title())
-		return false
+		if strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
+			// no-op
+		} else {
+			log.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
+				localManifest.Name, this.dependency.Title())
+			return false
+		}
 	}
 	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(localManifest) {
 		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
@@ -110,6 +115,7 @@ func (this *DependencyResolver) installPackage() error {
 	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
+		PackageName:   this.dependency.PackageName,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to install manifest for %s: %w", this.dependency.Title(), err)

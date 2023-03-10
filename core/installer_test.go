@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"strings"
@@ -41,9 +40,10 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 	originalManifest := contracts.Manifest{Name: "Package/Name", Version: "1.2.3"}
 	this.downloader.prepareManifestDownload(originalManifest)
 
-	manifest, err := this.installer.InstallManifest(this.installationRequest())
+	request := this.installationRequest(originalManifest.Name)
+	manifest, err := this.installer.InstallManifest(request)
 
-	this.So(this.downloader.request, should.Resemble, this.installationRequest().RemoteAddress)
+	this.So(this.downloader.request, should.Resemble, request.RemoteAddress)
 	this.So(manifest, should.Resemble, originalManifest)
 	this.So(err, should.BeNil)
 	fileName := "local/path/manifest_Package___Name.json"
@@ -61,14 +61,14 @@ func (this *PackageInstallerFixture) loadLocalManifest(fileName string) contract
 func (this *PackageInstallerFixture) TestInstallManifestDownloadError() {
 	downloadError := errors.New("something or other")
 	this.downloader.Error = downloadError
-	manifest, err := this.installer.InstallManifest(this.installationRequest())
+	manifest, err := this.installer.InstallManifest(this.installationRequest(""))
 	this.So(err, should.Equal, downloadError)
 	this.So(manifest, should.BeZeroValue)
 }
 
 func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.downloader.prepareMalformedDownload()
-	manifest, err := this.installer.InstallManifest(this.installationRequest())
+	manifest, err := this.installer.InstallManifest(this.installationRequest(""))
 	this.So(err, should.NotBeNil)
 	this.So(manifest, should.BeZeroValue)
 }
@@ -76,7 +76,7 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -88,7 +88,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
 	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -100,7 +100,7 @@ func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
 
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 }
@@ -108,7 +108,7 @@ func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
 func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 	this.downloader.prepareMalformedDownload()
 
-	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
@@ -117,7 +117,7 @@ func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 	this.downloader.Error = errors.New("i am an error")
 
-	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
@@ -126,7 +126,7 @@ func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest())
+	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.Listing(), should.BeEmpty)
@@ -146,10 +146,11 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 	}
 }
 
-func (this *PackageInstallerFixture) installationRequest() contracts.InstallationRequest {
+func (this *PackageInstallerFixture) installationRequest(packageName string) contracts.InstallationRequest {
 	return contracts.InstallationRequest{
 		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
 		LocalPath:     "local/path",
+		PackageName:   packageName,
 	}
 }
 
@@ -192,18 +193,18 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 	_ = archiveWriter.Close()
 	_ = compressor.Close()
 
-	this.Body = ioutil.NopCloser(bytes.NewReader(writer.Bytes()))
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 
 	return hasher.Sum(nil)
 }
 
 func (this *FakeDownloader) prepareManifestDownload(manifest contracts.Manifest) {
 	raw, _ := json.Marshal(manifest)
-	this.Body = ioutil.NopCloser(bytes.NewReader(raw))
+	this.Body = io.NopCloser(bytes.NewReader(raw))
 }
 
 func (this *FakeDownloader) prepareMalformedDownload() {
-	this.Body = ioutil.NopCloser(strings.NewReader("malformed"))
+	this.Body = io.NopCloser(strings.NewReader("malformed"))
 }
 
 var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{

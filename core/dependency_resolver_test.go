@@ -54,7 +54,7 @@ func (this *DependencyResolverFixture) TestFreshInstallation() {
 	err := this.Resolve()
 
 	this.So(err, should.BeNil)
-	this.assertNewPackageInstalled(this.dependency.PackageVersion)
+	this.assertNewPackageInstalled(manifest.Name, this.dependency.PackageVersion)
 }
 
 func (this *DependencyResolverFixture) TestManifestInstallationFailure() {
@@ -96,7 +96,7 @@ func (this *DependencyResolverFixture) TestLocalManifestHasWrongPackageName() {
 
 	this.So(err, should.BeNil)
 	this.assertPreviouslyInstalledPackageUninstalled()
-	this.assertNewPackageInstalled(this.dependency.PackageVersion)
+	this.assertNewPackageInstalled(this.dependency.PackageName, this.dependency.PackageVersion)
 }
 
 func (this *DependencyResolverFixture) TestLocalManifestHasWrongVersion() {
@@ -106,7 +106,7 @@ func (this *DependencyResolverFixture) TestLocalManifestHasWrongVersion() {
 
 	this.So(err, should.BeNil)
 	this.assertPreviouslyInstalledPackageUninstalled()
-	this.assertNewPackageInstalled(this.dependency.PackageVersion)
+	this.assertNewPackageInstalled(this.dependency.PackageName, this.dependency.PackageVersion)
 }
 
 func (this *DependencyResolverFixture) TestIntegrityCheckFailure() {
@@ -117,7 +117,7 @@ func (this *DependencyResolverFixture) TestIntegrityCheckFailure() {
 
 	this.So(err, should.BeNil)
 	this.assertPreviouslyInstalledPackageUninstalled()
-	this.assertNewPackageInstalled(this.dependency.PackageVersion)
+	this.assertNewPackageInstalled(this.dependency.PackageName, this.dependency.PackageVersion)
 	this.So(this.integrityChecker.localPath, should.Equal, this.dependency.LocalDirectory)
 	this.So(this.integrityChecker.manifest, should.Resemble, localManifest)
 }
@@ -177,7 +177,7 @@ func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
 
 	this.So(err, should.BeNil)
 	this.assertPreviouslyInstalledPackageUninstalled()
-	this.assertNewPackageInstalled("E")
+	this.assertNewPackageInstalled(this.packageInstaller.remote.Name, "E")
 }
 
 func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
@@ -192,19 +192,21 @@ func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
 
 	err := this.Resolve()
 
-	this.assertLatestPackageInstalled(err, version)
+	this.assertLatestPackageInstalled(err, manifest.Name, version)
 }
 
-func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, version string) {
+func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, name, version string) {
 	this.So(err, should.BeNil)
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
 	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
 		RemoteAddress: this.URL("gcs://A/B/C/manifest.json"),
 		LocalPath:     "local",
+		PackageName:   name,
 	})
 	this.So(this.packageInstaller.packageRequest, should.Resemble, contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
 		LocalPath:     "local",
+		PackageName:   "",
 	})
 }
 func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
@@ -223,11 +225,12 @@ func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
 	this.So(this.fileSystem.fileSystem, should.NotContainKey, "local/contents3")
 }
 
-func (this *DependencyResolverFixture) assertNewPackageInstalled(version string) {
+func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version string) {
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
 	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/manifest.json", version)),
 		LocalPath:     "local",
+		PackageName:   name,
 	})
 	this.So(this.packageInstaller.packageRequest, should.Resemble, contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
@@ -285,7 +288,7 @@ type FakePackageInstaller struct {
 	downloadError          error
 }
 
-func (this *FakePackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest contracts.Manifest, err error) {
 	return this.remoteLatest, this.downloadError
 }
 
