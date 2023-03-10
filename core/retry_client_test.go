@@ -73,7 +73,7 @@ func (this *RetryFixture) TestDownloadCallsInner() {
 
 	reader, err := this.client.Download(request)
 
-	all, _ := ioutil.ReadAll(reader)
+	all, _ := io.ReadAll(reader)
 	this.So(string(all), should.Equal, "content")
 	this.So(err, should.BeNil)
 	this.So(this.fakeClient.downloadRequest, should.Resemble, request)

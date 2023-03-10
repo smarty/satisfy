@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/smartystreets/gcs"
 
@@ -106,7 +105,7 @@ func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error
 		return nil, blankJSONPathErr
 	}
 	if path == "_STDIN_" {
-		return ioutil.ReadAll(this.stdin)
+		return io.ReadAll(this.stdin)
 	} else {
 		return this.storage.ReadFile(path)
 	}

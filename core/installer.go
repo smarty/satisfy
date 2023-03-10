@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -45,7 +44,7 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 
 	defer closeResource(body)
 
-	rawManifest, err := ioutil.ReadAll(body)
+	rawManifest, err := io.ReadAll(body)
 	err = json.Unmarshal(rawManifest, &manifest)
 
 	return manifest, err

@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/smartystreets/assertions/should"
@@ -32,7 +31,7 @@ func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
 	buffer := &bytes.Buffer{}
 	reader := this.fileSystem.Open("/file.txt")
-	io.Copy(buffer, reader)
+	_, _ = io.Copy(buffer, reader)
 	this.So(this.fileSystem.Listing()[0].Size(), should.Equal, len([]byte("Hello World")))
 }
 
@@ -43,7 +42,7 @@ func (this *MemoryFixture) TestReadFileNonExistingFile() {
 func (this *MemoryFixture) TestOpenWrittenFile() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
 	reader := this.fileSystem.Open("/file.txt")
-	raw, _ := ioutil.ReadAll(reader)
+	raw, _ := io.ReadAll(reader)
 	this.So(raw, should.Resemble, []byte("Hello World"))
 }
 

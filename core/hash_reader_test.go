@@ -2,7 +2,7 @@ package core
 
 import (
 	"crypto/md5"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 
@@ -25,7 +25,7 @@ func (this *HashReaderFixture) Test() {
 	data := strings.NewReader(stuff)
 	hasher := md5.New()
 
-	_, _ = ioutil.ReadAll(NewHashReader(data, hasher))
+	_, _ = io.ReadAll(NewHashReader(data, hasher))
 
 	this.So(hasher.Sum(nil), should.Resemble, expected.Sum(nil))
 }
