@@ -1,4 +1,4 @@
-package satisfy
+package transfer
 
 import (
 	"bytes"

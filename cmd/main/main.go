@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/smartystreets/satisfy/cmd/satisfy"
 	"github.com/smartystreets/satisfy/core"
 	"github.com/smartystreets/satisfy/shell"
+	"github.com/smartystreets/satisfy/transfer"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func uploadMain(args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	satisfy.NewUploadApp(config).Run()
+	transfer.NewUploadApp(config).Run()
 }
 
 func checkMain(args []string) {
@@ -44,15 +44,15 @@ func checkMain(args []string) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	satisfy.NewCheckApp(config).Run()
+	transfer.NewCheckApp(config).Run()
 }
 
 func downloadMain(args []string) {
-	config, err := satisfy.ParseDownloadConfig(args)
+	config, err := transfer.ParseDownloadConfig(args)
 	if err != nil {
 		log.Fatal(err)
 	}
-	satisfy.NewDownloadApp(config).Run()
+	transfer.NewDownloadApp(config).Run()
 }
 
 func versionMain() {
