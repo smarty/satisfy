@@ -1,4 +1,4 @@
-package main
+package satisfy
 
 import (
 	"context"
@@ -23,7 +23,7 @@ type DownloadConfig struct {
 	jsonPath          string
 }
 
-func parseDownloadConfig(args []string) (config DownloadConfig, err error) {
+func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 	flags := flag.NewFlagSet("satisfy", flag.ContinueOnError)
 	flags.IntVar(&config.MaxRetry,
 		"max-retry",
