@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/smartystreets/gcs"
+	"github.com/smarty/gcs"
 )
 
 type UploadConfig struct {

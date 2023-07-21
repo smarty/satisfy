@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/smartystreets/satisfy/core"
-	"github.com/smartystreets/satisfy/shell"
-	"github.com/smartystreets/satisfy/transfer"
+	"github.com/smarty/satisfy/core"
+	"github.com/smarty/satisfy/shell"
+	"github.com/smarty/satisfy/transfer"
 )
 
 func main() {

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartystreets/satisfy/contracts"
-	"github.com/smartystreets/satisfy/core"
-	"github.com/smartystreets/satisfy/shell"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/core"
+	"github.com/smarty/satisfy/shell"
 )
 
 type DownloadApp struct {

@@ -3,7 +3,7 @@
 NAME  := satisfy
 REPO  ?= $(or ${DOCKER_SERVER},smartystreets)
 IMAGE := $(REPO)/$(NAME):$(or ${VERSION},current)
-PKG   := github.com/smartystreets/$(NAME)/cmd/satisfy
+PKG   := github.com/smarty/$(NAME)/cmd/satisfy
 
 test: fmt
 	go test -timeout=1s -count=1 -short -cover ./...

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type FileListingIntegrityChecker struct {

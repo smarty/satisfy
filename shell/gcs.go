@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/smartystreets/gcs"
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/gcs"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type GoogleCloudStorageClient struct {

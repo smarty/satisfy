@@ -9,10 +9,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/smartystreets/gcs"
+	"github.com/smarty/gcs"
 
-	"github.com/smartystreets/satisfy/contracts"
-	"github.com/smartystreets/satisfy/core"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/core"
 )
 
 type DownloadConfig struct {

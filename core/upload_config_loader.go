@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/smartystreets/gcs"
+	"github.com/smarty/gcs"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type UploadConfigLoader struct {

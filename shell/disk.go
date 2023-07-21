@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type DiskFileSystem struct{ root string }

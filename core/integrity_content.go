@@ -8,7 +8,7 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type FileOpenChecker interface {

@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type ZipArchiveWriter struct {

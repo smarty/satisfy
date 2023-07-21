@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type TarArchiveWriter struct {

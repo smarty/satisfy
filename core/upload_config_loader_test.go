@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/smartystreets/assertions/should"
-	"github.com/smartystreets/gcs"
-	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/assertions/should"
+	"github.com/smarty/gcs"
+	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/contracts"
 )
 
 func TestUploadConfigLoaderFixture(t *testing.T) {

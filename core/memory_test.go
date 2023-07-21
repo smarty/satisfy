@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/satisfy/contracts"
 )
 
 type inMemoryFileSystem struct {

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/smartystreets/assertions/should"
-	"github.com/smartystreets/gunit"
-	"github.com/smartystreets/satisfy/contracts"
+	"github.com/smarty/assertions/should"
+	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/contracts"
 )
 
 func TestCompoundIntegrityCheckFixture(t *testing.T) {

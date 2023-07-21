@@ -1,6 +1,6 @@
 package core
 
-import "github.com/smartystreets/satisfy/contracts"
+import "github.com/smarty/satisfy/contracts"
 
 func Filter(original []contracts.Dependency, filter []string) (filtered []contracts.Dependency) {
 	if len(filter) == 0 {
