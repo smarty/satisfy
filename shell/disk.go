@@ -2,7 +2,6 @@ package shell
 
 import (
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -98,7 +97,7 @@ func (this *DiskFileSystem) Create(path string) io.WriteCloser {
 }
 
 func (this *DiskFileSystem) ReadFile(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
+	return os.ReadFile(path)
 }
 
 func (this *DiskFileSystem) WriteFile(path string, content []byte) {
@@ -106,7 +105,7 @@ func (this *DiskFileSystem) WriteFile(path string, content []byte) {
 	if err != nil {
 		log.Panic(err)
 	}
-	err = ioutil.WriteFile(path, content, 0644)
+	err = os.WriteFile(path, content, 0644)
 	if err != nil {
 		log.Panic(err)
 	}

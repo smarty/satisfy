@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"strings"
 	"testing"
@@ -125,7 +124,7 @@ type FakeClient struct {
 func (this *FakeClient) Download(request url.URL) (io.ReadCloser, error) {
 	this.downloadRequest = request
 	this.downloadAttempts++
-	return ioutil.NopCloser(strings.NewReader(this.downloadContent)), this.error
+	return io.NopCloser(strings.NewReader(this.downloadContent)), this.error
 }
 
 func (this *FakeClient) Upload(request contracts.UploadRequest) error {

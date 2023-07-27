@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"hash"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -68,7 +67,7 @@ func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
 
 func (this *UploadApp) buildArchiveAndManifestContents() {
 	var err error
-	this.file, err = ioutil.TempFile("", "")
+	this.file, err = os.CreateTemp("", "")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -52,7 +51,7 @@ func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 }
 
 func (this *inMemoryFileSystem) Open(path string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
+	return io.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
 }
 
 func (this *inMemoryFileSystem) Create(path string) io.WriteCloser {
