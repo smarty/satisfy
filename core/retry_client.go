@@ -30,7 +30,7 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 			return err
 		}
 		if x < this.maxRetry {
-			log.Println("[WARN] upload failed, retry imminent.")
+			log.Printf("[WARN] upload failed, %v \n retry imminent.", err)
 			this.sleep(time.Second * 3)
 		}
 	}
