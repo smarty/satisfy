@@ -58,15 +58,13 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromSpecifiedFile() {
 	config, err := this.loader.LoadConfig("upload", args)
 
 	this.So(err, should.BeNil)
-	this.So(config, should.Resemble, contracts.UploadConfig{
-		GoogleCredentials: parsedGoogleCredentials,
-		MaxRetry:          10,
-		JSONPath:          "config.json",
-		Overwrite:         true,
-		PackageConfig:     packageConfig,
-	})
+	this.So(config.MaxRetry, should.Equal, 10)
+	this.So(config.CredentialReader, should.NotBeNil)
+	this.So(config.GoogleCredentials, should.Resemble, parsedGoogleCredentials)
+	this.So(config.JSONPath, should.Equal, "config.json")
+	this.So(config.Overwrite, should.BeTrue)
+	this.So(config.PackageConfig, should.Resemble, packageConfig)
 }
-
 func (this *UploadConfigLoaderFixture) TestInValidJSONFromSpecifiedFile() {
 	this.storage.WriteFile("config.json", []byte("Invalid JSON"))
 	args := []string{"-json", "config.json"}
