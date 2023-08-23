@@ -60,6 +60,7 @@ func (this *UploadApp) Run() {
 			log.Println("[Error] Cannot refresh token: ", err)
 		}
 	}
+
 	log.Println("Uploading the archive...")
 	this.upload(this.buildArchiveUploadRequest())
 	this.closeArchiveFile()
