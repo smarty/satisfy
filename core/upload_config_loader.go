@@ -58,6 +58,9 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 		return contracts.UploadConfig{}, err
 	}
 
+	// allow refreshing the token later which accommodates long compression times which cause the bearer token to expire
+	config.CredentialReader = this.reader
+
 	return config, nil
 }
 
