@@ -3,6 +3,7 @@ package transfer
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"hash"
@@ -18,6 +19,8 @@ import (
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/shell"
 )
+
+const ForceAccessTokenRefreshInSeconds = 1800
 
 type UploadApp struct {
 	config        contracts.UploadConfig
@@ -38,11 +41,25 @@ func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 func (this *UploadApp) Run() {
 	this.buildRemoteStorageClient()
 
+	start := time.Now()
+
 	log.Println("Building the archive...")
 	this.buildArchiveAndManifestContents()
 	this.completeManifest()
 
 	log.Println("Manifest:", this.dumpManifest())
+
+	// TEMPORARY WORKAROUND
+	// If the compression took over 30 minutes, we need to refresh the bearer token
+	// so we have time to upload the archive and manifest before it expires.
+	if time.Now().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
+		var err error
+		this.config.GoogleCredentials, err = this.config.CredentialReader.Read(context.Background(), "")
+		this.buildRemoteStorageClient()
+		if err != nil {
+			log.Println("[Error] Cannot refresh token: ", err)
+		}
+	}
 
 	log.Println("Uploading the archive...")
 	this.upload(this.buildArchiveUploadRequest())
