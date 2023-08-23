@@ -50,16 +50,16 @@ func (this *UploadApp) Run() {
 	log.Println("Manifest:", this.dumpManifest())
 
 	// TEMPORARY WORKAROUND
-	// If the compression took over 30 minutes, we need to refresh the expired bearer token so
-	// we have time to upload all files.
-	if time.Now().Sub(start).Seconds() > ForceAccessTokenRefreshInSeconds {
+	// If the compression took over 30 minutes, we need to refresh the bearer token
+	// so we have time to upload the archive and manifest before it expires.
+	if time.Now().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
 		var err error
 		this.config.GoogleCredentials, err = this.config.CredentialReader.Read(context.Background(), "")
+		this.buildRemoteStorageClient()
 		if err != nil {
 			log.Println("[Error] Cannot refresh token: ", err)
 		}
 	}
-
 	log.Println("Uploading the archive...")
 	this.upload(this.buildArchiveUploadRequest())
 	this.closeArchiveFile()
