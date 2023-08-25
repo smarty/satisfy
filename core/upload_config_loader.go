@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/smarty/gcs"
 
@@ -45,11 +46,13 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 
 	config.PackageConfig, err = this.parseConfigFile(config.JSONPath)
 	if err != nil {
+		log.Printf("[Error] Error parsing configuration file: [%s]", err)
 		return contracts.UploadConfig{}, err
 	}
 
 	config.GoogleCredentials, err = this.reader.Read(context.Background(), "")
 	if err != nil {
+		log.Printf("[Error] Google authentication failed: [%s]", err)
 		return contracts.UploadConfig{}, err
 	}
 
