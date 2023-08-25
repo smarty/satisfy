@@ -41,7 +41,7 @@ func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 func (this *UploadApp) Run() {
 	this.buildRemoteStorageClient()
 
-	start := time.Now()
+	start := time.Now().UTC()
 
 	log.Println("Building the archive...")
 	this.buildArchiveAndManifestContents()
@@ -52,7 +52,12 @@ func (this *UploadApp) Run() {
 	// TEMPORARY WORKAROUND
 	// If the compression took over 30 minutes, we need to refresh the bearer token
 	// so we have time to upload the archive and manifest before it expires.
-	if time.Now().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
+	// Other Resolution Thoughts:
+	// Perhaps the retry client can be modified to handle 401 errors and refresh the token,
+	// The problem with this approach is if the file to upload is large, the 401 does not occur until after
+	// the entire time is spent to upload the file, so it does not fail fast. If we attempted to upload
+	// the manifest first it could be a fast fail.
+	if time.Now().UTC().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
 		var err error
 		this.config.GoogleCredentials, err = this.config.CredentialReader.Read(context.Background(), "")
 		this.buildRemoteStorageClient()
