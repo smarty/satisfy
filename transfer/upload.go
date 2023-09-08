@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -43,9 +44,14 @@ func (this *UploadApp) Run() {
 
 	start := time.Now().UTC()
 
-	log.Println("Building the archive...")
-	this.buildArchiveAndManifestContents()
-	this.completeManifest()
+	if this.config.PackageConfig.SourceFile == "" {
+		log.Println("Building the archive...")
+		this.buildArchiveAndManifestContents()
+		this.completeManifest()
+	} else {
+		log.Printf("Building the archive from file: %s...\n", this.config.PackageConfig.SourceFile)
+		this.buildManifestContentsFromFile()
+	}
 
 	log.Println("Manifest:", this.dumpManifest())
 
@@ -114,6 +120,47 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	}
 
 	this.closeArchiveFile()
+}
+
+func (this *UploadApp) buildManifestContentsFromFile() {
+	var err error
+	this.file, err = os.Open(this.config.PackageConfig.SourceFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	this.hasher = md5.New()
+	_, err = io.Copy(this.hasher, this.file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	md5Sum := this.hasher.Sum(nil)
+
+	fileInfo, err := os.Stat(this.file.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	filepath.Base(this.config.PackageConfig.SourceFile)
+
+	archiveItem := contracts.ArchiveItem{
+		Path:        filepath.Base(this.config.PackageConfig.SourceFile),
+		Size:        fileInfo.Size(),
+		MD5Checksum: md5Sum,
+	}
+
+	this.manifest = contracts.Manifest{
+		Name:    this.packageConfig.PackageName,
+		Version: this.packageConfig.PackageVersion,
+		Archive: contracts.Archive{
+			Filename:             contracts.RemoteArchiveFilename,
+			Size:                 uint64(fileInfo.Size()),
+			MD5Checksum:          md5Sum,
+			Contents:             []contracts.ArchiveItem{archiveItem},
+			CompressionAlgorithm: this.packageConfig.CompressionAlgorithm,
+		},
+	}
+
 }
 
 func (this *UploadApp) InitializeCompressor(writer io.Writer) {
