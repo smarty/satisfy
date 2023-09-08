@@ -121,7 +121,7 @@ func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.Upload
 	if config.MaxRetry < 0 {
 		return maxRetryErr
 	}
-	if config.PackageConfig.CompressionAlgorithm == "" && config.PackageConfig.SourceFile == "" {
+	if config.PackageConfig.CompressionAlgorithm == "" {
 		return blankCompressionAlgorithmErr
 	}
 	if config.PackageConfig.SourceDirectory == "" && config.PackageConfig.SourceFile == "" {

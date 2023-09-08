@@ -141,8 +141,6 @@ func (this *UploadApp) buildManifestContentsFromFile() {
 		log.Fatal(err)
 	}
 
-	filepath.Base(this.config.PackageConfig.SourceFile)
-
 	archiveItem := contracts.ArchiveItem{
 		Path:        filepath.Base(this.config.PackageConfig.SourceFile),
 		Size:        fileInfo.Size(),
