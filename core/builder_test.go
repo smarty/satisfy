@@ -9,23 +9,23 @@ import (
 	"github.com/smarty/satisfy/contracts"
 )
 
-func TestPackageBuilderFixture(t *testing.T) {
-	gunit.Run(new(PackageBuilderFixture), t)
+func TestDirectoryPackageBuilderFixture(t *testing.T) {
+	gunit.Run(new(DirectoryPackageBuilderFixture), t)
 }
 
-type PackageBuilderFixture struct {
+type DirectoryPackageBuilderFixture struct {
 	*gunit.Fixture
-	builder    *PackageBuilder
+	builder    PackageBuilder
 	fileSystem *inMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
 }
 
-func (this *PackageBuilderFixture) Setup() {
+func (this *DirectoryPackageBuilderFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher)
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	_ = this.fileSystem.Chmod("/in/file0.txt", 0755)
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
@@ -33,8 +33,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.fileSystem.WriteFile("/in/sub/file0.txt", []byte("ccc"))
 	this.fileSystem.Root = "/in"
 }
-
-func (this *PackageBuilderFixture) TestContentsAreInventoried() {
+func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
@@ -45,8 +44,7 @@ func (this *PackageBuilderFixture) TestContentsAreInventoried() {
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
-
-func (this *PackageBuilderFixture) TestContentsAreArchived() {
+func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
@@ -58,36 +56,31 @@ func (this *PackageBuilderFixture) TestContentsAreArchived() {
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
-
-func (this *PackageBuilderFixture) TestSimulatedArchiveWriteError() {
+func (this *DirectoryPackageBuilderFixture) TestSimulatedArchiveWriteError() {
 	this.archive.writeError = writeErr
 
 	err := this.builder.Build()
 
 	this.So(err, should.Equal, writeErr)
 }
-
-func (this *PackageBuilderFixture) TestSimulatedArchiveCloseError() {
+func (this *DirectoryPackageBuilderFixture) TestSimulatedArchiveCloseError() {
 	this.archive.closedError = closeErr
 
 	err := this.builder.Build()
 
 	this.So(err, should.Equal, closeErr)
 }
-
-func (this *PackageBuilderFixture) TestAbsoluteSymlinkOutOfBoundsNotAllowed() {
+func (this *DirectoryPackageBuilderFixture) TestAbsoluteSymlinkOutOfBoundsNotAllowed() {
 	this.fileSystem.CreateSymlink("/out/of-bounds.txt", "/in/link.txt")
 	err := this.builder.Build()
 	this.So(err, should.NotBeNil)
 }
-
-func (this *PackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAllowed() {
+func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAllowed() {
 	this.fileSystem.CreateSymlink("../../out/of-bounds.txt", "/in/link.txt")
 	err := this.builder.Build()
 	this.So(err, should.NotBeNil)
 }
-
-func (this *PackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
+func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
 	this.fileSystem.CreateSymlink("../file0.txt", "/in/inner/link.txt")
 	err := this.builder.Build()
 	if !this.So(err, should.BeNil) {

@@ -124,7 +124,7 @@ func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.Upload
 	if config.PackageConfig.CompressionAlgorithm == "" {
 		return blankCompressionAlgorithmErr
 	}
-	if config.PackageConfig.SourceDirectory == "" {
+	if config.PackageConfig.SourceDirectory == "" && config.PackageConfig.SourceFile == "" {
 		return blankSourceDirectoryErr
 	}
 	if config.PackageConfig.PackageName == "" {
@@ -143,7 +143,7 @@ var (
 	maxRetryErr                  = errors.New("max-retry must be positive")
 	blankJSONPathErr             = errors.New("json flag must be populated")
 	blankCompressionAlgorithmErr = errors.New("compression algorithm should not be blank")
-	blankSourceDirectoryErr      = errors.New("source directory should not be blank")
+	blankSourceDirectoryErr      = errors.New("either 'source directory' or 'source file' must be provided")
 	blankPackageNameErr          = errors.New("package name should not be blank")
 	blankPackageVersionErr       = errors.New("package version should not be blank")
 	nilRemoteAddressPrefixErr    = errors.New("remote address prefix should not be nil")

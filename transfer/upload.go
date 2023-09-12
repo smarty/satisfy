@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -28,7 +29,7 @@ type UploadApp struct {
 	file          *os.File
 	hasher        hash.Hash
 	compressor    io.WriteCloser
-	builder       *core.PackageBuilder
+	builder       core.PackageBuilder
 	manifest      contracts.Manifest
 	client        contracts.RemoteStorage
 }
@@ -43,7 +44,6 @@ func (this *UploadApp) Run() {
 
 	start := time.Now().UTC()
 
-	log.Println("Building the archive...")
 	this.buildArchiveAndManifestContents()
 	this.completeManifest()
 
@@ -97,11 +97,20 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.InitializeCompressor(writer)
 
-	this.builder = core.NewPackageBuilder(
-		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
-		shell.NewSwitchArchiveWriter(this.compressor),
-		md5.New(),
-	)
+	if this.config.PackageConfig.SourceFile == "" {
+		this.builder = core.NewDirectoryPackageBuilder(
+			shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
+			shell.NewSwitchArchiveWriter(this.compressor),
+			md5.New(),
+		)
+	} else {
+		this.builder = core.NewFilePackageBuilder(
+			this.config.PackageConfig.SourceFile,
+			writer,
+			shell.NewDiskFileSystem(filepath.Dir(this.config.PackageConfig.SourceFile)),
+			this.hasher,
+		)
+	}
 
 	err = this.builder.Build()
 	if err != nil {

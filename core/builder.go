@@ -11,28 +11,83 @@ import (
 	"github.com/smarty/satisfy/contracts"
 )
 
-type PackageBuilderFileSystem interface {
+type PackageBuilder interface {
+	Build() error
+	Contents() []contracts.ArchiveItem
+}
+
+type FilePackageBuilderFileSystem interface {
+	contracts.FileOpener
+	contracts.FileChecker
+}
+
+type FilePackageBuilder struct {
+	sourceFile string
+	writer     io.Writer
+	hasher     hash.Hash
+	contents   []contracts.ArchiveItem
+	fileSystem FilePackageBuilderFileSystem
+}
+
+func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem FilePackageBuilderFileSystem, hasher hash.Hash) PackageBuilder {
+	return &FilePackageBuilder{
+		sourceFile: sourceFile,
+		writer:     writer,
+		hasher:     hasher,
+		fileSystem: fileSystem,
+	}
+}
+
+func (this *FilePackageBuilder) Build() error {
+	file := this.fileSystem.Open(this.sourceFile)
+	defer func() { _ = file.Close() }()
+
+	_, err := io.Copy(this.writer, file)
+	if err != nil {
+		return err
+	}
+	md5Sum := this.hasher.Sum(nil)
+
+	fileInfo, err := this.fileSystem.Stat(this.sourceFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	archiveItem := contracts.ArchiveItem{
+		Path:        this.sourceFile,
+		Size:        fileInfo.Size(),
+		MD5Checksum: md5Sum,
+	}
+	this.contents = []contracts.ArchiveItem{archiveItem}
+	return err
+}
+
+func (this *FilePackageBuilder) Contents() []contracts.ArchiveItem {
+	return this.contents
+}
+
+type DirectoryPackageBuilderFileSystem interface {
 	contracts.PathLister
 	contracts.FileOpener
 	contracts.RootPath
 }
 
-type PackageBuilder struct {
-	storage  PackageBuilderFileSystem
+type DirectoryPackageBuilder struct {
+	storage  DirectoryPackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
 	contents []contracts.ArchiveItem
 }
 
-func NewPackageBuilder(storage PackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) *PackageBuilder {
-	return &PackageBuilder{
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) PackageBuilder {
+	return &DirectoryPackageBuilder{
 		storage: storage,
 		archive: archive,
 		hasher:  hasher,
 	}
 }
 
-func (this *PackageBuilder) Build() error {
+func (this *DirectoryPackageBuilder) Build() error {
 	for _, file := range this.storage.Listing() {
 		err := this.add(file)
 		if err != nil {
@@ -42,7 +97,7 @@ func (this *PackageBuilder) Build() error {
 	return this.archive.Close()
 }
 
-func (this *PackageBuilder) add(file contracts.FileInfo) error {
+func (this *DirectoryPackageBuilder) add(file contracts.FileInfo) error {
 	log.Printf("Adding \"%s\" to archive.", file.Path())
 	header, err := this.buildHeader(file)
 	if err != nil {
@@ -57,7 +112,7 @@ func (this *PackageBuilder) add(file contracts.FileInfo) error {
 	return err
 }
 
-func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSourcePath string) error {
+func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, symlinkSourcePath string) error {
 	if symlinkSourcePath != "" {
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
@@ -77,7 +132,7 @@ func (this *PackageBuilder) archiveContents(file contracts.FileInfo, symlinkSour
 	return err
 }
 
-func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contracts.ArchiveHeader, err error) {
+func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo) (header contracts.ArchiveHeader, err error) {
 	header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
@@ -93,7 +148,7 @@ func (this *PackageBuilder) buildHeader(file contracts.FileInfo) (header contrac
 	return header, err
 }
 
-func (this *PackageBuilder) relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
+func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
 	path := file.Symlink()
 	if this.isAbsolute(path) {
 		return filepath.Rel(filepath.Dir(file.Path()), path)
@@ -103,7 +158,7 @@ func (this *PackageBuilder) relativeLinkSourcePath(file contracts.FileInfo) (str
 	return filepath.Rel(filepath.Dir(file.Path()), path)
 }
 
-func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
+func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
 	return fmt.Errorf(
 		"the file \"%s\" is a symlink that refers to \"%s\" which is outside of the configured root directory: \"%s\"",
 		file.Path(),
@@ -111,7 +166,7 @@ func (this *PackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) erro
 		this.storage.RootPath())
 }
 
-func (this *PackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
 	defer this.hasher.Reset()
 	return contracts.ArchiveItem{
 		Path:        strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/"),
@@ -120,18 +175,18 @@ func (this *PackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkS
 	}
 }
 
-func (this *PackageBuilder) determineFileSize(file contracts.FileInfo, symlinkSourcePath string) int64 {
+func (this *DirectoryPackageBuilder) determineFileSize(file contracts.FileInfo, symlinkSourcePath string) int64 {
 	if symlinkSourcePath == "" {
 		return file.Size()
 	}
 	return int64(len(symlinkSourcePath))
 }
 
-func (this *PackageBuilder) Contents() []contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) Contents() []contracts.ArchiveItem {
 	return this.contents
 }
 
-func (this *PackageBuilder) outOfBounds(info contracts.FileInfo) bool {
+func (this *DirectoryPackageBuilder) outOfBounds(info contracts.FileInfo) bool {
 	if this.isAbsolute(info.Symlink()) {
 		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
 	}
@@ -139,6 +194,6 @@ func (this *PackageBuilder) outOfBounds(info contracts.FileInfo) bool {
 	return !strings.HasPrefix(cleaned, this.storage.RootPath())
 }
 
-func (this *PackageBuilder) isAbsolute(path string) bool {
+func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 	return strings.HasPrefix(path, "/")
 }
