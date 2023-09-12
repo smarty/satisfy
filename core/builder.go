@@ -54,7 +54,7 @@ func (this *FilePackageBuilder) Build() error {
 	}
 
 	archiveItem := contracts.ArchiveItem{
-		Path:        this.sourceFile,
+		Path:        filepath.Base(this.sourceFile),
 		Size:        fileInfo.Size(),
 		MD5Checksum: md5Sum,
 	}
