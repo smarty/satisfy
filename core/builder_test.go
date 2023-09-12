@@ -15,7 +15,7 @@ func TestPackageBuilderFixture(t *testing.T) {
 
 type PackageBuilderFixture struct {
 	*gunit.Fixture
-	builder    *PackageBuilder
+	builder    PackageBuilder
 	fileSystem *inMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
@@ -25,7 +25,7 @@ func (this *PackageBuilderFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewPackageBuilder(this.fileSystem, this.archive, this.hasher)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher)
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	_ = this.fileSystem.Chmod("/in/file0.txt", 0755)
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))

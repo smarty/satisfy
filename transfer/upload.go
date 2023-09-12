@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -29,7 +28,7 @@ type UploadApp struct {
 	file          *os.File
 	hasher        hash.Hash
 	compressor    io.WriteCloser
-	builder       *core.PackageBuilder
+	builder       core.PackageBuilder
 	manifest      contracts.Manifest
 	client        contracts.RemoteStorage
 }
@@ -44,14 +43,8 @@ func (this *UploadApp) Run() {
 
 	start := time.Now().UTC()
 
-	if this.config.PackageConfig.SourceFile == "" {
-		log.Println("Building the archive...")
-		this.buildArchiveAndManifestContents()
-		this.completeManifest()
-	} else {
-		log.Printf("Building the archive from file: %s...\n", this.config.PackageConfig.SourceFile)
-		this.buildManifestContentsFromFile()
-	}
+	this.buildArchiveAndManifestContents()
+	this.completeManifest()
 
 	log.Println("Manifest:", this.dumpManifest())
 
@@ -103,11 +96,15 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.InitializeCompressor(writer)
 
-	this.builder = core.NewPackageBuilder(
-		shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
-		shell.NewSwitchArchiveWriter(this.compressor),
-		md5.New(),
-	)
+	if this.config.PackageConfig.SourceFile == "" {
+		this.builder = core.NewDirectoryPackageBuilder(
+			shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
+			shell.NewSwitchArchiveWriter(this.compressor),
+			md5.New(),
+		)
+	} else {
+		this.builder = core.NewFilePackageBuilder(this.config.PackageConfig.SourceFile, writer, this.hasher)
+	}
 
 	err = this.builder.Build()
 	if err != nil {
@@ -120,45 +117,6 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	}
 
 	this.closeArchiveFile()
-}
-
-func (this *UploadApp) buildManifestContentsFromFile() {
-	var err error
-	this.file, err = os.Open(this.config.PackageConfig.SourceFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	this.hasher = md5.New()
-	_, err = io.Copy(this.hasher, this.file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	md5Sum := this.hasher.Sum(nil)
-
-	fileInfo, err := os.Stat(this.file.Name())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	archiveItem := contracts.ArchiveItem{
-		Path:        filepath.Base(this.config.PackageConfig.SourceFile),
-		Size:        fileInfo.Size(),
-		MD5Checksum: md5Sum,
-	}
-
-	this.manifest = contracts.Manifest{
-		Name:    this.packageConfig.PackageName,
-		Version: this.packageConfig.PackageVersion,
-		Archive: contracts.Archive{
-			Filename:             contracts.RemoteArchiveFilename,
-			Size:                 uint64(fileInfo.Size()),
-			MD5Checksum:          md5Sum,
-			Contents:             []contracts.ArchiveItem{archiveItem},
-			CompressionAlgorithm: this.packageConfig.CompressionAlgorithm,
-		},
-	}
-
 }
 
 func (this *UploadApp) InitializeCompressor(writer io.Writer) {
