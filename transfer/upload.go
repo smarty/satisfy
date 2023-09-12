@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -103,7 +104,12 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 			md5.New(),
 		)
 	} else {
-		this.builder = core.NewFilePackageBuilder(this.config.PackageConfig.SourceFile, writer, this.hasher)
+		this.builder = core.NewFilePackageBuilder(
+			filepath.Base(this.config.PackageConfig.SourceFile),
+			writer,
+			os.DirFS(filepath.Dir(this.config.PackageConfig.SourceFile)),
+			this.hasher,
+		)
 	}
 
 	err = this.builder.Build()

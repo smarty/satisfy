@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/fs"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -28,35 +28,38 @@ type FilePackageBuilder struct {
 	writer     io.Writer
 	hasher     hash.Hash
 	contents   []contracts.ArchiveItem
+	fileSystem fs.FS
 }
 
-func NewFilePackageBuilder(sourceFile string, writer io.Writer, hasher hash.Hash) PackageBuilder {
+func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem fs.FS, hasher hash.Hash) PackageBuilder {
 	return &FilePackageBuilder{
 		sourceFile: sourceFile,
 		writer:     writer,
 		hasher:     hasher,
+		fileSystem: fileSystem,
 	}
 }
 
 func (this *FilePackageBuilder) Build() error {
-	file, err := os.Open(this.sourceFile)
-	defer func() { _ = file.Close() }()
+	file, err := this.fileSystem.Open(this.sourceFile)
 	if err != nil {
 		return err
 	}
+	defer func() { _ = file.Close() }()
+
 	_, err = io.Copy(this.writer, file)
 	if err != nil {
 		return err
 	}
 	md5Sum := this.hasher.Sum(nil)
 
-	fileInfo, err := os.Stat(file.Name())
+	fileInfo, err := file.Stat()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	archiveItem := contracts.ArchiveItem{
-		Path:        filepath.Base(this.sourceFile),
+		Path:        this.sourceFile,
 		Size:        fileInfo.Size(),
 		MD5Checksum: md5Sum,
 	}
