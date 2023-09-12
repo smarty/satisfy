@@ -105,9 +105,9 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 		)
 	} else {
 		this.builder = core.NewFilePackageBuilder(
-			filepath.Base(this.config.PackageConfig.SourceFile),
+			this.config.PackageConfig.SourceFile,
 			writer,
-			os.DirFS(filepath.Dir(this.config.PackageConfig.SourceFile)),
+			shell.NewDiskFileSystem(filepath.Dir(this.config.PackageConfig.SourceFile)),
 			this.hasher,
 		)
 	}

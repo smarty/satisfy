@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/fs"
 	"log"
 	"path/filepath"
 	"strings"
@@ -12,15 +11,14 @@ import (
 	"github.com/smarty/satisfy/contracts"
 )
 
-type PackageBuilderFileSystem interface {
-	contracts.PathLister
-	contracts.FileOpener
-	contracts.RootPath
-}
-
 type PackageBuilder interface {
 	Build() error
 	Contents() []contracts.ArchiveItem
+}
+
+type FilePackageBuilderFileSystem interface {
+	contracts.FileOpener
+	contracts.FileChecker
 }
 
 type FilePackageBuilder struct {
@@ -28,10 +26,10 @@ type FilePackageBuilder struct {
 	writer     io.Writer
 	hasher     hash.Hash
 	contents   []contracts.ArchiveItem
-	fileSystem fs.FS
+	fileSystem FilePackageBuilderFileSystem
 }
 
-func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem fs.FS, hasher hash.Hash) PackageBuilder {
+func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem FilePackageBuilderFileSystem, hasher hash.Hash) PackageBuilder {
 	return &FilePackageBuilder{
 		sourceFile: sourceFile,
 		writer:     writer,
@@ -41,19 +39,16 @@ func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem fs.FS
 }
 
 func (this *FilePackageBuilder) Build() error {
-	file, err := this.fileSystem.Open(this.sourceFile)
-	if err != nil {
-		return err
-	}
+	file := this.fileSystem.Open(this.sourceFile)
 	defer func() { _ = file.Close() }()
 
-	_, err = io.Copy(this.writer, file)
+	_, err := io.Copy(this.writer, file)
 	if err != nil {
 		return err
 	}
 	md5Sum := this.hasher.Sum(nil)
 
-	fileInfo, err := file.Stat()
+	fileInfo, err := this.fileSystem.Stat(this.sourceFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,14 +66,20 @@ func (this *FilePackageBuilder) Contents() []contracts.ArchiveItem {
 	return this.contents
 }
 
+type DirectoryPackageBuilderFileSystem interface {
+	contracts.PathLister
+	contracts.FileOpener
+	contracts.RootPath
+}
+
 type DirectoryPackageBuilder struct {
-	storage  PackageBuilderFileSystem
+	storage  DirectoryPackageBuilderFileSystem
 	archive  contracts.ArchiveWriter
 	hasher   hash.Hash
 	contents []contracts.ArchiveItem
 }
 
-func NewDirectoryPackageBuilder(storage PackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) PackageBuilder {
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) PackageBuilder {
 	return &DirectoryPackageBuilder{
 		storage: storage,
 		archive: archive,
