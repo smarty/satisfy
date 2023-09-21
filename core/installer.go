@@ -28,12 +28,13 @@ type PackageInstallerFileSystem interface {
 }
 
 type PackageInstaller struct {
-	downloader contracts.Downloader
-	filesystem PackageInstallerFileSystem
+	downloader   contracts.Downloader
+	filesystem   PackageInstallerFileSystem
+	showProgress bool
 }
 
-func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem) *PackageInstaller {
-	return &PackageInstaller{downloader: downloader, filesystem: filesystem}
+func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem, showProgress bool) *PackageInstaller {
+	return &PackageInstaller{downloader: downloader, filesystem: filesystem, showProgress: showProgress}
 }
 
 func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest contracts.Manifest, err error) {
@@ -123,7 +124,9 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		} else {
 			writer := this.filesystem.Create(pathItem)
 			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string) {
-				fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
+				if this.showProgress {
+					fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
+				}
 			})
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)

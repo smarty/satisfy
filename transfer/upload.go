@@ -102,6 +102,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 			shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
 			shell.NewSwitchArchiveWriter(this.compressor),
 			md5.New(),
+			this.config.ShowProgress,
 		)
 	} else {
 		this.builder = core.NewFilePackageBuilder(
@@ -109,6 +110,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 			writer,
 			shell.NewDiskFileSystem(filepath.Dir(this.config.PackageConfig.SourceFile)),
 			this.hasher,
+			this.config.ShowProgress,
 		)
 	}
 

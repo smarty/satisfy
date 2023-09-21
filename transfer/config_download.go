@@ -18,6 +18,7 @@ import (
 type DownloadConfig struct {
 	MaxRetry          int
 	QuickVerification bool
+	ShowProgress      bool
 	GoogleCredentials gcs.Credentials
 	Dependencies      contracts.DependencyListing
 	jsonPath          string
@@ -34,6 +35,11 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		"quick",
 		true,
 		"When set to false, perform full file content validation on installed packages.",
+	)
+	flags.BoolVar(&config.ShowProgress,
+		"progress",
+		true,
+		"Displays progress stats as files are extracted from the archive.",
 	)
 	flags.StringVar(&config.jsonPath,
 		"json",

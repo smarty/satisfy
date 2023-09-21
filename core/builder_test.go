@@ -25,7 +25,7 @@ func (this *DirectoryPackageBuilderFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	_ = this.fileSystem.Chmod("/in/file0.txt", 0755)
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
