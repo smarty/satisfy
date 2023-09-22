@@ -85,6 +85,11 @@ func (this *UploadConfigLoader) parseCLI(name string, args []string) (config con
 		false,
 		"When set, always upload package, even when it already exists at specified remote location.",
 	)
+	flags.BoolVar(&config.ShowProgress,
+		"progress",
+		true,
+		"Displays progress stats as files are added to the archive.",
+	)
 	flags.Usage = func() {
 		_, _ = fmt.Fprintf(this.stderr, "Usage of satisfy %s:", name)
 		flags.PrintDefaults()

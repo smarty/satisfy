@@ -13,6 +13,7 @@ type UploadConfig struct {
 	GoogleCredentials gcs.Credentials
 	JSONPath          string
 	Overwrite         bool
+	ShowProgress      bool
 	PackageConfig     PackageConfig
 }
 

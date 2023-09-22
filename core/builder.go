@@ -22,19 +22,21 @@ type FilePackageBuilderFileSystem interface {
 }
 
 type FilePackageBuilder struct {
-	sourceFile string
-	writer     io.Writer
-	hasher     hash.Hash
-	contents   []contracts.ArchiveItem
-	fileSystem FilePackageBuilderFileSystem
+	sourceFile   string
+	writer       io.Writer
+	hasher       hash.Hash
+	contents     []contracts.ArchiveItem
+	fileSystem   FilePackageBuilderFileSystem
+	showProgress bool
 }
 
-func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem FilePackageBuilderFileSystem, hasher hash.Hash) PackageBuilder {
+func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem FilePackageBuilderFileSystem, hasher hash.Hash, showProgress bool) PackageBuilder {
 	return &FilePackageBuilder{
-		sourceFile: sourceFile,
-		writer:     writer,
-		hasher:     hasher,
-		fileSystem: fileSystem,
+		sourceFile:   sourceFile,
+		writer:       writer,
+		hasher:       hasher,
+		fileSystem:   fileSystem,
+		showProgress: showProgress,
 	}
 }
 
@@ -73,17 +75,19 @@ type DirectoryPackageBuilderFileSystem interface {
 }
 
 type DirectoryPackageBuilder struct {
-	storage  DirectoryPackageBuilderFileSystem
-	archive  contracts.ArchiveWriter
-	hasher   hash.Hash
-	contents []contracts.ArchiveItem
+	storage      DirectoryPackageBuilderFileSystem
+	archive      contracts.ArchiveWriter
+	hasher       hash.Hash
+	contents     []contracts.ArchiveItem
+	showProgress bool
 }
 
-func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash) PackageBuilder {
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash, showProgress bool) PackageBuilder {
 	return &DirectoryPackageBuilder{
-		storage: storage,
-		archive: archive,
-		hasher:  hasher,
+		storage:      storage,
+		archive:      archive,
+		hasher:       hasher,
+		showProgress: showProgress,
 	}
 }
 
@@ -118,7 +122,9 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		return nil
 	}
 	progressWriter := newArchiveProgressCounter(file.Size(), func(archived, total string) {
-		fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
+		if this.showProgress {
+			fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
+		}
 	})
 	defer func() {
 		fmt.Printf("\n")
