@@ -73,6 +73,24 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.So(manifest, should.BeZeroValue)
 }
 
+func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompressionNoTar() {
+	checksum := this.downloader.prepareArchiveDownloadNoTar(gzipAlgorithm)
+
+	err := this.installer.InstallPackage(
+		contracts.Manifest{
+			Archive: contracts.Archive{
+				MD5Checksum: checksum,
+				Contents: []contracts.ArchiveItem{
+					{Path: "Hello/World"},
+				},
+				CompressionAlgorithm: gzipAlgorithm,
+			},
+		}, this.installationRequest(""))
+
+	this.So(err, should.BeNil)
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+}
+
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
@@ -191,6 +209,21 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 		Linkname: "Hello/World",
 	})
 	_ = archiveWriter.Close()
+	_ = compressor.Close()
+
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
+
+	return hasher.Sum(nil)
+}
+
+func (this *FakeDownloader) prepareArchiveDownloadNoTar(compressionAlgorithm string) []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	multi := io.MultiWriter(hasher, writer)
+	compressor := compression[compressionAlgorithm](multi, 4)
+
+	_, _ = compressor.Write([]byte("Hello World"))
+
 	_ = compressor.Close()
 
 	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))

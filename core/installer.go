@@ -2,6 +2,7 @@ package core
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/md5"
@@ -73,20 +74,31 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	}
 
 	defer closeResource(body)
-	checksumReader := NewHashReader(body, md5.New())
+	bufferedReader := bufio.NewReader(body)
+	typeBytes, err := bufferedReader.Peek(2)
+	checksumReader := NewHashReader(bufferedReader, md5.New())
 
-	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
-	if !found {
-		return errors.New("invalid compression algorithm")
-	}
-	decompressor, err := factory(checksumReader)
-	if err != nil {
-		return err
-	}
-	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
-	if err != nil {
-		this.revertFileSystem(paths)
-		return err
+	var paths []string
+	// see if we have a straight GZipped file. These are magic numbers from http://www.ietf.org/rfc/rfc1952.txt
+	if (typeBytes[0] == 0x1f) && (typeBytes[1] == 0x8b) {
+		paths, err = this.gunzipArchive(checksumReader, request, manifest.Archive.Contents[0].Path)
+		if err != nil {
+			return err
+		}
+	} else {
+		factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
+		if !found {
+			return errors.New("invalid compression algorithm")
+		}
+		decompressor, err := factory(checksumReader)
+		if err != nil {
+			return err
+		}
+		paths, err = this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
+		if err != nil {
+			this.revertFileSystem(paths)
+			return err
+		}
 	}
 	actualChecksum := checksumReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
@@ -123,9 +135,13 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
 			writer := this.filesystem.Create(pathItem)
-			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string) {
+			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
 				if this.showProgress {
-					fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
+					if done {
+						fmt.Printf("\nExtracted %s of %s.\n", archived, total)
+					} else {
+						fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
+					}
 				}
 			})
 			multiWriter := io.MultiWriter(writer, progressReader)
@@ -144,6 +160,38 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			}
 		}
 	}
+	return paths, nil
+}
+
+func (this *PackageInstaller) gunzipArchive(reader io.Reader, request contracts.InstallationRequest, fileName string) (paths []string, err error) {
+	pathItem := filepath.Join(request.LocalPath, strings.TrimSuffix(fileName, ".gz"))
+	paths = append(paths, pathItem)
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("Saving archive item \"%s\" to \"%s\".",
+		fileName, pathItem)
+
+	writer := this.filesystem.Create(pathItem)
+	progressReader := newArchiveProgressCounter(0, func(archived, total string, done bool) {
+		if this.showProgress {
+			if done {
+				fmt.Printf("\nExtracted %s.\n", archived)
+			} else {
+				fmt.Printf("\033[2K\rExtracted %s.", archived)
+			}
+		}
+	})
+	multiWriter := io.MultiWriter(writer, progressReader)
+	_, err = io.Copy(multiWriter, gzipReader)
+	_ = writer.Close()
+	_ = progressReader.Close()
+	if err != nil {
+		return paths, err
+	}
+
 	return paths, nil
 }
 
