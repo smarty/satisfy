@@ -73,33 +73,43 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 		return err
 	}
 
-	defer closeResource(body)
+	isTar := true
 	bufferedReader := bufio.NewReader(body)
-	typeBytes, err := bufferedReader.Peek(2)
-	checksumReader := NewHashReader(bufferedReader, md5.New())
-
-	var paths []string
-	// see if we have a straight GZipped file. These are magic numbers from http://www.ietf.org/rfc/rfc1952.txt
-	if (typeBytes[0] == 0x1f) && (typeBytes[1] == 0x8b) {
-		paths, err = this.gunzipArchive(checksumReader, request, manifest.Archive.Contents[0].Path)
+	if manifest.Archive.CompressionAlgorithm == "gzip" {
+		// We'll need to see if there's a .tar archive or not in the zipped file
+		header, _ := bufferedReader.Peek(512)
+		newReader := bytes.NewReader(header)
+		decompressor, err := this.getCompressor(newReader, manifest.Archive.CompressionAlgorithm)
 		if err != nil {
 			return err
 		}
-	} else {
-		factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
-		if !found {
-			return errors.New("invalid compression algorithm")
+		archiveReader, err := this.getArchiveReader(decompressor)
+		_, err = archiveReader.Next()
+		if err != nil {
+			isTar = false
 		}
-		decompressor, err := factory(checksumReader)
+
+	}
+
+	defer closeResource(body)
+	checksumReader := NewHashReader(bufferedReader, md5.New())
+
+	var paths []string
+	if isTar {
+		decompressor, err := this.getCompressor(checksumReader, manifest.Archive.CompressionAlgorithm)
 		if err != nil {
 			return err
 		}
 		paths, err = this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
-		if err != nil {
-			this.revertFileSystem(paths)
-			return err
-		}
+	} else {
+		paths, err = this.gunzipArchive(checksumReader, request, manifest.Archive.Contents[0].Path)
 	}
+
+	if err != nil {
+		this.revertFileSystem(paths)
+		return err
+	}
+
 	actualChecksum := checksumReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
 		this.revertFileSystem(paths)
@@ -109,13 +119,34 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
-	defer closeResource(decompressor)
+func (this *PackageInstaller) getCompressor(reader io.Reader, compressionAlgorithm string) (io.ReadCloser, error) {
+	factory, found := decompressors[compressionAlgorithm]
+	if !found {
+		return nil, errors.New("invalid compression algorithm")
+	}
+	decompressor, err := factory(reader)
+	if err != nil {
+		return nil, err
+	}
+	return decompressor, nil
+}
+
+func (this *PackageInstaller) getArchiveReader(decompressor io.ReadCloser) (ArchiveReader, error) {
 	var reader ArchiveReader
 	if archiveReader, ok := decompressor.(ArchiveReader); ok {
 		reader = archiveReader
 	} else {
 		reader = archiveFormats[""](decompressor)
+	}
+	return reader, nil
+
+}
+
+func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
+	defer closeResource(decompressor)
+	reader, err := this.getArchiveReader(decompressor)
+	if err != nil {
+		return paths, err
 	}
 
 	for i := 0; ; i++ {
@@ -168,7 +199,7 @@ func (this *PackageInstaller) gunzipArchive(reader io.Reader, request contracts.
 	paths = append(paths, pathItem)
 	gzipReader, err := gzip.NewReader(reader)
 	if err != nil {
-		panic(err)
+		return paths, err
 	}
 
 	log.Printf("Saving archive item \"%s\" to \"%s\".",
