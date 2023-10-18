@@ -38,7 +38,7 @@ func humanFileSize(size float64) string {
 type archiveProgressCounter struct {
 	written    int64
 	total      string
-	onProgress func(written string, total string)
+	onProgress func(written string, total string, done bool)
 	printTimer *time.Ticker
 	done       chan struct{}
 }
@@ -56,17 +56,17 @@ func (this *archiveProgressCounter) Read(p []byte) (n int, err error) {
 }
 
 func (this *archiveProgressCounter) Close() error {
-	this.reportProgress()
+	this.reportProgress(true)
 	this.printTimer.Stop()
 	close(this.done)
 	return nil
 }
 
-func (this *archiveProgressCounter) reportProgress() {
-	this.onProgress(humanFileSize(float64(this.written)), this.total)
+func (this *archiveProgressCounter) reportProgress(done bool) {
+	this.onProgress(humanFileSize(float64(this.written)), this.total, done)
 }
 
-func newArchiveProgressCounter(size int64, onProgress func(written, total string)) io.WriteCloser {
+func newArchiveProgressCounter(size int64, onProgress func(written, total string, done bool)) io.WriteCloser {
 	this := &archiveProgressCounter{total: humanFileSize(float64(size)), onProgress: onProgress}
 	this.printTimer = time.NewTicker(2 * time.Second)
 	this.done = make(chan struct{})
@@ -74,7 +74,7 @@ func newArchiveProgressCounter(size int64, onProgress func(written, total string
 		for {
 			select {
 			case <-this.printTimer.C:
-				this.reportProgress()
+				this.reportProgress(false)
 			case <-this.done:
 				return
 			}

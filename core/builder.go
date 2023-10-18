@@ -121,9 +121,13 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := newArchiveProgressCounter(file.Size(), func(archived, total string) {
+	progressWriter := newArchiveProgressCounter(file.Size(), func(archived, total string, done bool) {
 		if this.showProgress {
-			fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
+			if done {
+				fmt.Printf("\nArchived %s of %s.\n", archived, total)
+			} else {
+				fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
+			}
 		}
 	})
 	defer func() {
