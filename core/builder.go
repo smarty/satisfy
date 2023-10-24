@@ -16,58 +16,6 @@ type PackageBuilder interface {
 	Contents() []contracts.ArchiveItem
 }
 
-type FilePackageBuilderFileSystem interface {
-	contracts.FileOpener
-	contracts.FileChecker
-}
-
-type FilePackageBuilder struct {
-	sourceFile   string
-	writer       io.Writer
-	hasher       hash.Hash
-	contents     []contracts.ArchiveItem
-	fileSystem   FilePackageBuilderFileSystem
-	showProgress bool
-}
-
-func NewFilePackageBuilder(sourceFile string, writer io.Writer, fileSystem FilePackageBuilderFileSystem, hasher hash.Hash, showProgress bool) PackageBuilder {
-	return &FilePackageBuilder{
-		sourceFile:   sourceFile,
-		writer:       writer,
-		hasher:       hasher,
-		fileSystem:   fileSystem,
-		showProgress: showProgress,
-	}
-}
-
-func (this *FilePackageBuilder) Build() error {
-	file := this.fileSystem.Open(this.sourceFile)
-	defer func() { _ = file.Close() }()
-
-	_, err := io.Copy(this.writer, file)
-	if err != nil {
-		return err
-	}
-	md5Sum := this.hasher.Sum(nil)
-
-	fileInfo, err := this.fileSystem.Stat(this.sourceFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	archiveItem := contracts.ArchiveItem{
-		Path:        filepath.Base(this.sourceFile),
-		Size:        fileInfo.Size(),
-		MD5Checksum: md5Sum,
-	}
-	this.contents = []contracts.ArchiveItem{archiveItem}
-	return err
-}
-
-func (this *FilePackageBuilder) Contents() []contracts.ArchiveItem {
-	return this.contents
-}
-
 type DirectoryPackageBuilderFileSystem interface {
 	contracts.PathLister
 	contracts.FileOpener
@@ -93,7 +41,7 @@ func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archi
 
 func (this *DirectoryPackageBuilder) Build() error {
 	for _, file := range this.storage.Listing() {
-		err := this.add(file)
+		err := this.add(file, false)
 		if err != nil {
 			return err
 		}
@@ -101,9 +49,9 @@ func (this *DirectoryPackageBuilder) Build() error {
 	return this.archive.Close()
 }
 
-func (this *DirectoryPackageBuilder) add(file contracts.FileInfo) error {
+func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool) error {
 	log.Printf("Adding \"%s\" to archive.", file.Path())
-	header, err := this.buildHeader(file)
+	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
 		return err
 	}
@@ -142,8 +90,12 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 	return err
 }
 
-func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo) (header contracts.ArchiveHeader, err error) {
-	header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo, fileOnly bool) (header contracts.ArchiveHeader, err error) {
+	if fileOnly {
+		header.Name = filepath.Base(file.Path())
+	} else {
+		header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+	}
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
 	header.Executable = contracts.IsExecutable(file.Mode())

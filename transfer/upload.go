@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -97,22 +96,20 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 	writer := io.MultiWriter(this.hasher, this.file)
 	this.InitializeCompressor(writer)
 
-	if this.config.PackageConfig.SourceFile == "" {
-		this.builder = core.NewDirectoryPackageBuilder(
-			shell.NewDiskFileSystem(this.packageConfig.SourceDirectory),
-			shell.NewSwitchArchiveWriter(this.compressor),
-			md5.New(),
-			this.config.ShowProgress,
-		)
-	} else {
-		this.builder = core.NewFilePackageBuilder(
-			this.config.PackageConfig.SourceFile,
-			writer,
-			shell.NewDiskFileSystem(filepath.Dir(this.config.PackageConfig.SourceFile)),
-			this.hasher,
-			this.config.ShowProgress,
-		)
+	sourcePath := this.packageConfig.SourcePath
+	if sourcePath == "" {
+		sourcePath = this.packageConfig.SourceDirectory
 	}
+	if sourcePath == "" {
+		sourcePath = this.config.PackageConfig.SourceFile
+	}
+
+	this.builder = core.NewDirectoryPackageBuilder(
+		shell.NewDiskFileSystem(sourcePath),
+		shell.NewSwitchArchiveWriter(this.compressor),
+		md5.New(),
+		this.config.ShowProgress,
+	)
 
 	err = this.builder.Build()
 	if err != nil {

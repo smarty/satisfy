@@ -2,7 +2,6 @@ package core
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/md5"
@@ -73,43 +72,22 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 		return err
 	}
 
-	isTar := true
-	bufferedReader := bufio.NewReader(body)
-	if manifest.Archive.CompressionAlgorithm == "gzip" {
-		// We'll need to see if there's a .tar archive or not in the zipped file
-		header, _ := bufferedReader.Peek(512)
-		newReader := bytes.NewReader(header)
-		decompressor, err := this.getCompressor(newReader, manifest.Archive.CompressionAlgorithm)
-		if err != nil {
-			return err
-		}
-		archiveReader, err := this.getArchiveReader(decompressor)
-		_, err = archiveReader.Next()
-		if err != nil {
-			isTar = false
-		}
-
-	}
-
 	defer closeResource(body)
-	checksumReader := NewHashReader(bufferedReader, md5.New())
+	checksumReader := NewHashReader(body, md5.New())
 
-	var paths []string
-	if isTar {
-		decompressor, err := this.getCompressor(checksumReader, manifest.Archive.CompressionAlgorithm)
-		if err != nil {
-			return err
-		}
-		paths, err = this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
-	} else {
-		paths, err = this.gunzipArchive(checksumReader, request, manifest.Archive.Contents[0].Path)
+	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
+	if !found {
+		return errors.New("invalid compression algorithm")
 	}
-
+	decompressor, err := factory(checksumReader)
+	if err != nil {
+		return err
+	}
+	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
 	if err != nil {
 		this.revertFileSystem(paths)
 		return err
 	}
-
 	actualChecksum := checksumReader.Sum(nil)
 	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
 		this.revertFileSystem(paths)
@@ -119,34 +97,13 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	return nil
 }
 
-func (this *PackageInstaller) getCompressor(reader io.Reader, compressionAlgorithm string) (io.ReadCloser, error) {
-	factory, found := decompressors[compressionAlgorithm]
-	if !found {
-		return nil, errors.New("invalid compression algorithm")
-	}
-	decompressor, err := factory(reader)
-	if err != nil {
-		return nil, err
-	}
-	return decompressor, nil
-}
-
-func (this *PackageInstaller) getArchiveReader(decompressor io.ReadCloser) (ArchiveReader, error) {
+func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
+	defer closeResource(decompressor)
 	var reader ArchiveReader
 	if archiveReader, ok := decompressor.(ArchiveReader); ok {
 		reader = archiveReader
 	} else {
 		reader = archiveFormats[""](decompressor)
-	}
-	return reader, nil
-
-}
-
-func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request contracts.InstallationRequest, itemCount int) (paths []string, err error) {
-	defer closeResource(decompressor)
-	reader, err := this.getArchiveReader(decompressor)
-	if err != nil {
-		return paths, err
 	}
 
 	for i := 0; ; i++ {
@@ -191,38 +148,6 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			}
 		}
 	}
-	return paths, nil
-}
-
-func (this *PackageInstaller) gunzipArchive(reader io.Reader, request contracts.InstallationRequest, fileName string) (paths []string, err error) {
-	pathItem := filepath.Join(request.LocalPath, strings.TrimSuffix(fileName, ".gz"))
-	paths = append(paths, pathItem)
-	gzipReader, err := gzip.NewReader(reader)
-	if err != nil {
-		return paths, err
-	}
-
-	log.Printf("Saving archive item \"%s\" to \"%s\".",
-		fileName, pathItem)
-
-	writer := this.filesystem.Create(pathItem)
-	progressReader := newArchiveProgressCounter(0, func(archived, total string, done bool) {
-		if this.showProgress {
-			if done {
-				fmt.Printf("\nExtracted %s.\n", archived)
-			} else {
-				fmt.Printf("\033[2K\rExtracted %s.", archived)
-			}
-		}
-	})
-	multiWriter := io.MultiWriter(writer, progressReader)
-	_, err = io.Copy(multiWriter, gzipReader)
-	_ = writer.Close()
-	_ = progressReader.Close()
-	if err != nil {
-		return paths, err
-	}
-
 	return paths, nil
 }
 

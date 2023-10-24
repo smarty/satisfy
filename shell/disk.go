@@ -25,7 +25,7 @@ func (this *DiskFileSystem) RootPath() string {
 }
 
 func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
-	err := filepath.Walk(this.root, func(path string, info os.FileInfo, err error) error {
+	listingFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -46,9 +46,21 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 		}
 		listing = append(listing, fileInfo)
 		return nil
-	})
+	}
+	stat, err := os.Stat(this.root)
 	if err != nil {
 		log.Panic(err)
+	}
+	if stat.IsDir() == false {
+		err = listingFunc(this.root, stat, err)
+		if err != nil {
+			log.Panic(err)
+		}
+	} else {
+		err = filepath.Walk(this.root, listingFunc)
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 	return listing
 }

@@ -22,6 +22,7 @@ type PackageConfig struct {
 	CompressionLevel     int    `json:"compression_level"`
 	SourceDirectory      string `json:"source_directory"`
 	SourceFile           string `json:"source_file"`
+	SourcePath           string `json:"source_path"`
 	PackageName          string `json:"package_name"`
 	PackageVersion       string `json:"package_version"`
 	RemoteAddressPrefix  *URL   `json:"remote_address"`
