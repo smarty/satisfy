@@ -1,5 +1,7 @@
 github.com/klauspost/compress v1.17.0 h1:Rnbp4K9EjcDuVuHtd0dgA4qNuv9yKDYKK1ulpJwgrqM=
 github.com/klauspost/compress v1.17.0/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
+github.com/krolaw/zipstream v0.0.0-20180621105154-0a2661891f94 h1:+AIlO01SKT9sfWU5CLWi0cfHc7dQwgGz3FhFRzXLoMg=
+github.com/krolaw/zipstream v0.0.0-20180621105154-0a2661891f94/go.mod h1:TcE3PIIkVWbP/HjhRAafgCjRKvDOi086iqp9VkNX/ng=
 github.com/smarty/assertions v1.15.1 h1:812oFiXI+G55vxsFf+8bIZ1ux30qtkdqzKbEFwyX3Tk=
 github.com/smarty/assertions v1.15.1/go.mod h1:yABtdzeQs6l1brC900WlRNwj6ZR55d7B+E8C6HtKdec=
 github.com/smarty/gcs v1.4.0 h1:63J6ekpIN1MP+LVKNA7OWXrrhXIuMB1sPKxhDrTY4LU=

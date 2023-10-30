@@ -8,15 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/klauspost/compress/zstd"
+	"github.com/krolaw/zipstream"
+	"github.com/smarty/satisfy/contracts"
 	"io"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/klauspost/compress/zstd"
-	"github.com/smarty/satisfy/contracts"
 )
 
 type PackageInstallerFileSystem interface {
@@ -180,6 +180,7 @@ func ComposeManifestPath(localPath, packageName string) string {
 
 var decompressors = map[string]func(_ io.Reader) (io.ReadCloser, error){
 	"zstd": newZStdReader,
+	"zip":  newZipReader,
 	"gzip": newGZipReader,
 }
 
@@ -189,6 +190,9 @@ func newZStdReader(source io.Reader) (io.ReadCloser, error) {
 	} else {
 		return reader.IOReadCloser(), nil
 	}
+}
+func newZipReader(source io.Reader) (io.ReadCloser, error) {
+	return NewZipArchiveReader(source).(io.ReadCloser), nil
 }
 func newGZipReader(source io.Reader) (io.ReadCloser, error) {
 	return gzip.NewReader(source)
@@ -210,5 +214,49 @@ var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
 func closeResource(closer io.Closer) {
 	if closer != nil {
 		_ = closer.Close()
+	}
+}
+
+type ZipArchiveReader struct {
+	zipReader *zipstream.Reader
+}
+
+func (z ZipArchiveReader) Next() (*tar.Header, error) {
+	header, err := z.zipReader.Next()
+	if err != nil {
+		return nil, err
+	}
+	return &tar.Header{
+		Typeflag:   0,
+		Name:       header.Name,
+		Linkname:   "",
+		Size:       int64(header.UncompressedSize64),
+		Mode:       0644,
+		Uid:        0,
+		Gid:        0,
+		Uname:      "",
+		Gname:      "",
+		ModTime:    header.Modified,
+		AccessTime: header.Modified,
+		ChangeTime: header.Modified,
+		Devmajor:   0,
+		Devminor:   0,
+		Xattrs:     nil,
+		PAXRecords: nil,
+		Format:     0,
+	}, err
+}
+
+func (z ZipArchiveReader) Read(p []byte) (n int, err error) {
+	return z.zipReader.Read(p)
+}
+
+func (z ZipArchiveReader) Close() error {
+	return nil
+}
+
+func NewZipArchiveReader(r io.Reader) ArchiveReader {
+	return &ZipArchiveReader{
+		zipReader: zipstream.NewReader(r),
 	}
 }
