@@ -221,8 +221,8 @@ type ZipArchiveReader struct {
 	zipReader *zipstream.Reader
 }
 
-func (z ZipArchiveReader) Next() (*tar.Header, error) {
-	header, err := z.zipReader.Next()
+func (this ZipArchiveReader) Next() (*tar.Header, error) {
+	header, err := this.zipReader.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -247,11 +247,11 @@ func (z ZipArchiveReader) Next() (*tar.Header, error) {
 	}, err
 }
 
-func (z ZipArchiveReader) Read(p []byte) (n int, err error) {
-	return z.zipReader.Read(p)
+func (this ZipArchiveReader) Read(p []byte) (n int, err error) {
+	return this.zipReader.Read(p)
 }
 
-func (z ZipArchiveReader) Close() error {
+func (this ZipArchiveReader) Close() error {
 	return nil
 }
 
