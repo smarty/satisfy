@@ -5,6 +5,7 @@ import (
 	"hash"
 	"io"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -40,10 +41,17 @@ func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archi
 }
 
 func (this *DirectoryPackageBuilder) Build() error {
-	for _, file := range this.storage.Listing() {
-		err := this.add(file, false)
+	if fileInfo, ok := this.fileOnly(); ok == true {
+		err := this.add(fileInfo, true)
 		if err != nil {
 			return err
+		}
+	} else {
+		for _, file := range this.storage.Listing() {
+			err := this.add(file, false)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return this.archive.Close()
@@ -158,4 +166,15 @@ func (this *DirectoryPackageBuilder) outOfBounds(info contracts.FileInfo) bool {
 
 func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 	return strings.HasPrefix(path, "/")
+}
+
+func (this *DirectoryPackageBuilder) fileOnly() (contracts.FileInfo, bool) {
+	if len(this.storage.Listing()) == 1 {
+		if fileInfo, err := os.Stat(this.storage.Listing()[0].Path()); err == nil {
+			if !fileInfo.IsDir() {
+				return this.storage.Listing()[0], true
+			}
+		}
+	}
+	return nil, false
 }
