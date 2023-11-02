@@ -93,6 +93,36 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed
 		ModTime:  InMemoryModTime,
 	}, contents: nil})
 }
+func (this *DirectoryPackageBuilderFixture) TestFileOnlyEnsureNoPath() {
+	this.fileSystem = newInMemoryFileSystem()
+	this.archive = NewFakeArchiveWriter()
+	this.hasher = NewFakeHasher()
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
+	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
+	err := this.builder.Build()
+	if !this.So(err, should.BeNil) {
+		return
+	}
+	this.So(this.archive.items[0].ArchiveHeader.Name, should.Equal, "file0.txt")
+}
+
+func (this *DirectoryPackageBuilderFixture) TestMultipleFilesEnsurePath() {
+	this.fileSystem = newInMemoryFileSystem()
+	this.archive = NewFakeArchiveWriter()
+	this.hasher = NewFakeHasher()
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
+	this.fileSystem.WriteDirectory("/out")
+	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
+	this.fileSystem.WriteFile("/out/in/file1.txt", []byte("a"))
+	err := this.builder.Build()
+	if !this.So(err, should.BeNil) {
+		return
+	}
+	this.So(len(this.archive.items), should.Equal, 3)
+	this.So(this.archive.items[0].ArchiveHeader.Name, should.Equal, "out")
+	this.So(this.archive.items[1].ArchiveHeader.Name, should.Equal, "out/in/file0.txt")
+	this.So(this.archive.items[2].ArchiveHeader.Name, should.Equal, "out/in/file1.txt")
+}
 
 /////////////////////////
 

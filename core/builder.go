@@ -5,7 +5,6 @@ import (
 	"hash"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -170,10 +169,8 @@ func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 
 func (this *DirectoryPackageBuilder) fileOnly() (contracts.FileInfo, bool) {
 	if len(this.storage.Listing()) == 1 {
-		if fileInfo, err := os.Stat(this.storage.Listing()[0].Path()); err == nil {
-			if !fileInfo.IsDir() {
-				return this.storage.Listing()[0], true
-			}
+		if this.storage.Listing()[0].Mode().IsRegular() {
+			return this.storage.Listing()[0], true
 		}
 	}
 	return nil, false

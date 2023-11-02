@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -97,6 +98,15 @@ func (this *inMemoryFileSystem) WriteFile(path string, content []byte) {
 		path:     path,
 		contents: content,
 		mod:      InMemoryModTime,
+		mode:     os.FileMode(0),
+	}
+}
+
+func (this *inMemoryFileSystem) WriteDirectory(path string) {
+	this.fileSystem[path] = &file{
+		path: path,
+		mod:  InMemoryModTime,
+		mode: fs.ModeDir,
 	}
 }
 
