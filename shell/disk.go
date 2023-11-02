@@ -76,6 +76,7 @@ func (this *DiskFileSystem) Stat(path string) (contracts.FileInfo, error) {
 		size:    info.Size(),
 		mod:     info.ModTime(),
 		symlink: source,
+		mode:    info.Mode(),
 	}
 	return fileInfo, nil
 }
