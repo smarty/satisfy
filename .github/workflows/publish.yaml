@@ -27,8 +27,14 @@ jobs:
         make build OS=darwin CPU=amd64
         GZIP=-9 tar -C workspace/ -czvf satisfy_darwin-amd64.tar.gz . --owner=0 --group=0
 
+        make build OS=darwin CPU=arm64
+        GZIP=-9 tar -C workspace/ -czvf satisfy_darwin-arm64.tar.gz . --owner=0 --group=0
+
         make publish OS=linux CPU=amd64
         GZIP=-9 tar -C workspace/ -czvf satisfy_linux-amd64.tar.gz . --owner=0 --group=0
+
+        make publish OS=linux CPU=arm64
+        GZIP=-9 tar -C workspace/ -czvf satisfy_linux-arm64.tar.gz . --owner=0 --group=0
 
     - id: create_release
       uses: actions/create-release@v1
@@ -45,6 +51,24 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: satisfy_darwin-amd64.tar.gz
+        asset_name: satisfy_darwin-amd64.tar.gz
+        asset_content_type: application/tar+gzip
+
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: satisfy_darwin-arm64.tar.gz
+        asset_name: satisfy_darwin-arm64.tar.gz
+        asset_content_type: application/tar+gzip
+
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: satisfy_linux-amd64.tar.gz
         asset_name: satisfy_linux-amd64.tar.gz
         asset_content_type: application/tar+gzip
@@ -54,6 +78,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: satisfy_darwin-amd64.tar.gz
-        asset_name: satisfy_darwin-amd64.tar.gz
+        asset_path: satisfy_linux-arm64.tar.gz
+        asset_name: satisfy_linux-arm64.tar.gz
         asset_content_type: application/tar+gzip
