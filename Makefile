@@ -18,7 +18,7 @@ clean:
 	rm -rf workspace/ coverage.txt
 
 compile: clean
-	GOOS="$(OS)" GOARCH="$(CPU)" CGO_ENABLED="0" go build -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" -o workspace/satisfy "$(PKG)"
+	GOOS="$(OS)" GOARCH="$(CPU)" GOAMD64="v3" CGO_ENABLED="0" go build -trimpath -ldflags "-X main.ldflagsSoftwareVersion=${VERSION}" -o workspace/satisfy "$(PKG)"
 
 build: coverage compile
 
