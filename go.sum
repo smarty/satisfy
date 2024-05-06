@@ -1,10 +1,8 @@
-github.com/klauspost/compress v1.17.4 h1:Ej5ixsIri7BrIjBkRZLTo6ghwrEtHFk7ijlczPW4fZ4=
-github.com/klauspost/compress v1.17.4/go.mod h1:/dCuZOvVtNoHsyb+cuJD3itjs3NbnF6KH9zAO4BDxPM=
-github.com/krolaw/zipstream v0.0.0-20180621105154-0a2661891f94 h1:+AIlO01SKT9sfWU5CLWi0cfHc7dQwgGz3FhFRzXLoMg=
-github.com/krolaw/zipstream v0.0.0-20180621105154-0a2661891f94/go.mod h1:TcE3PIIkVWbP/HjhRAafgCjRKvDOi086iqp9VkNX/ng=
+github.com/klauspost/compress v1.17.8 h1:YcnTYrq7MikUT7k0Yb5eceMmALQPYBW/Xltxn0NAMnU=
+github.com/klauspost/compress v1.17.8/go.mod h1:Di0epgTjJY877eYKx5yC51cX2A2Vl2ibi7bDH9ttBbw=
 github.com/smarty/assertions v1.15.1 h1:812oFiXI+G55vxsFf+8bIZ1ux30qtkdqzKbEFwyX3Tk=
 github.com/smarty/assertions v1.15.1/go.mod h1:yABtdzeQs6l1brC900WlRNwj6ZR55d7B+E8C6HtKdec=
-github.com/smarty/gcs v1.4.0 h1:63J6ekpIN1MP+LVKNA7OWXrrhXIuMB1sPKxhDrTY4LU=
-github.com/smarty/gcs v1.4.0/go.mod h1:pVoEX4RyiJBZdsF4rbOls+1rXR5RXnWWIf7ftNcCzkY=
+github.com/smarty/gcs v1.4.1 h1:lXM/Q6jj9o50L+jGlwq4+9Tf09PO8HFkohApCLEcQDY=
+github.com/smarty/gcs v1.4.1/go.mod h1:AKtF3MN9hrQ/iLxQ+zRaSkKGGzKPLUaMqpMqwiNjQm8=
 github.com/smarty/gunit v1.5.0 h1:OmG6a/rgi7qCjlQis6VjXbvx/WqZ8I6xSlbfN4YB5MY=
 github.com/smarty/gunit v1.5.0/go.mod h1:uAeNibUD292KZRcg5OTy7lb6WR5++UC0BQOzNuiRzpU=

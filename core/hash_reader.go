@@ -19,3 +19,18 @@ func (this *HashReader) Read(buffer []byte) (int, error) {
 	_, _ = this.Hash.Write(buffer[0:count])
 	return count, err
 }
+
+type HashReaderAt struct {
+	io.ReaderAt
+	hash.Hash
+}
+
+func NewHashReaderAt(source io.ReaderAt, off int64, target hash.Hash) *HashReaderAt {
+	return &HashReaderAt{ReaderAt: source, Hash: target}
+}
+
+func (this *HashReaderAt) ReadAt(buffer []byte, off int64) (int, error) {
+	count, err := this.ReaderAt.ReadAt(buffer, off)
+	_, _ = this.Hash.Write(buffer[0:count])
+	return count, err
+}

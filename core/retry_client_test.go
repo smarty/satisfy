@@ -127,6 +127,18 @@ func (this *FakeClient) Download(request url.URL) (io.ReadCloser, error) {
 	return io.NopCloser(strings.NewReader(this.downloadContent)), this.error
 }
 
+func (this *FakeClient) Seek(request url.URL, begin, end int64) (io.ReadCloser, error) {
+	this.downloadRequest = request
+	this.downloadAttempts++
+	return io.NopCloser(strings.NewReader(this.downloadContent[begin:end])), this.error
+}
+
+func (this *FakeClient) Size(request url.URL) (int64, error) {
+	return int64(len(this.downloadContent)), this.error
+}
+
+//TODO: Implement tests for seek and size
+
 func (this *FakeClient) Upload(request contracts.UploadRequest) error {
 	this.uploadRequest = request
 	this.uploadAttempts++

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -28,6 +29,12 @@ type UploadRequest struct {
 
 type Downloader interface {
 	Download(url.URL) (io.ReadCloser, error)
+	Seek(url.URL, int64, int64) (io.ReadCloser, error)
+	Size(url.URL) (int64, error)
+}
+
+type DownloadSetter interface {
+	SetDownloader(url.URL, Downloader)
 }
 
 func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
@@ -46,18 +53,23 @@ var RetryErr = errors.New("retry")
 
 type StatusCodeError struct {
 	actualStatusCode   int
-	expectedStatusCode int
+	expectedStatusCode []int
 	remoteAddress      url.URL
 }
 
-func NewStatusCodeError(actual int, expected int, remoteAddress url.URL) *StatusCodeError {
+func NewStatusCodeError(actual int, expected []int, remoteAddress url.URL) *StatusCodeError {
 	return &StatusCodeError{actualStatusCode: actual, expectedStatusCode: expected, remoteAddress: remoteAddress}
 }
 
 func (this *StatusCodeError) Error() string {
+	var IDs []string
+	for _, i := range this.expectedStatusCode {
+		IDs = append(IDs, strconv.Itoa(i))
+	}
+
 	return fmt.Sprintf(
-		"expected status code: [%d] actual status code: [%d] remote address: [%s]",
-		this.expectedStatusCode, this.actualStatusCode, this.remoteAddress.String(),
+		"expected status code: [%s] actual status code: [%d] remote address: [%s]",
+		strings.Join(IDs, " or "), this.actualStatusCode, this.remoteAddress.String(),
 	)
 }
 

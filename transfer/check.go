@@ -44,6 +44,6 @@ func (this *CheckApp) Run() {
 
 func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {
 	client := shell.NewHTTPClient()
-	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusNotFound)
+	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusNotFound})
 	return core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }

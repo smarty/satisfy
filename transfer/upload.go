@@ -170,7 +170,7 @@ func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contrac
 
 func (this *UploadApp) buildRemoteStorageClient() {
 	client := shell.NewHTTPClient()
-	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, http.StatusOK)
+	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusOK})
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }
 

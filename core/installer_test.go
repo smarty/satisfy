@@ -167,6 +167,24 @@ func (this *FakeDownloader) Download(request url.URL) (io.ReadCloser, error) {
 	return this.Body, this.Error
 }
 
+func (this *FakeDownloader) Seek(request url.URL, start, end int64) (io.ReadCloser, error) {
+	this.request = request
+	buff := bytes.NewBuffer([]byte{})
+	_, err := io.Copy(buff, this.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := bytes.NewReader(buff.Bytes()[start:end])
+	return io.NopCloser(reader), this.Error
+}
+
+func (this *FakeDownloader) Size(request url.URL) (int64, error) {
+	this.request = request
+	buff := bytes.NewBuffer([]byte{})
+	return io.Copy(buff, this.Body)
+}
+
 func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) []byte {
 	hasher := md5.New()
 	writer := bytes.NewBuffer(nil)

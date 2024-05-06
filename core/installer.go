@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/klauspost/compress/zstd"
-	"github.com/krolaw/zipstream"
 	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/shell"
 	"io"
 	"log"
 	"net/url"
@@ -18,6 +18,9 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+// Compile-time check of interface implementations.
+var _ contracts.DownloadSetter = (*shell.ZipArchiveReader)(nil)
 
 type PackageInstallerFileSystem interface {
 	contracts.FileCreator
@@ -106,6 +109,10 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		reader = archiveFormats[""](decompressor)
 	}
 
+	if _, ok := reader.(contracts.DownloadSetter); ok {
+		reader.(contracts.DownloadSetter).SetDownloader(request.RemoteAddress, this.downloader)
+	}
+
 	for i := 0; ; i++ {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -126,7 +133,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
 				if this.showProgress {
 					if done {
-						fmt.Printf("\nExtracted %s of %s.\n", archived, total)
+						fmt.Printf("\nDone extracting %s.\n", archived)
 					} else {
 						fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
 					}
@@ -152,6 +159,9 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 }
 
 func byteCountToString(size int64) string {
+	if size < 1 {
+		return "? bytes"
+	}
 	const unit = 1024
 	if size < unit {
 		return fmt.Sprintf("%d bytes", size)
@@ -192,7 +202,7 @@ func newZStdReader(source io.Reader) (io.ReadCloser, error) {
 	}
 }
 func newZipReader(source io.Reader) (io.ReadCloser, error) {
-	return NewZipArchiveReader(source).(io.ReadCloser), nil
+	return shell.NewZipArchiveReader(source).(io.ReadCloser), nil
 }
 func newGZipReader(source io.Reader) (io.ReadCloser, error) {
 	return gzip.NewReader(source)
@@ -209,54 +219,13 @@ var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
 	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+type DownloadSetter interface {
+	SetDownloader(url.URL, contracts.Downloader)
+}
 
 func closeResource(closer io.Closer) {
 	if closer != nil {
 		_ = closer.Close()
-	}
-}
-
-type ZipArchiveReader struct {
-	zipReader *zipstream.Reader
-}
-
-func (this ZipArchiveReader) Next() (*tar.Header, error) {
-	header, err := this.zipReader.Next()
-	if err != nil {
-		return nil, err
-	}
-	return &tar.Header{
-		Typeflag:   0,
-		Name:       header.Name,
-		Linkname:   "",
-		Size:       int64(header.UncompressedSize64),
-		Mode:       0644,
-		Uid:        0,
-		Gid:        0,
-		Uname:      "",
-		Gname:      "",
-		ModTime:    header.Modified,
-		AccessTime: header.Modified,
-		ChangeTime: header.Modified,
-		Devmajor:   0,
-		Devminor:   0,
-		Xattrs:     nil,
-		PAXRecords: nil,
-		Format:     0,
-	}, err
-}
-
-func (this ZipArchiveReader) Read(p []byte) (n int, err error) {
-	return this.zipReader.Read(p)
-}
-
-func (this ZipArchiveReader) Close() error {
-	return nil
-}
-
-func NewZipArchiveReader(r io.Reader) ArchiveReader {
-	return &ZipArchiveReader{
-		zipReader: zipstream.NewReader(r),
 	}
 }

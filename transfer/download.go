@@ -22,7 +22,7 @@ type DownloadApp struct {
 
 func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	disk := shell.NewDiskFileSystem("")
-	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, http.StatusOK)
+	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusPartialContent, http.StatusOK})
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk, config.ShowProgress)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
