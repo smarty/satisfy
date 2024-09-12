@@ -39,7 +39,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	// TODO: drain response body
+	_, _ = io.Copy(io.Discard, response.Body)
 
 	if this.isExpectedStatus(response.StatusCode) == false {
 		if this.isSafeRetryStatus(response.StatusCode) {
