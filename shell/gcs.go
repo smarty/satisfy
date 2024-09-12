@@ -39,6 +39,8 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	}
 	defer func() { _ = response.Body.Close() }()
 
+	// TODO: drain response body
+
 	if this.isExpectedStatus(response.StatusCode) == false {
 		if this.isSafeRetryStatus(response.StatusCode) {
 			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.RetryErr)
