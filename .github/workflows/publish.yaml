@@ -30,7 +30,7 @@ jobs:
         make build OS=darwin CPU=arm64
         GZIP=-9 tar -C workspace/ -czvf satisfy_darwin-arm64.tar.gz . --owner=0 --group=0
 
-        make publish OS=linux CPU=amd64
+        make publish-amd OS=linux CPU=amd64
         GZIP=-9 tar -C workspace/ -czvf satisfy_linux-amd64.tar.gz . --owner=0 --group=0
 
         make publish OS=linux CPU=arm64

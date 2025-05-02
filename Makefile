@@ -35,4 +35,7 @@ image: build
 publish: image
 	docker push "$(IMAGE)"
 
+publish-amd: image
+	docker push "$(IMAGE)-$(CPU)"
+
 .PHONY: test fmt coverage clean compile build install image publish
