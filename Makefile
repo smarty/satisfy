@@ -3,6 +3,7 @@
 NAME  := satisfy
 REPO  ?= $(or ${DOCKER_SERVER},smartystreets)
 IMAGE := $(REPO)/$(NAME):$(or ${VERSION},current)
+IMAGEARCH := $(REPO)/$(NAME)-$(CPU):$(or ${VERSION},current)
 PKG   := github.com/smarty/$(NAME)/cmd/satisfy
 
 test: fmt
@@ -35,7 +36,8 @@ image: build
 publish: image
 	docker push "$(IMAGE)"
 
-publish-amd: image
-	docker push "$(IMAGE)-$(CPU)"
+publish-amd: build
+	docker build . --no-cache --rm -t "$(IMAGEARCH)"
+	docker push "$(IMAGEARCH)"
 
 .PHONY: test fmt coverage clean compile build install image publish
