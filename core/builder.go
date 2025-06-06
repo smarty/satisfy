@@ -137,8 +137,14 @@ func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file contracts.FileI
 
 func (this *DirectoryPackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
 	defer this.hasher.Reset()
+	var path string
+	if _, ok := this.fileOnly(); ok == true {
+		path = filepath.Base(file.Path())
+	} else {
+		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+	}
 	return contracts.ArchiveItem{
-		Path:        strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/"),
+		Path:        path,
 		Size:        this.determineFileSize(file, symlinkSourcePath),
 		MD5Checksum: this.hasher.Sum(nil),
 	}
