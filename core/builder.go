@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -76,7 +77,7 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := newArchiveProgressCounter(file.Size(), func(archived, total string, done bool) {
+	progressWriter := archive_progress.NewArchiveProgressCounter(file.Size(), func(archived, total string, done bool) {
 		if this.showProgress {
 			if done {
 				fmt.Printf("\nArchived %s of %s.\n", archived, total)

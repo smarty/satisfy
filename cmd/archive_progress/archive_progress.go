@@ -1,4 +1,4 @@
-package core
+package archive_progress
 
 import (
 	"io"
@@ -66,7 +66,7 @@ func (this *archiveProgressCounter) reportProgress(done bool) {
 	this.onProgress(humanFileSize(float64(this.written)), this.total, done)
 }
 
-func newArchiveProgressCounter(size int64, onProgress func(written, total string, done bool)) io.WriteCloser {
+func NewArchiveProgressCounter(size int64, onProgress func(written, total string, done bool)) io.WriteCloser {
 	this := &archiveProgressCounter{total: humanFileSize(float64(size)), onProgress: onProgress}
 	this.printTimer = time.NewTicker(2 * time.Second)
 	this.done = make(chan struct{})
