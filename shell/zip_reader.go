@@ -91,7 +91,6 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 	multiWriter := io.MultiWriter(tmp, progress)
 	this.size, err = io.Copy(multiWriter, reader)
 
-	//this.size, err = io.Copy(tmp, reader)
 	if err != nil {
 		err := tmp.Close()
 		if err != nil {
