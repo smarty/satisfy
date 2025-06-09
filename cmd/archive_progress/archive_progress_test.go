@@ -1,4 +1,4 @@
-package core
+package archive_progress
 
 import (
 	"github.com/smarty/assertions/should"
@@ -31,7 +31,7 @@ func (this *ArchiveProgressCounter) TestRound() {
 }
 
 func (this *ArchiveProgressCounter) LongTestProgress() {
-	a := newArchiveProgressCounter(250_000_000.00, func(written, total string, done bool) {
+	a := NewArchiveProgressCounter(250_000_000.00, func(written, total string, done bool) {
 		this.written = written
 		this.total = total
 	})

@@ -8,15 +8,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/klauspost/compress/zstd"
-	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/shell"
 	"io"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/smarty/satisfy/cmd/archive_progress"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/shell"
 )
 
 // Compile-time check of interface implementations.
@@ -130,7 +132,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
 			writer := this.filesystem.Create(pathItem)
-			progressReader := newArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
+			progressReader := archive_progress.NewArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
 				if this.showProgress {
 					if done {
 						fmt.Printf("\nDone extracting %s.\n", archived)

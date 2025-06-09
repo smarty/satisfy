@@ -3,12 +3,14 @@ package shell
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"net/url"
 	"os"
 
 	"github.com/klauspost/compress/zip"
+	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -78,12 +80,28 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	this.file = tmp
 
-	this.size, err = io.Copy(tmp, reader)
+	progress := archive_progress.NewArchiveProgressCounter(this.size, func(archived, total string, done bool) {
+		if done {
+			fmt.Printf("\nDone downloading archive %s.\n", archived)
+		} else {
+			fmt.Printf("\033[2K\rDownloading archive... %s.", archived)
+		}
+	})
+
+	multiWriter := io.MultiWriter(tmp, progress)
+	this.size, err = io.Copy(multiWriter, reader)
+
+	//this.size, err = io.Copy(tmp, reader)
 	if err != nil {
 		err := tmp.Close()
 		if err != nil {
 			return err
 		}
+		return err
+	}
+
+	err = progress.Close()
+	if err != nil {
 		return err
 	}
 
