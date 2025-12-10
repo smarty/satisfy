@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"crypto/md5"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -40,6 +41,13 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 }
 
 func (this *DownloadApp) Run() {
+	err := this.TryRun()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (this *DownloadApp) TryRun() error {
 	for _, dependency := range this.listing.Listing {
 		go this.install(dependency)
 	}
@@ -50,8 +58,9 @@ func (this *DownloadApp) Run() {
 		log.Println("[WARN]", err)
 	}
 	if failed > 0 {
-		log.Fatalf("[WARN] %d packages failed to install.", failed)
+		return fmt.Errorf("[WARN] %d packages failed to install.", failed)
 	}
+	return nil
 }
 
 func (this *DownloadApp) awaitCompletion() {
