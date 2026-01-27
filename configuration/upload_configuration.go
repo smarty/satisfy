@@ -71,7 +71,7 @@ func (this *UploadConfiguration) Parse(args []string) (err error) {
 
 	this.GoogleCredentials, err = this.gcsCredentialsReader.Read(this.ctx, "")
 	if err != nil {
-		this.logger.LogLine(logging.Error, "Google authentication failed: %v", err)
+		this.logger.LogLine(logging.Error, "Google authentication failed: [%v]", err)
 		return err
 	}
 

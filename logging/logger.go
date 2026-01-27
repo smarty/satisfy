@@ -41,6 +41,16 @@ func (this Logger) Fatal(err error) {
 	this.exitFunc(1)
 }
 
+// FatalClean writes a formatted error message to stderr without any prefix and
+// exits with code 1.
+//
+// Parameters:
+//   - err: the error to log.
+func (this Logger) FatalClean(err error) {
+	printfSimple(this.stdErr, "%v\n", err)
+	this.exitFunc(1)
+}
+
 // Log writes a formatted message to stderr with the specified level prefix.
 //
 // Parameters:
@@ -136,12 +146,13 @@ func (this Logger) WriterOut() io.Writer {
 }
 
 func printf(writer io.Writer, level Level, format string, v ...any) {
+	const stackSkip = 2
 	if level == NoPrefix {
 		printfSimple(writer, format, v...)
 		return
 	}
 
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := runtime.Caller(stackSkip)
 	if !ok {
 		file = "???" // same behavior as log.Lshortfile
 		line = 0

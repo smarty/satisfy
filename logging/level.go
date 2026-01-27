@@ -10,8 +10,8 @@ const (
 var levelFormat = []string{
 	"",
 	"",
-	" [WARN] ",
-	" [Error] ",
+	" [WARN]",
+	" [Error]",
 }
 
 // Level represents a log severity level for categorizing log messages.
