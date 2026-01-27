@@ -41,6 +41,17 @@ func (this Logger) Fatal(err error) {
 	this.exitFunc(1)
 }
 
+// FatalWithLevel writes a formatted error message to stderr with the specified
+// level and exits with code 1.
+//
+// Parameters:
+//   - level: the log severity level.
+//   - err: the error to log.
+func (this Logger) FatalWithLevel(level Level, err error) {
+	printf(this.stdErr, level, "%v\n", err)
+	this.exitFunc(1)
+}
+
 // FatalClean writes a formatted error message to stderr without any prefix and
 // exits with code 1.
 //
