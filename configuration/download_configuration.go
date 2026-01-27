@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 
@@ -65,6 +66,11 @@ func (this *DownloadConfiguration) Parse(args []string) (err error) {
 	}
 
 	this.Dependencies, err = this.loadDependencyListing(this.jsonPath, flags.Args())
+	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
+		EmitExampleDependenciesFile(this.logger)
+		return nil
+	}
+
 	if err != nil {
 		this.logger.LogLine(logging.Warning, "Unable to load dependency listing: %v", err)
 		return err

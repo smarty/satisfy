@@ -34,8 +34,34 @@ type UploadApp struct {
 }
 
 func NewUploadApp(config contracts.UploadConfig) *UploadApp {
-	NewCheckApp(config).Run()
+	runPreUploadCheck(config)
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
+}
+
+func runPreUploadCheck(config contracts.UploadConfig) {
+	if config.Overwrite {
+		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
+		return
+	}
+
+	client := shell.NewHTTPClient()
+	gcsClient := shell.NewGoogleCloudStorageClient(client, config.GoogleCredentials, []int{http.StatusNotFound})
+	retryClient := core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)
+
+	address := config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+	body, err := retryClient.Download(address)
+	if err == nil {
+		_ = body.Close()
+		return
+	}
+
+	statusError, ok := err.(*contracts.StatusCodeError)
+	if ok && statusError.StatusCode() == http.StatusOK {
+		log.Println("[INFO] Package already exists on remote storage.")
+		os.Exit(2)
+	}
+
+	log.Fatalln("[WARN] Sanity check failed:", err)
 }
 
 func (this *UploadApp) Run() {

@@ -181,13 +181,22 @@ func looksLikeFlag(arg string) bool {
 }
 
 func mainCheck(args []string) {
-	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
-	config, err := loader.LoadConfig("check", args)
+	config := configuration.NewCheckConfiguration(
+		context.Background(),
+		readPackageConfigFunc,
+		gcs.NewCredentialsReader(
+			gcs.CredentialOptions.VaultServer(os.Getenv("VAULT_ADDR"), os.Getenv("VAULT_TOKEN")),
+			gcs.CredentialOptions.EnvironmentReader(shell.NewEnvironment()),
+			gcs.CredentialOptions.FileReader(shell.NewDiskFileSystem("")),
+		),
+		logger,
+	)
+	err := config.Parse(args)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	transfer.NewCheckApp(config).Run()
+	transfer.NewCheckApp(*config).Run()
 }
 
 func mainDownload(args []string) {
@@ -216,7 +225,7 @@ func mainUpload(args []string) {
 }
 
 func mainVersion() {
-	logger.LogLineClean("satisfy [debug]")
+	logger.LogLine(logging.Info, "satisfy [debug]")
 }
 
 func printAvailableCommands() {
@@ -233,4 +242,24 @@ func readFromReader(reader io.Reader) (listing contracts.DependencyListing, err 
 	decoder := json.NewDecoder(reader)
 	err = decoder.Decode(&listing)
 	return listing, err
+}
+
+func readPackageConfigFunc(path string) (config contracts.PackageConfig, err error) {
+	var data []byte
+	if path == configuration.StdInPath {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(path)
+	}
+
+	if err != nil {
+		return config, fmt.Errorf("could not read config file (%q): %w", path, err)
+	}
+
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		return config, fmt.Errorf("could not parse config file (%q): %w", path, err)
+	}
+
+	return config, nil
 }

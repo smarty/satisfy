@@ -6,16 +6,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/shell"
 )
 
 type CheckApp struct {
-	config contracts.UploadConfig
+	config configuration.CheckConfiguration
 }
 
-func NewCheckApp(config contracts.UploadConfig) *CheckApp {
+func NewCheckApp(config configuration.CheckConfiguration) *CheckApp {
 	return &CheckApp{config: config}
 }
 
