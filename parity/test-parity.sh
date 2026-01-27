@@ -206,9 +206,13 @@ run_parity_test() {
         return 1
     fi
 
-    # Normalize outputs by removing timestamps (YYYY/MM/DD HH:MM:SS pattern)
-    sed -E 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' "$baseline_output" > "$baseline_normalized"
-    sed -E 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' "$test_output" > "$test_normalized"
+    # Normalize outputs by removing timestamps (YYYY/MM/DD HH:MM:SS pattern) and file:line references
+    sed -E -e 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' \
+           -e 's/[a-zA-Z0-9_]+\.go:[0-9]+:/FILE:LINE:/g' \
+           "$baseline_output" > "$baseline_normalized"
+    sed -E -e 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' \
+           -e 's/[a-zA-Z0-9_]+\.go:[0-9]+:/FILE:LINE:/g' \
+           "$test_output" > "$test_normalized"
 
     # Compare normalized outputs
     if ! diff -u "$baseline_normalized" "$test_normalized" > "$diff_output" 2>&1; then

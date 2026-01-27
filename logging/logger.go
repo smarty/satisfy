@@ -148,7 +148,7 @@ func printf(writer io.Writer, level Level, format string, v ...any) {
 	}
 
 	file = shortenFilePath(file)
-	prefix := fmt.Sprintf("%s %s:%d: %s", time.Now().Format("2006/01/02 15:04:05"), file, line, level.String())
+	prefix := fmt.Sprintf("%s %s:%d:%s", time.Now().Format("2006/01/02 15:04:05"), file, line, level.String())
 	printfSimple(writer, "%s "+format+"", append([]any{prefix}, v...)...)
 }
 
