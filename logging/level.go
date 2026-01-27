@@ -11,7 +11,7 @@ var levelFormat = []string{
 	"",
 	"",
 	" [WARN] ",
-	" [ERROR] ",
+	" [Error] ",
 }
 
 // Level represents a log severity level for categorizing log messages.

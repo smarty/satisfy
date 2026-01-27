@@ -69,14 +69,14 @@ func (this *UploadConfiguration) Parse(args []string) (err error) {
 		return err
 	}
 
-	err = this.validatePackageConfig()
-	if err != nil {
-		return err
-	}
-
 	this.GoogleCredentials, err = this.gcsCredentialsReader.Read(this.ctx, "")
 	if err != nil {
 		this.logger.LogLine(logging.Error, "Google authentication failed: %v", err)
+		return err
+	}
+
+	err = this.validatePackageConfig()
+	if err != nil {
 		return err
 	}
 

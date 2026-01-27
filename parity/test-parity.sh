@@ -219,6 +219,21 @@ run_parity_test() {
         log_failure "$test_description: Output mismatch"
         echo -e "${YELLOW}Diff (timestamps normalized):${NC}"
         head -n 50 "$diff_output" | sed 's/^/    /'
+
+        # Extract and display file:line references from both outputs
+        echo ""
+        echo -e "${YELLOW}Source locations:${NC}"
+        local baseline_locations=$(grep -oE '[a-zA-Z0-9_]+\.go:[0-9]+:' "$baseline_output" | sort -u)
+        local test_locations=$(grep -oE '[a-zA-Z0-9_]+\.go:[0-9]+:' "$test_output" | sort -u)
+        if [ -n "$baseline_locations" ]; then
+            echo -e "  ${BLUE}Baseline:${NC}"
+            echo "$baseline_locations" | sed 's/^/    /'
+        fi
+        if [ -n "$test_locations" ]; then
+            echo -e "  ${BLUE}Test:${NC}"
+            echo "$test_locations" | sed 's/^/    /'
+        fi
+
         PARITY_FAILURES+=("$test_name: Output mismatch")
         return 1
     fi
