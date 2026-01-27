@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/shell"
@@ -23,7 +24,7 @@ import (
 const ForceAccessTokenRefreshInSeconds = 1800
 
 type UploadApp struct {
-	config        contracts.UploadConfig
+	config        configuration.UploadConfiguration
 	packageConfig contracts.PackageConfig
 	file          *os.File
 	hasher        hash.Hash
@@ -33,12 +34,12 @@ type UploadApp struct {
 	client        contracts.RemoteStorage
 }
 
-func NewUploadApp(config contracts.UploadConfig) *UploadApp {
+func NewUploadApp(config configuration.UploadConfiguration) *UploadApp {
 	runPreUploadCheck(config)
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
-func runPreUploadCheck(config contracts.UploadConfig) {
+func runPreUploadCheck(config configuration.UploadConfiguration) {
 	if config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return
@@ -127,7 +128,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 		sourcePath = this.packageConfig.SourceDirectory
 	}
 	if sourcePath == "" {
-		sourcePath = this.config.PackageConfig.SourceFile
+		sourcePath = this.packageConfig.SourceFile
 	}
 
 	this.builder = core.NewDirectoryPackageBuilder(

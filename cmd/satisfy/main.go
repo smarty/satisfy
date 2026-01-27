@@ -12,7 +12,6 @@ import (
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/logging"
 	"github.com/smarty/satisfy/shell"
 	"github.com/smarty/satisfy/transfer"
@@ -215,13 +214,22 @@ func mainDownload(args []string) {
 }
 
 func mainUpload(args []string) {
-	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
-	config, err := loader.LoadConfig("upload", args)
+	config := configuration.NewUploadConfiguration(
+		context.Background(),
+		readPackageConfigFunc,
+		gcs.NewCredentialsReader(
+			gcs.CredentialOptions.VaultServer(os.Getenv("VAULT_ADDR"), os.Getenv("VAULT_TOKEN")),
+			gcs.CredentialOptions.EnvironmentReader(shell.NewEnvironment()),
+			gcs.CredentialOptions.FileReader(shell.NewDiskFileSystem("")),
+		),
+		logger,
+	)
+	err := config.Parse(args)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	transfer.NewUploadApp(config).Run()
+	transfer.NewUploadApp(*config).Run()
 }
 
 func mainVersion() {
