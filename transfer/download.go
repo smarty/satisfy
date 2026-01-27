@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/shell"
@@ -21,7 +22,7 @@ type DownloadApp struct {
 	results   chan error
 }
 
-func NewDownloadApp(config DownloadConfig) *DownloadApp {
+func NewDownloadApp(config configuration.DownloadConfiguration) *DownloadApp {
 	disk := shell.NewDiskFileSystem("")
 	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusPartialContent, http.StatusOK})
 	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk, config.ShowProgress)

@@ -119,6 +119,22 @@ func (this Logger) PrintLineClean(format string, v ...any) {
 	printfSimple(this.stdOut, format+"\n", v...)
 }
 
+// WriterErr returns the stderr writer used by the logger.
+//
+// Returns:
+//   - io.Writer: the stderr writer.
+func (this Logger) WriterErr() io.Writer {
+	return this.stdErr
+}
+
+// WriterOut returns the stdout writer used by the logger.
+//
+// Returns:
+//   - io.Writer: the stdout writer.
+func (this Logger) WriterOut() io.Writer {
+	return this.stdOut
+}
+
 func printf(writer io.Writer, level Level, format string, v ...any) {
 	if level == NoPrefix {
 		printfSimple(writer, format, v...)

@@ -1,10 +1,17 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"slices"
 	"sort"
 
+	"github.com/smarty/gcs"
+	"github.com/smarty/satisfy/configuration"
+	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/logging"
 	"github.com/smarty/satisfy/shell"
@@ -82,6 +89,25 @@ func main() {
 }
 
 // ----- helper functions -----
+
+func downloadDependencyListFunc(path string) (listing contracts.DependencyListing, err error) {
+	if path == configuration.StdInPath {
+		return readFromReader(os.Stdin)
+	} else {
+		file, err := os.Open(path)
+		if os.IsNotExist(err) {
+			configuration.EmitExampleDependenciesFile(logger)
+			return listing, fmt.Errorf("specified dependency file (%q) not found: %w", path, err)
+		}
+
+		if err != nil {
+			return listing, fmt.Errorf("could not open specified dependency file (%q): %w", path, err)
+		}
+
+		defer func() { _ = file.Close() }()
+		return readFromReader(file)
+	}
+}
 
 func handleMalformedSubcommand(input string) {
 	const threshold = 2
@@ -165,12 +191,18 @@ func mainCheck(args []string) {
 }
 
 func mainDownload(args []string) {
-	config, err := transfer.ParseDownloadConfig(args)
+	config := configuration.NewDownloadConfiguration(
+		context.Background(),
+		downloadDependencyListFunc,
+		gcs.NewCredentialsReader(),
+		logger,
+	)
+	err := config.Parse(args)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	transfer.NewDownloadApp(config).Run()
+	transfer.NewDownloadApp(*config).Run()
 }
 
 func mainUpload(args []string) {
@@ -195,4 +227,10 @@ func printAvailableCommands() {
 	}
 
 	logger.LogLineClean("%s", messageDownloadIsDefault)
+}
+
+func readFromReader(reader io.Reader) (listing contracts.DependencyListing, err error) {
+	decoder := json.NewDecoder(reader)
+	err = decoder.Decode(&listing)
+	return listing, err
 }
