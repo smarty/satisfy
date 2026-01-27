@@ -226,7 +226,7 @@ func mainUpload(args []string) {
 	)
 	err := config.Parse(args)
 	if err != nil {
-		logger.Fatal(err)
+		logger.FatalClean(err)
 	}
 
 	transfer.NewUploadApp(*config).Run()
