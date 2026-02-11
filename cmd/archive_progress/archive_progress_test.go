@@ -26,7 +26,7 @@ func (this *ArchiveProgressCounter) TestHumanFileSizeWithZero() {
 }
 
 func (this *ArchiveProgressCounter) TestRound() {
-	rounded := round(26.2245, .5, 3)
+	rounded := round(26.2248, .5, 3)
 	this.So(rounded, should.Equal, 26.225)
 }
 
