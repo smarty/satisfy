@@ -16,9 +16,8 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/shell"
+	"github.com/smarty/satisfy/internal/shell"
 )
 
 // Compile-time check of interface implementations.
@@ -33,13 +32,17 @@ type PackageInstallerFileSystem interface {
 }
 
 type PackageInstaller struct {
-	downloader   contracts.Downloader
-	filesystem   PackageInstallerFileSystem
-	showProgress bool
+	downloader  contracts.Downloader
+	filesystem  PackageInstallerFileSystem
+	newProgress func(int64) io.WriteCloser
 }
 
-func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem, showProgress bool) *PackageInstaller {
-	return &PackageInstaller{downloader: downloader, filesystem: filesystem, showProgress: showProgress}
+func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem, newProgress func(int64) io.WriteCloser) *PackageInstaller {
+	if newProgress == nil {
+		newProgress = noopProgress
+	}
+
+	return &PackageInstaller{downloader: downloader, filesystem: filesystem, newProgress: newProgress}
 }
 
 func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest contracts.Manifest, err error) {
@@ -80,7 +83,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	defer closeResource(body)
 	checksumReader := NewHashReader(body, md5.New())
 
-	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
+	factory, found := this.decompressor(manifest.Archive.CompressionAlgorithm)
 	if !found {
 		return errors.New("invalid compression algorithm")
 	}
@@ -132,15 +135,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			this.filesystem.CreateSymlink(header.Linkname, pathItem)
 		} else {
 			writer := this.filesystem.Create(pathItem)
-			progressReader := archive_progress.NewArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
-				if this.showProgress {
-					if done {
-						fmt.Printf("\nDone extracting %s.\n", archived)
-					} else {
-						fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
-					}
-				}
-			})
+			progressReader := this.newProgress(header.Size)
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
 			_ = writer.Close()
@@ -190,10 +185,20 @@ func ComposeManifestPath(localPath, packageName string) string {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+func (this *PackageInstaller) decompressor(algorithm string) (func(io.Reader) (io.ReadCloser, error), bool) {
+	if algorithm == "zip" {
+		return func(r io.Reader) (io.ReadCloser, error) {
+			return shell.NewZipArchiveReader(r, this.newProgress), nil
+		}, true
+	}
+
+	factory, found := decompressors[algorithm]
+	return factory, found
+}
+
 var decompressors = map[string]func(_ io.Reader) (io.ReadCloser, error){
-	"zstd": newZStdReader,
-	"zip":  newZipReader,
 	"gzip": newGZipReader,
+	"zstd": newZStdReader,
 }
 
 func newZStdReader(source io.Reader) (io.ReadCloser, error) {
@@ -202,9 +207,6 @@ func newZStdReader(source io.Reader) (io.ReadCloser, error) {
 	} else {
 		return reader.IOReadCloser(), nil
 	}
-}
-func newZipReader(source io.Reader) (io.ReadCloser, error) {
-	return shell.NewZipArchiveReader(source).(io.ReadCloser), nil
 }
 func newGZipReader(source io.Reader) (io.ReadCloser, error) {
 	return gzip.NewReader(source)

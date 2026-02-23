@@ -17,15 +17,15 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/core"
-	"github.com/smarty/satisfy/shell"
+	"github.com/smarty/satisfy/internal/core"
+	"github.com/smarty/satisfy/internal/shell"
 )
 
 const ForceAccessTokenRefreshInSeconds = 1800
 
 type UploadApp struct {
 	config        configuration.UploadConfiguration
-	packageConfig contracts.PackageConfig
+	packageConfig configuration.PackageConfig
 	file          *os.File
 	hasher        hash.Hash
 	compressor    io.WriteCloser
@@ -49,7 +49,7 @@ func runPreUploadCheck(config configuration.UploadConfiguration) {
 	gcsClient := shell.NewGoogleCloudStorageClient(client, config.GoogleCredentials, []int{http.StatusNotFound})
 	retryClient := core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)
 
-	address := config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+	address := config.PackageConfig.ComposeRemoteAddress(configuration.RemoteManifestFilename)
 	body, err := retryClient.Download(address)
 	if err == nil {
 		_ = body.Close()
@@ -98,14 +98,14 @@ func (this *UploadApp) Run() {
 	this.deleteLocalArchiveFile()
 
 	log.Println("Uploading the manifest...")
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
+	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(configuration.RemoteManifestFilename)))
 	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
 }
 
 func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
 	this.openArchiveFile()
 	return contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(configuration.RemoteArchiveFilename),
 		Body:          NewFileWrapper(this.file),
 		Size:          int64(this.manifest.Archive.Size),
 		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
@@ -135,7 +135,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 		shell.NewDiskFileSystem(sourcePath),
 		shell.NewSwitchArchiveWriter(this.compressor),
 		md5.New(),
-		this.config.ShowProgress,
+		this.config.NewProgress,
 	)
 
 	err = this.builder.Build()
@@ -210,7 +210,7 @@ func (this *UploadApp) completeManifest() {
 		Name:    this.packageConfig.PackageName,
 		Version: this.packageConfig.PackageVersion,
 		Archive: contracts.Archive{
-			Filename:             contracts.RemoteArchiveFilename,
+			Filename:             configuration.RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),

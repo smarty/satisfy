@@ -1,27 +1,20 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"os"
 	"slices"
 	"sort"
 
-	"github.com/smarty/gcs"
+	satisfy "github.com/smarty/satisfy"
 	"github.com/smarty/satisfy/configuration"
-	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/logging"
-	"github.com/smarty/satisfy/shell"
-	"github.com/smarty/satisfy/transfer"
 )
 
 const messageDownloadIsDefault = "Note: 'download' is the default command and doesn't need to be specified."
 
 var helpFlags = []string{"-h", "--help", "-help"}
 
-var logger = logging.NewLogger(os.Stdout, os.Stderr, os.Exit)
+var logger = configuration.NewLogger(os.Stdout, os.Stderr, os.Exit)
 
 var validCommands = []Command{
 	{
@@ -88,25 +81,6 @@ func main() {
 }
 
 // ----- helper functions -----
-
-func downloadDependencyListFunc(path string) (listing contracts.DependencyListing, err error) {
-	if path == configuration.StdInPath {
-		return readFromReader(os.Stdin)
-	} else {
-		file, err := os.Open(path)
-		if os.IsNotExist(err) {
-			configuration.EmitExampleDependenciesFile(logger)
-			return listing, fmt.Errorf("specified dependency file (%q) not found: %w", path, err)
-		}
-
-		if err != nil {
-			return listing, fmt.Errorf("could not open specified dependency file (%q): %w", path, err)
-		}
-
-		defer func() { _ = file.Close() }()
-		return readFromReader(file)
-	}
-}
 
 func handleMalformedSubcommand(input string) {
 	const threshold = 2
@@ -180,60 +154,38 @@ func looksLikeFlag(arg string) bool {
 }
 
 func mainCheck(args []string) {
-	config := configuration.NewCheckConfiguration(
-		context.Background(),
-		readPackageConfigFunc,
-		gcs.NewCredentialsReader(
-			gcs.CredentialOptions.VaultServer(os.Getenv("VAULT_ADDR"), os.Getenv("VAULT_TOKEN")),
-			gcs.CredentialOptions.EnvironmentReader(shell.NewEnvironment()),
-			gcs.CredentialOptions.FileReader(shell.NewDiskFileSystem("")),
-		),
-		logger,
-	)
-	err := config.Parse(args)
+	config, err := parseCheck(args)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	transfer.NewCheckApp(*config).Run()
+	satisfy.Check(config)
 }
 
 func mainDownload(args []string) {
-	config := configuration.NewDownloadConfiguration(
-		context.Background(),
-		downloadDependencyListFunc,
-		gcs.NewCredentialsReader(),
-		logger,
-	)
-	err := config.Parse(args)
+	config, err := parseDownload(args)
+	if errors.Is(err, configuration.ErrNoDependenciesMatch) {
+		return
+	}
+
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	transfer.NewDownloadApp(*config).Run()
+	satisfy.Download(config)
 }
 
 func mainUpload(args []string) {
-	config := configuration.NewUploadConfiguration(
-		context.Background(),
-		readPackageConfigFunc,
-		gcs.NewCredentialsReader(
-			gcs.CredentialOptions.VaultServer(os.Getenv("VAULT_ADDR"), os.Getenv("VAULT_TOKEN")),
-			gcs.CredentialOptions.EnvironmentReader(shell.NewEnvironment()),
-			gcs.CredentialOptions.FileReader(shell.NewDiskFileSystem("")),
-		),
-		logger,
-	)
-	err := config.Parse(args)
+	config, err := parseUpload(args)
 	if err != nil {
-		logger.FatalWithLevel(logging.Info, err)
+		logger.FatalWithLevel(configuration.Info, err)
 	}
 
-	transfer.NewUploadApp(*config).Run()
+	satisfy.Upload(config)
 }
 
 func mainVersion() {
-	logger.LogLine(logging.Info, "satisfy [debug]")
+	logger.LogLine(configuration.Info, "satisfy [debug]")
 }
 
 func printAvailableCommands() {
@@ -244,30 +196,4 @@ func printAvailableCommands() {
 	}
 
 	logger.LogLineClean("%s", messageDownloadIsDefault)
-}
-
-func readFromReader(reader io.Reader) (listing contracts.DependencyListing, err error) {
-	decoder := json.NewDecoder(reader)
-	err = decoder.Decode(&listing)
-	return listing, err
-}
-
-func readPackageConfigFunc(path string) (config contracts.PackageConfig, err error) {
-	var data []byte
-	if path == configuration.StdInPath {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(path)
-	}
-
-	if err != nil {
-		return config, fmt.Errorf("could not read config file (%q): %w", path, err)
-	}
-
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return config, fmt.Errorf("could not parse config file (%q): %w", path, err)
-	}
-
-	return config, nil
 }

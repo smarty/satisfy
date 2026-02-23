@@ -11,6 +11,7 @@ import (
 
 	"github.com/smarty/gcs"
 
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -103,10 +104,10 @@ exit code 2: package has already been uploaded`)
 	return config, err
 }
 
-func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.PackageConfig, err error) {
+func (this *UploadConfigLoader) parseConfigFile(path string) (config configuration.PackageConfig, err error) {
 	data, err := this.readRawJSON(path)
 	if err != nil {
-		return contracts.PackageConfig{}, err
+		return configuration.PackageConfig{}, err
 	}
 	return config, json.Unmarshal(data, &config)
 }

@@ -1,155 +1,87 @@
 package configuration
 
 import (
-	"context"
-	"flag"
-	"fmt"
+	"io"
 
 	"github.com/smarty/gcs"
-	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/logging"
 )
 
+// UploadConfiguration holds the settings needed to archive and upload a
+// package to remote storage.
 type UploadConfiguration struct {
 	GoogleCredentials gcs.Credentials
 	CredentialReader  gcs.CredentialsReader
 	MaxRetry          int
+	NewProgress       func(int64) io.WriteCloser
 	Overwrite         bool
-	ShowProgress      bool
-	PackageConfig     contracts.PackageConfig
-
-	ctx                  context.Context
-	gcsCredentialsReader gcs.CredentialsReader
-	jsonPath             string
-	logger               *logging.Logger
-	packageConfigFunc    func(path string) (contracts.PackageConfig, error)
+	PackageConfig     PackageConfig
 }
 
-// NewUploadConfiguration creates a new [UploadConfiguration] instance.
+// UploadOption configures an [UploadConfiguration].
+type UploadOption func(*UploadConfiguration)
+
+// NewUploadConfiguration creates an [UploadConfiguration] with the provided
+// credentials and package config, applying any supplied options over the
+// following defaults:
+//   - MaxRetry:  5
+//   - Overwrite: false
 //
 // Parameters:
-//   - ctx: the context for managing cancellation and timeouts.
-//   - packageConfigFunc: a function to load the package configuration from a
-//     given path.
-//   - gcsCredentialsReader: a reader for Google Cloud Storage credentials.
-//   - logger: a logger for emitting messages.
+//   - credentials:   GCS credentials used to authenticate remote storage calls.
+//   - credReader:    reader used to refresh credentials when access tokens expire.
+//   - packageConfig: the package metadata describing what to upload.
+//   - opts:          zero or more options that override the defaults above.
 //
 // Returns:
-//   - *UploadConfiguration: a new upload configuration instance.
-func NewUploadConfiguration(
-	ctx context.Context,
-	packageConfigFunc func(path string) (contracts.PackageConfig, error),
-	gcsCredentialsReader gcs.CredentialsReader,
-	logger *logging.Logger,
-) *UploadConfiguration {
-	return &UploadConfiguration{
-		ctx:                  ctx,
-		packageConfigFunc:    packageConfigFunc,
-		gcsCredentialsReader: gcsCredentialsReader,
-		logger:               logger,
+//   - UploadConfiguration: the fully populated configuration value.
+func NewUploadConfiguration(credentials gcs.Credentials, credReader gcs.CredentialsReader, packageConfig PackageConfig, opts ...UploadOption) UploadConfiguration {
+	c := UploadConfiguration{
+		GoogleCredentials: credentials,
+		CredentialReader:  credReader,
+		PackageConfig:     packageConfig,
+		MaxRetry:          5,
 	}
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	return c
 }
 
-// Parse processes command-line arguments to populate the configuration.
+// UploadMaxRetry sets the maximum number of HTTP retry attempts.
 //
 // Parameters:
-//   - args: the command-line arguments to parse.
+//   - n: the maximum number of retries; must be non-negative.
 //
 // Returns:
-//   - error: an error if parsing fails; otherwise, nil.
-func (this *UploadConfiguration) Parse(args []string) (err error) {
-	err = this.parseFlags(args)
-	if err != nil {
-		return err
-	}
-
-	this.PackageConfig, err = this.packageConfigFunc(this.jsonPath)
-	if err != nil {
-		this.logger.LogLine(logging.Error, "Error parsing configuration file: %v", err)
-		return err
-	}
-
-	this.GoogleCredentials, err = this.gcsCredentialsReader.Read(this.ctx, "")
-	if err != nil {
-		this.logger.LogLine(logging.Error, "Google authentication failed: [%v]", err)
-		return err
-	}
-
-	err = this.validatePackageConfig()
-	if err != nil {
-		return err
-	}
-
-	this.CredentialReader = this.gcsCredentialsReader
-	return nil
+//   - UploadOption: the configured option.
+func UploadMaxRetry(n int) UploadOption {
+	return func(c *UploadConfiguration) { c.MaxRetry = n }
 }
 
-func (this *UploadConfiguration) parseFlags(args []string) (err error) {
-	flags := flag.NewFlagSet("satisfy upload", flag.ContinueOnError)
-	flags.SetOutput(this.logger.WriterErr())
-	flags.StringVar(&this.jsonPath,
-		"json",
-		StdInPath,
-		fmt.Sprintf("Path to file with config file or, if equal to %q, read from stdin.", StdInPath),
-	)
-	flags.IntVar(&this.MaxRetry,
-		"max-retry",
-		5,
-		"HTTP max retry.",
-	)
-	flags.BoolVar(&this.Overwrite,
-		"overwrite",
-		false,
-		"When set, always upload package, even when it already exists at specified remote location.",
-	)
-	flags.BoolVar(&this.ShowProgress,
-		"progress",
-		true,
-		"Displays progress stats as files are added to the archive.",
-	)
-
-	flags.Usage = func() {
-		this.logger.LogLineClean("Usage of %s:", flags.Name())
-		flags.PrintDefaults()
-		this.logger.LogLineClean("")
-		this.logger.LogLineClean("exit code 0: success")
-		this.logger.LogLineClean("exit code 1: general failure (see stderr for details)")
-		this.logger.LogLineClean("exit code 2: package has already been uploaded")
-	}
-
-	err = flags.Parse(args)
-	if err != nil {
-		this.logger.LogLine(logging.Warning, "Unable to parse command line flags: %v", err)
-		return err
-	}
-
-	return nil
+// UploadOverwrite controls whether the pre-upload existence check is skipped.
+// When enabled, the package is uploaded regardless of whether it already exists
+// on remote storage.
+//
+// Parameters:
+//   - enabled: when true, skips the pre-upload manifest check.
+//
+// Returns:
+//   - UploadOption: the configured option.
+func UploadOverwrite(enabled bool) UploadOption {
+	return func(c *UploadConfiguration) { c.Overwrite = enabled }
 }
 
-func (this *UploadConfiguration) validatePackageConfig() error {
-	if this.MaxRetry < 0 {
-		return contracts.ErrMaxRetry
-	}
-
-	if this.PackageConfig.CompressionAlgorithm == "" {
-		return contracts.ErrBlankCompressionAlgorithm
-	}
-
-	if this.PackageConfig.SourceDirectory == "" && this.PackageConfig.SourceFile == "" && this.PackageConfig.SourcePath == "" {
-		return contracts.ErrBlankSourceDirectory
-	}
-
-	if this.PackageConfig.PackageName == "" {
-		return contracts.ErrBlankPackageName
-	}
-
-	if this.PackageConfig.PackageVersion == "" {
-		return contracts.ErrBlankPackageVersion
-	}
-
-	if this.PackageConfig.RemoteAddressPrefix == nil {
-		return contracts.ErrNilRemoteAddressPrefix
-	}
-
-	return nil
+// UploadProgress sets the factory used to create a progress writer for each
+// file added to the archive. The factory receives the file size and must
+// return an io.WriteCloser; bytes written to it are counted for progress
+// reporting. A nil or no-op factory disables progress output.
+//
+// Parameters:
+//   - factory: called with the file size; returns a progress-tracking writer.
+//
+// Returns:
+//   - UploadOption: the configured option.
+func UploadProgress(factory func(int64) io.WriteCloser) UploadOption {
+	return func(c *UploadConfiguration) { c.NewProgress = factory }
 }

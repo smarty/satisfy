@@ -9,6 +9,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -22,17 +23,17 @@ type DependencyResolverFixture struct {
 	fileSystem       *inMemoryFileSystem
 	integrityChecker *FakeIntegrityCheck
 	packageInstaller *FakePackageInstaller
-	dependency       contracts.Dependency
+	dependency       configuration.Dependency
 }
 
 func (this *DependencyResolverFixture) Setup() {
 	this.integrityChecker = &FakeIntegrityCheck{}
 	this.fileSystem = newInMemoryFileSystem()
 	this.packageInstaller = &FakePackageInstaller{}
-	this.dependency = contracts.Dependency{
+	this.dependency = configuration.Dependency{
 		PackageName:    "B/C",
 		PackageVersion: "D",
-		RemoteAddress:  contracts.URL(this.URL("gcs://A")),
+		RemoteAddress:  configuration.URL(this.URL("gcs://A")),
 		LocalDirectory: "local",
 	}
 	this.fileSystem.WriteFile("local/manifest_B|C.json", []byte("{}"))

@@ -1,149 +1,70 @@
 package configuration
 
 import (
-	"context"
-	"flag"
-	"fmt"
-
 	"github.com/smarty/gcs"
-	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/logging"
 )
 
+// CheckConfiguration holds the settings needed to determine whether a package
+// version already exists on remote storage.
 type CheckConfiguration struct {
 	GoogleCredentials gcs.Credentials
 	CredentialReader  gcs.CredentialsReader
 	MaxRetry          int
 	Overwrite         bool
-	PackageConfig     contracts.PackageConfig
-
-	ctx                  context.Context
-	gcsCredentialsReader gcs.CredentialsReader
-	jsonPath             string
-	logger               *logging.Logger
-	packageConfigFunc    func(path string) (contracts.PackageConfig, error)
+	PackageConfig     PackageConfig
 }
 
-// NewCheckConfiguration creates a new [CheckConfiguration] instance.
+// CheckOption configures a [CheckConfiguration].
+type CheckOption func(*CheckConfiguration)
+
+// CheckMaxRetry sets the maximum number of HTTP retry attempts.
 //
 // Parameters:
-//   - ctx: the context for managing cancellation and timeouts.
-//   - packageConfigFunc: a function to load the package configuration from a
-//     given path.
-//   - gcsCredentialsReader: a reader for Google Cloud Storage credentials.
-//   - logger: a logger for emitting messages.
+//   - n: the maximum number of retries; must be non-negative.
 //
 // Returns:
-//   - *CheckConfiguration: a new check configuration instance.
-func NewCheckConfiguration(
-	ctx context.Context,
-	packageConfigFunc func(path string) (contracts.PackageConfig, error),
-	gcsCredentialsReader gcs.CredentialsReader,
-	logger *logging.Logger,
-) *CheckConfiguration {
-	return &CheckConfiguration{
-		ctx:                  ctx,
-		packageConfigFunc:    packageConfigFunc,
-		gcsCredentialsReader: gcsCredentialsReader,
-		logger:               logger,
-	}
+//   - CheckOption: the configured option.
+func CheckMaxRetry(n int) CheckOption {
+	return func(c *CheckConfiguration) { c.MaxRetry = n }
 }
 
-// Parse processes command-line arguments to populate the configuration.
+// CheckOverwrite controls whether the remote manifest check is skipped.
+// When enabled, the check command reports success regardless of whether the
+// package already exists on remote storage.
 //
 // Parameters:
-//   - args: the command-line arguments to parse.
+//   - enabled: when true, skips the remote manifest check.
 //
 // Returns:
-//   - error: an error if parsing fails; otherwise, nil.
-func (this *CheckConfiguration) Parse(args []string) (err error) {
-	err = this.parseFlags(args)
-	if err != nil {
-		return err
-	}
-
-	this.PackageConfig, err = this.packageConfigFunc(this.jsonPath)
-	if err != nil {
-		this.logger.LogLine(logging.Error, "Error parsing configuration file: %v", err)
-		return err
-	}
-
-	err = this.validatePackageConfig()
-	if err != nil {
-		return err
-	}
-
-	this.GoogleCredentials, err = this.gcsCredentialsReader.Read(this.ctx, "")
-	if err != nil {
-		this.logger.LogLine(logging.Error, "Google authentication failed: %v", err)
-		return err
-	}
-
-	this.CredentialReader = this.gcsCredentialsReader
-	return nil
+//   - CheckOption: the configured option.
+func CheckOverwrite(enabled bool) CheckOption {
+	return func(c *CheckConfiguration) { c.Overwrite = enabled }
 }
 
-func (this *CheckConfiguration) parseFlags(args []string) (err error) {
-	flags := flag.NewFlagSet("satisfy check", flag.ContinueOnError)
-	flags.SetOutput(this.logger.WriterErr())
-	flags.StringVar(&this.jsonPath,
-		"json",
-		StdInPath,
-		fmt.Sprintf("Path to file with config file or, if equal to %q, read from stdin.", StdInPath),
-	)
-	flags.IntVar(&this.MaxRetry,
-		"max-retry",
-		5,
-		"HTTP max retry.",
-	)
-	flags.BoolVar(&this.Overwrite,
-		"overwrite",
-		false,
-		"When set, always upload package, even when it already exists at specified remote location.",
-	)
-
-	flags.Usage = func() {
-		this.logger.LogLineClean("Usage of %s:", flags.Name())
-		flags.PrintDefaults()
-		this.logger.LogLineClean("")
-		this.logger.LogLineClean("exit code 0: success")
-		this.logger.LogLineClean("exit code 1: general failure (see stderr for details)")
-		this.logger.LogLineClean("exit code 2: package has already been uploaded")
+// NewCheckConfiguration creates a [CheckConfiguration] with the provided
+// credentials and package config, applying any supplied options over the
+// following defaults:
+//   - MaxRetry:  5
+//   - Overwrite: false
+//
+// Parameters:
+//   - credentials:   GCS credentials used to authenticate remote storage calls.
+//   - credReader:    reader used to refresh credentials when access tokens expire.
+//   - packageConfig: the package metadata describing what to check.
+//   - opts:          zero or more options that override the defaults above.
+//
+// Returns:
+//   - CheckConfiguration: the fully populated configuration value.
+func NewCheckConfiguration(credentials gcs.Credentials, credReader gcs.CredentialsReader, packageConfig PackageConfig, opts ...CheckOption) CheckConfiguration {
+	c := CheckConfiguration{
+		GoogleCredentials: credentials,
+		CredentialReader:  credReader,
+		PackageConfig:     packageConfig,
+		MaxRetry:          5,
+	}
+	for _, opt := range opts {
+		opt(&c)
 	}
 
-	err = flags.Parse(args)
-	if err != nil {
-		this.logger.LogLine(logging.Warning, "Unable to parse command line flags: %v", err)
-		return err
-	}
-
-	return nil
-}
-
-func (this *CheckConfiguration) validatePackageConfig() error {
-	if this.MaxRetry < 0 {
-		return contracts.ErrMaxRetry
-	}
-
-	if this.PackageConfig.CompressionAlgorithm == "" {
-		return contracts.ErrBlankCompressionAlgorithm
-	}
-
-	if this.PackageConfig.SourceDirectory == "" && this.PackageConfig.SourceFile == "" && this.PackageConfig.SourcePath == "" {
-		return contracts.ErrBlankSourceDirectory
-	}
-
-	if this.PackageConfig.PackageName == "" {
-		return contracts.ErrBlankPackageName
-	}
-
-	if this.PackageConfig.PackageVersion == "" {
-		return contracts.ErrBlankPackageVersion
-	}
-
-	if this.PackageConfig.RemoteAddressPrefix == nil {
-		return contracts.ErrNilRemoteAddressPrefix
-	}
-
-	return nil
+	return c
 }

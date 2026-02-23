@@ -3,14 +3,12 @@ package shell
 import (
 	"archive/tar"
 	"bytes"
-	"fmt"
 	"io"
 	"log"
 	"net/url"
 	"os"
 
 	"github.com/klauspost/compress/zip"
-	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -20,6 +18,7 @@ type ZipArchiveReader struct {
 	zipReader            *zip.Reader
 	archiveURL           url.URL
 	downloader           contracts.Downloader
+	newProgress          func(int64) io.WriteCloser
 	currentFileCount     int
 	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
@@ -80,13 +79,7 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	this.file = tmp
 
-	progress := archive_progress.NewArchiveProgressCounter(this.size, func(archived, total string, done bool) {
-		if done {
-			fmt.Printf("\nDone downloading archive %s.\n", archived)
-		} else {
-			fmt.Printf("\033[2K\rDownloading archive... %s.", archived)
-		}
-	})
+	progress := this.newProgress(this.size)
 
 	multiWriter := io.MultiWriter(tmp, progress)
 	this.size, err = io.Copy(multiWriter, reader)
@@ -128,8 +121,12 @@ func (this *ZipArchiveReader) Close() error {
 	return nil
 }
 
-func NewZipArchiveReader(reader io.Reader) io.ReadCloser {
-	zipArchiveReader := &ZipArchiveReader{checksumReader: reader}
+func NewZipArchiveReader(reader io.Reader, newProgress func(int64) io.WriteCloser) io.ReadCloser {
+	if newProgress == nil {
+		newProgress = noopProgress
+	}
+
+	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, newProgress: newProgress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
 		log.Fatalf("failed to download zip archive: %s", err)

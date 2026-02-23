@@ -10,12 +10,12 @@ import (
 
 	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/core"
-	"github.com/smarty/satisfy/shell"
+	"github.com/smarty/satisfy/internal/core"
+	"github.com/smarty/satisfy/internal/shell"
 )
 
 type DownloadApp struct {
-	listing   contracts.DependencyListing
+	listing   configuration.DependencyListing
 	installer *core.PackageInstaller
 	integrity contracts.IntegrityCheck
 	waiter    *sync.WaitGroup
@@ -25,7 +25,7 @@ type DownloadApp struct {
 func NewDownloadApp(config configuration.DownloadConfiguration) *DownloadApp {
 	disk := shell.NewDiskFileSystem("")
 	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusPartialContent, http.StatusOK})
-	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk, config.ShowProgress)
+	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk, config.NewProgress)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
@@ -69,7 +69,7 @@ func (this *DownloadApp) awaitCompletion() {
 	close(this.results)
 }
 
-func (this *DownloadApp) install(dependency contracts.Dependency) {
+func (this *DownloadApp) install(dependency configuration.Dependency) {
 	defer this.waiter.Done()
 
 	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)

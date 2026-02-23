@@ -1,147 +1,86 @@
 package configuration
 
 import (
-	"context"
-	"errors"
-	"flag"
-	"fmt"
+	"io"
 
 	"github.com/smarty/gcs"
-	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/core"
-	"github.com/smarty/satisfy/logging"
 )
 
+// DownloadConfiguration holds the settings needed to download and install
+// package dependencies.
 type DownloadConfiguration struct {
-	Dependencies      contracts.DependencyListing
+	Dependencies      DependencyListing
 	GoogleCredentials gcs.Credentials
 	MaxRetry          int
+	NewProgress       func(int64) io.WriteCloser
 	QuickVerification bool
-	ShowProgress      bool
-
-	ctx                   context.Context
-	gcsCredentialsReader  gcs.CredentialsReader
-	jsonPath              string
-	logger                *logging.Logger
-	dependencyListingFunc func(path string) (contracts.DependencyListing, error)
 }
 
-// NewDownloadConfiguration creates a new [DownloadConfiguration] instance.
+// DownloadOption configures a [DownloadConfiguration].
+type DownloadOption func(*DownloadConfiguration)
+
+// DownloadMaxRetry sets the maximum number of HTTP retry attempts per package.
 //
 // Parameters:
-//   - ctx: the context for managing cancellation and timeouts.
-//   - dependencyListingFunc: a function to load the dependency listing from a
-//     given path.
-//   - gcsCredentialsReader: a reader for Google Cloud Storage credentials.
-//   - logger: a logger for emitting messages.
+//   - n: the maximum number of retries; must be non-negative.
 //
 // Returns:
-//   - *DownloadConfiguration: a new download configuration instance.
-func NewDownloadConfiguration(
-	ctx context.Context,
-	dependencyListingFunc func(path string) (contracts.DependencyListing, error),
-	gcsCredentialsReader gcs.CredentialsReader,
-	logger *logging.Logger,
-) *DownloadConfiguration {
-	return &DownloadConfiguration{
-		ctx:                   ctx,
-		dependencyListingFunc: dependencyListingFunc,
-		gcsCredentialsReader:  gcsCredentialsReader,
-		logger:                logger,
-	}
+//   - DownloadOption: the configured option.
+func DownloadMaxRetry(n int) DownloadOption {
+	return func(c *DownloadConfiguration) { c.MaxRetry = n }
 }
 
-// Parse processes command-line arguments to populate the configuration.
+// DownloadQuickVerification controls the integrity check strategy used for
+// already-installed packages. When disabled, full file content (MD5) validation
+// is performed in addition to the faster file-listing check.
 //
 // Parameters:
-//   - args: the command-line arguments to parse.
+//   - enabled: when true, only the file listing is validated; when false, file
+//     contents are also verified.
 //
 // Returns:
-//   - error: an error if parsing fails; otherwise, nil.
-func (this *DownloadConfiguration) Parse(args []string) (err error) {
-	var flags *flag.FlagSet
-	flags, err = this.parseFlags(args)
-	if err != nil {
-		return err
-	}
-
-	this.Dependencies, err = this.loadDependencyListing(this.jsonPath, flags.Args())
-	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
-		EmitExampleDependenciesFile(this.logger)
-		return nil
-	}
-
-	if err != nil {
-		this.logger.LogLine(logging.Warning, "Unable to load dependency listing: %v", err)
-		return err
-	}
-
-	this.GoogleCredentials, err = this.gcsCredentialsReader.Read(this.ctx, this.Dependencies.Credentials)
-	return err
+//   - DownloadOption: the configured option.
+func DownloadQuickVerification(enabled bool) DownloadOption {
+	return func(c *DownloadConfiguration) { c.QuickVerification = enabled }
 }
 
-func (this *DownloadConfiguration) loadDependencyListing(path string, filter []string) (contracts.DependencyListing, error) {
-	dependencies, err := this.dependencyListingFunc(path)
-	if err != nil {
-		return contracts.DependencyListing{}, err
-	}
-
-	err = dependencies.Validate()
-	if err != nil {
-		return contracts.DependencyListing{}, err
-	}
-
-	dependencies.Listing = core.Filter(dependencies.Listing, filter)
-	if len(dependencies.Listing) == 0 {
-		this.logger.LogLine(logging.Warning, "No dependencies provided. You can go about your business. Move along.")
-		return dependencies, contracts.ErrNoDependenciesMatch
-	}
-
-	return dependencies, nil
+// DownloadProgress sets the factory used to create a progress writer for each
+// file extracted from an archive. The factory receives the file size and must
+// return an io.WriteCloser; bytes written to it are counted for progress
+// reporting. A nil or no-op factory disables progress output.
+//
+// Parameters:
+//   - factory: called with the file size; returns a progress-tracking writer.
+//
+// Returns:
+//   - DownloadOption: the configured option.
+func DownloadProgress(factory func(int64) io.WriteCloser) DownloadOption {
+	return func(c *DownloadConfiguration) { c.NewProgress = factory }
 }
 
-func (this *DownloadConfiguration) parseFlags(args []string) (flags *flag.FlagSet, err error) {
-	flags = flag.NewFlagSet("satisfy", flag.ContinueOnError)
-	flags.SetOutput(this.logger.WriterErr())
-	flags.IntVar(&this.MaxRetry,
-		"max-retry",
-		5,
-		"How many times to retry attempts to download packages.",
-	)
-	flags.BoolVar(&this.QuickVerification,
-		"quick",
-		true,
-		"When set to false, perform full file content validation on installed packages.",
-	)
-	flags.BoolVar(&this.ShowProgress,
-		"progress",
-		true,
-		"Displays progress stats as files are extracted from the archive.",
-	)
-	flags.StringVar(&this.jsonPath,
-		"json",
-		StdInPath,
-		fmt.Sprintf("Path to file with dependency listing or, if equal to %q, read from stdin.", StdInPath),
-	)
-
-	flags.Usage = func() {
-		this.logger.LogLineClean("Usage of %s:", flags.Name())
-		flags.PrintDefaults()
-		this.logger.LogLineClean("")
-		this.logger.LogLineClean("  Package names may be passed as non-flag arguments and will serve as a filter " +
-			"against the provided dependency listing.")
-		this.logger.LogLineClean("  The satisfy tool also provides 2 additional subcommands:")
-		this.logger.LogLineClean("")
-		this.logger.LogLineClean("	check	Has package@version already been uploaded according to json config?")
-		this.logger.LogLineClean("	upload	Upload package contents according to json config.")
-		this.logger.LogLineClean("")
+// NewDownloadConfiguration creates a [DownloadConfiguration] with the provided
+// credentials and dependency listing, applying any supplied options over the
+// following defaults:
+//   - MaxRetry:          5
+//   - QuickVerification: true
+//
+// Parameters:
+//   - credentials:  GCS credentials used to authenticate remote storage calls.
+//   - dependencies: the listing of packages to download and install.
+//   - opts:         zero or more options that override the defaults above.
+//
+// Returns:
+//   - DownloadConfiguration: the fully populated configuration value.
+func NewDownloadConfiguration(credentials gcs.Credentials, dependencies DependencyListing, opts ...DownloadOption) DownloadConfiguration {
+	c := DownloadConfiguration{
+		GoogleCredentials: credentials,
+		Dependencies:      dependencies,
+		MaxRetry:          5,
+		QuickVerification: true,
+	}
+	for _, opt := range opts {
+		opt(&c)
 	}
 
-	err = flags.Parse(args)
-	if err != nil {
-		this.logger.LogLine(logging.Warning, "Unable to parse command line flags: %v", err)
-		return flags, err
-	}
-
-	return flags, nil
+	return c
 }

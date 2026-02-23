@@ -33,7 +33,7 @@ type PackageInstallerFixture struct {
 func (this *PackageInstallerFixture) Setup() {
 	this.downloader = &FakeDownloader{}
 	this.filesystem = newInMemoryFileSystem()
-	this.installer = NewPackageInstaller(this.downloader, this.filesystem, true)
+	this.installer = NewPackageInstaller(this.downloader, this.filesystem, noopProgress)
 }
 
 func (this *PackageInstallerFixture) TestInstallManifest() {

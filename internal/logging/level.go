@@ -1,8 +1,8 @@
 package logging
 
 const (
-	Info     Level = iota // default
-	NoPrefix              // don't print date/time/file
+	Info     Level = iota // default value
+	NoPrefix              // no date-time and file prefix
 	Warning
 	Error
 )
@@ -14,7 +14,6 @@ var levelFormat = []string{
 	" [Error]",
 }
 
-// Level represents a log severity level for categorizing log messages.
 type Level int
 
 // String returns the prefix string associated with the log level.

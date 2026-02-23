@@ -1,11 +1,10 @@
-package core
+package configuration
 
 import (
 	"testing"
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
 )
 
 func TestFilterFixture(t *testing.T) {
@@ -14,7 +13,7 @@ func TestFilterFixture(t *testing.T) {
 
 type FilterFixture struct {
 	*gunit.Fixture
-	listing []contracts.Dependency
+	listing []Dependency
 	filter  []string
 }
 
@@ -32,16 +31,16 @@ func (this *FilterFixture) TestEmptyFilter() {
 
 func (this *FilterFixture) TestValidFilter() {
 	filtered := Filter(this.listing, []string{"B"})
-	this.So(filtered, should.Resemble, []contracts.Dependency{{PackageName: "B"}})
+	this.So(filtered, should.Resemble, []Dependency{{PackageName: "B"}})
 }
 
 func (this *FilterFixture) TestMultipleMatchesOnPackageName() {
 	filtered := Filter(this.listing, []string{"A"})
-	this.So(filtered, should.Resemble, []contracts.Dependency{{PackageName: "A"}, {PackageName: "A"}})
+	this.So(filtered, should.Resemble, []Dependency{{PackageName: "A"}, {PackageName: "A"}})
 }
 
 func (this *FilterFixture) appendDependency(name string) {
-	this.listing = append(this.listing, contracts.Dependency{PackageName: name})
+	this.listing = append(this.listing, Dependency{PackageName: name})
 }
 
 func (this *FilterFixture) appendFilter(name string) {

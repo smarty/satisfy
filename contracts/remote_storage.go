@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 )
@@ -35,18 +34,6 @@ type Downloader interface {
 
 type DownloadSetter interface {
 	SetDownloader(url.URL, Downloader)
-}
-
-func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
-	if version == "latest" {
-		prefix.Path = path.Join(prefix.Path, packageName, fileName)
-	} else {
-		prefix.Path = path.Join(prefix.Path, packageName, version, fileName)
-	}
-	if !strings.HasPrefix(prefix.Path, "/") {
-		prefix.Path = "/" + prefix.Path
-	}
-	return prefix
 }
 
 var RetryErr = errors.New("retry")

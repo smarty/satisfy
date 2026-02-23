@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -28,15 +27,19 @@ type DirectoryPackageBuilder struct {
 	archive      contracts.ArchiveWriter
 	hasher       hash.Hash
 	contents     []contracts.ArchiveItem
-	showProgress bool
+	newProgress  func(int64) io.WriteCloser
 }
 
-func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash, showProgress bool) PackageBuilder {
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash, newProgress func(int64) io.WriteCloser) PackageBuilder {
+	if newProgress == nil {
+		newProgress = noopProgress
+	}
+
 	return &DirectoryPackageBuilder{
-		storage:      storage,
-		archive:      archive,
-		hasher:       hasher,
-		showProgress: showProgress,
+		storage:     storage,
+		archive:     archive,
+		hasher:      hasher,
+		newProgress: newProgress,
 	}
 }
 
@@ -77,18 +80,7 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := archive_progress.NewArchiveProgressCounter(file.Size(), func(archived, total string, done bool) {
-		if this.showProgress {
-			if done {
-				fmt.Printf("\nArchived %s of %s.\n", archived, total)
-			} else {
-				fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
-			}
-		}
-	})
-	defer func() {
-		fmt.Printf("\n")
-	}()
+	progressWriter := this.newProgress(file.Size())
 	defer closeResource(progressWriter)
 	writer := io.MultiWriter(this.hasher, this.archive, progressWriter)
 	reader := this.storage.Open(file.Path())

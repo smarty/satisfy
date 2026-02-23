@@ -8,8 +8,8 @@ import (
 
 	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/core"
-	"github.com/smarty/satisfy/shell"
+	"github.com/smarty/satisfy/internal/core"
+	"github.com/smarty/satisfy/internal/shell"
 )
 
 type CheckApp struct {
@@ -27,7 +27,7 @@ func (this *CheckApp) Run() {
 	}
 
 	client := this.buildRemoteStorageClient()
-	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+	address := this.config.PackageConfig.ComposeRemoteAddress(configuration.RemoteManifestFilename)
 	body, err := client.Download(address)
 	if err == nil {
 		defer func() { _ = body.Close() }()

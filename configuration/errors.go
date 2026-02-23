@@ -1,4 +1,4 @@
-package contracts
+package configuration
 
 import "errors"
 

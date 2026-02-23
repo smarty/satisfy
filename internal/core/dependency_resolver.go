@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 )
 
@@ -21,14 +22,14 @@ type DependencyResolver struct {
 	fileSystem       DependencyResolverFileSystem
 	integrityChecker contracts.IntegrityCheck
 	packageInstaller contracts.PackageInstaller
-	dependency       contracts.Dependency
+	dependency       configuration.Dependency
 }
 
 func NewDependencyResolver(
 	fileSystem DependencyResolverFileSystem,
 	integrityChecker contracts.IntegrityCheck,
 	packageInstaller contracts.PackageInstaller,
-	dependency contracts.Dependency,
+	dependency configuration.Dependency,
 ) *DependencyResolver {
 	return &DependencyResolver{
 		fileSystem:       fileSystem,
@@ -127,13 +128,13 @@ func (this *DependencyResolver) installPackage() error {
 	}
 
 	// TODO:
-	//  Manifest archive should always be used during download/install instead of contracts.RemoteArchiveFilename.
-	//    The contracts.RemoteArchiveFilename is to be used during the creation of a manifest, but once the manifest
-	//    exists, we can change the archive filename in the contracts and all previously uploaded manifests using the
+	//  Manifest archive should always be used during download/install instead of configuration.RemoteArchiveFilename.
+	//    The configuration.RemoteArchiveFilename is to be used during the creation of a manifest, but once the manifest
+	//    exists, we can change the archive filename in the configuration and all previously uploaded manifests using the
 	//    older name are still recognized and understood.
 
 	err = this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
-		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
+		RemoteAddress: this.dependency.ComposeRemoteAddress(configuration.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
 	if err != nil {

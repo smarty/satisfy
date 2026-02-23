@@ -1,4 +1,4 @@
-package contracts
+package configuration
 
 import (
 	"net/url"
@@ -22,8 +22,8 @@ func (this *URLFixture) Setup() {
 func (this *URLFixture) TestMarshal() {
 	address, err := url.Parse("https://google.com")
 	this.So(err, should.BeNil)
-	url := URL(*address)
-	pointer := &url
+	u := URL(*address)
+	pointer := &u
 	raw, err := pointer.MarshalJSON()
 	this.So(err, should.BeNil)
 	this.So(string(raw), should.Equal, `"https://google.com"`)
