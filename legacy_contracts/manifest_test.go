@@ -1,4 +1,4 @@
-package contracts
+package legacy_contracts
 
 import (
 	"encoding/json"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestIntegrityListingFixture(t *testing.T) {
@@ -17,15 +17,15 @@ type IntegrityListingFixture struct {
 
 	checker    *FileListingIntegrityChecker
 	fileSystem *inMemoryFileSystem
-	manifest   contracts.Manifest
+	manifest   legacy_contracts.Manifest
 }
 
 func (this *IntegrityListingFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.checker = NewFileListingIntegrityChecker(this.fileSystem)
-	this.manifest = contracts.Manifest{
-		Archive: contracts.Archive{
-			Contents: []contracts.ArchiveItem{
+	this.manifest = legacy_contracts.Manifest{
+		Archive: legacy_contracts.Archive{
+			Contents: []legacy_contracts.ArchiveItem{
 				{Path: "/a", Size: 1},
 				{Path: "/bb", Size: 2},
 				{Path: "/cc/c", Size: 3},
@@ -44,7 +44,7 @@ func (this *IntegrityListingFixture) TestFileListingIntegrityCheck() {
 }
 
 func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
-	this.manifest.Archive.Contents = append(this.manifest.Archive.Contents, contracts.ArchiveItem{
+	this.manifest.Archive.Contents = append(this.manifest.Archive.Contents, legacy_contracts.ArchiveItem{
 		Path: "/eeeee",
 		Size: 5,
 	})

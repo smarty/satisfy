@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type ZipArchiveWriter struct {
@@ -15,7 +15,7 @@ type ZipArchiveWriter struct {
 	once    sync.Once
 }
 
-func NewZipArchiveWriter(writer io.Writer, level int) contracts.ArchiveWriter {
+func NewZipArchiveWriter(writer io.Writer, level int) legacy_contracts.ArchiveWriter {
 	inner := zip.NewWriter(writer)
 	inner.RegisterCompressor(zip.Deflate, func(target io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(target, level)
@@ -23,7 +23,7 @@ func NewZipArchiveWriter(writer io.Writer, level int) contracts.ArchiveWriter {
 	return &ZipArchiveWriter{inner: inner}
 }
 
-func (this *ZipArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
+func (this *ZipArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
 	var err error
 
 	this.current, err = this.inner.CreateHeader(&zip.FileHeader{

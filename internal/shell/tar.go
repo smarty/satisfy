@@ -5,15 +5,15 @@ import (
 	"io"
 	"log"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type TarArchiveWriter struct {
 	*tar.Writer
 }
 
-func NewSwitchArchiveWriter(writer io.Writer) contracts.ArchiveWriter {
-	if inner, ok := writer.(contracts.ArchiveWriter); ok {
+func NewSwitchArchiveWriter(writer io.Writer) legacy_contracts.ArchiveWriter {
+	if inner, ok := writer.(legacy_contracts.ArchiveWriter); ok {
 		return inner
 	} else {
 		return NewTarArchiveWriter(writer)
@@ -24,7 +24,7 @@ func NewTarArchiveWriter(writer io.Writer) *TarArchiveWriter {
 	return &TarArchiveWriter{Writer: tar.NewWriter(writer)}
 }
 
-func (this *TarArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
+func (this *TarArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
 	tarHeader := &tar.Header{
 		Name:    header.Name,
 		Size:    header.Size,

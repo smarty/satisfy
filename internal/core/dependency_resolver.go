@@ -8,28 +8,28 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type DependencyResolverFileSystem interface {
-	contracts.FileChecker
-	contracts.FileReader
-	contracts.Deleter
+	legacy_contracts.FileChecker
+	legacy_contracts.FileReader
+	legacy_contracts.Deleter
 }
 
 type DependencyResolver struct {
 	fileSystem       DependencyResolverFileSystem
-	integrityChecker contracts.IntegrityCheck
-	packageInstaller contracts.PackageInstaller
-	dependency       configuration.Dependency
+	integrityChecker legacy_contracts.IntegrityCheck
+	packageInstaller legacy_contracts.PackageInstaller
+	dependency       contracts.Dependency
 }
 
 func NewDependencyResolver(
 	fileSystem DependencyResolverFileSystem,
-	integrityChecker contracts.IntegrityCheck,
-	packageInstaller contracts.PackageInstaller,
-	dependency configuration.Dependency,
+	integrityChecker legacy_contracts.IntegrityCheck,
+	packageInstaller legacy_contracts.PackageInstaller,
+	dependency contracts.Dependency,
 ) *DependencyResolver {
 	return &DependencyResolver{
 		fileSystem:       fileSystem,
@@ -60,7 +60,7 @@ func (this *DependencyResolver) Resolve() error {
 	return this.installPackage()
 }
 
-func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest contracts.Manifest, err error) {
+func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest legacy_contracts.Manifest, err error) {
 	file, err := this.fileSystem.ReadFile(manifestPath)
 	if err != nil {
 		return localManifest, err
@@ -69,7 +69,7 @@ func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localMan
 	if err == nil {
 		return localManifest, nil
 	}
-	return contracts.Manifest{}, fmt.Errorf(
+	return legacy_contracts.Manifest{}, fmt.Errorf(
 		"existing manifest found but malformed at %q (%s);"+
 			" the corresponding package must be uninstalled manually"+
 			" before installation of %q at version %q can be attempted",
@@ -81,7 +81,7 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Manifest) bool {
+func (this *DependencyResolver) isInstalledCorrectly(localManifest legacy_contracts.Manifest) bool {
 	if localManifest.Name != this.dependency.PackageName {
 		if strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
 			// no-op
@@ -113,7 +113,7 @@ func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Man
 
 func (this *DependencyResolver) installPackage() error {
 	log.Printf("Downloading manifest for %s", this.dependency.Title())
-	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
+	manifest, err := this.packageInstaller.InstallManifest(legacy_contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
 		PackageName:   this.dependency.PackageName,
@@ -133,8 +133,8 @@ func (this *DependencyResolver) installPackage() error {
 	//    exists, we can change the archive filename in the configuration and all previously uploaded manifests using the
 	//    older name are still recognized and understood.
 
-	err = this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
-		RemoteAddress: this.dependency.ComposeRemoteAddress(configuration.RemoteArchiveFilename),
+	err = this.packageInstaller.InstallPackage(manifest, legacy_contracts.InstallationRequest{
+		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
 	if err != nil {
@@ -145,13 +145,13 @@ func (this *DependencyResolver) installPackage() error {
 	return nil
 }
 
-func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) {
+func (this *DependencyResolver) uninstallPackage(manifest legacy_contracts.Manifest) {
 	for _, item := range manifest.Archive.Contents {
 		this.fileSystem.Delete(filepath.Join(this.dependency.LocalDirectory, item.Path))
 	}
 }
 
-func (this *DependencyResolver) localManifestIsLatest(manifest contracts.Manifest) bool {
+func (this *DependencyResolver) localManifestIsLatest(manifest legacy_contracts.Manifest) bool {
 	remoteManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteManifestAddress())
 	if err != nil {
 		log.Println("Failed to download the latest manifest file:", err)

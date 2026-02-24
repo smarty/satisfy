@@ -11,23 +11,23 @@ import (
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/cmd/archive_progress"
-	"github.com/smarty/satisfy/configuration"
+	"github.com/smarty/satisfy/contracts"
 )
 
 const stdInPath = "_STDIN_"
 
-func decodeDependencyListing(reader io.Reader) (configuration.DependencyListing, error) {
-	var listing configuration.DependencyListing
+func decodeDependencyListing(reader io.Reader) (contracts.DependencyListing, error) {
+	var listing contracts.DependencyListing
 	err := json.NewDecoder(reader).Decode(&listing)
 	return listing, err
 }
 
 func emitExampleDependenciesFile() {
-	var listing configuration.DependencyListing
-	listing.Listing = append(listing.Listing, configuration.Dependency{
+	var listing contracts.DependencyListing
+	listing.Listing = append(listing.Listing, contracts.Dependency{
 		PackageName:    "example_package_name",
 		PackageVersion: "0.0.1",
-		RemoteAddress:  configuration.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		RemoteAddress:  contracts.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
 
@@ -39,20 +39,20 @@ func emitExampleDependenciesFile() {
 	logger.LogLineClean("Example json file: %s", string(raw))
 }
 
-func loadDependencyListing(path string, filter []string) (configuration.DependencyListing, error) {
+func loadDependencyListing(path string, filter []string) (contracts.DependencyListing, error) {
 	dependencies, err := readDependencyListing(path)
 	if err != nil {
-		return configuration.DependencyListing{}, err
+		return contracts.DependencyListing{}, err
 	}
 
 	if err = dependencies.Validate(); err != nil {
-		return configuration.DependencyListing{}, err
+		return contracts.DependencyListing{}, err
 	}
 
-	dependencies.Listing = configuration.Filter(dependencies.Listing, filter)
+	dependencies.Listing = contracts.Filter(dependencies.Listing, filter)
 	if len(dependencies.Listing) == 0 {
-		logger.LogLine(configuration.Warning, "No dependencies provided. You can go about your business. Move along.")
-		return dependencies, configuration.ErrNoDependenciesMatch
+		logger.LogLine(contracts.Warning, "No dependencies provided. You can go about your business. Move along.")
+		return dependencies, contracts.ErrNoDependenciesMatch
 	}
 
 	return dependencies, nil
@@ -64,7 +64,7 @@ func newVaultCredentialsReader() gcs.CredentialsReader {
 	)
 }
 
-func parseCheck(args []string) (configuration.CheckConfiguration, error) {
+func parseCheck(args []string) (contracts.CheckConfiguration, error) {
 	flags := flag.NewFlagSet("satisfy check", flag.ContinueOnError)
 	flags.SetOutput(logger.WriterErr())
 
@@ -88,34 +88,34 @@ func parseCheck(args []string) (configuration.CheckConfiguration, error) {
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(configuration.Warning, "Unable to parse command line flags: %v", err)
-		return configuration.CheckConfiguration{}, err
+		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
+		return contracts.CheckConfiguration{}, err
 	}
 
 	pkgConfig, err := readPackageConfig(jsonPath)
 	if err != nil {
-		logger.LogLine(configuration.Error, "Error parsing configuration file: %v", err)
-		return configuration.CheckConfiguration{}, err
+		logger.LogLine(contracts.Error, "Error parsing configuration file: %v", err)
+		return contracts.CheckConfiguration{}, err
 	}
 
 	if err = validatePackageConfig(pkgConfig, maxRetry); err != nil {
-		return configuration.CheckConfiguration{}, err
+		return contracts.CheckConfiguration{}, err
 	}
 
 	credReader := newVaultCredentialsReader()
 	creds, err := credReader.Read(context.Background(), "")
 	if err != nil {
-		logger.LogLine(configuration.Error, "Google authentication failed: %v", err)
-		return configuration.CheckConfiguration{}, err
+		logger.LogLine(contracts.Error, "Google authentication failed: %v", err)
+		return contracts.CheckConfiguration{}, err
 	}
 
-	return configuration.NewCheckConfiguration(creds, credReader, pkgConfig,
-		configuration.CheckMaxRetry(maxRetry),
-		configuration.CheckOverwrite(overwrite),
+	return contracts.NewCheckConfiguration(creds, credReader, pkgConfig,
+		contracts.CheckMaxRetry(maxRetry),
+		contracts.CheckOverwrite(overwrite),
 	), nil
 }
 
-func parseDownload(args []string) (configuration.DownloadConfiguration, error) {
+func parseDownload(args []string) (contracts.DownloadConfiguration, error) {
 	flags := flag.NewFlagSet("satisfy", flag.ContinueOnError)
 	flags.SetOutput(logger.WriterErr())
 
@@ -146,24 +146,24 @@ func parseDownload(args []string) (configuration.DownloadConfiguration, error) {
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(configuration.Warning, "Unable to parse command line flags: %v", err)
-		return configuration.DownloadConfiguration{}, err
+		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
+		return contracts.DownloadConfiguration{}, err
 	}
 
 	deps, err := loadDependencyListing(jsonPath, flags.Args())
-	if errors.Is(err, configuration.ErrNoDependenciesMatch) {
+	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
 		emitExampleDependenciesFile()
-		return configuration.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, err
 	}
 
 	if err != nil {
-		logger.LogLine(configuration.Warning, "Unable to load dependency listing: %v", err)
-		return configuration.DownloadConfiguration{}, err
+		logger.LogLine(contracts.Warning, "Unable to load dependency listing: %v", err)
+		return contracts.DownloadConfiguration{}, err
 	}
 
 	creds, err := gcs.NewCredentialsReader().Read(context.Background(), deps.Credentials)
 	if err != nil {
-		return configuration.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, err
 	}
 
 	var downloadProgress func(int64) io.WriteCloser
@@ -179,14 +179,14 @@ func parseDownload(args []string) (configuration.DownloadConfiguration, error) {
 		}
 	}
 
-	return configuration.NewDownloadConfiguration(creds, deps,
-		configuration.DownloadMaxRetry(maxRetry),
-		configuration.DownloadQuickVerification(quickVerification),
-		configuration.DownloadProgress(downloadProgress),
+	return contracts.NewDownloadConfiguration(creds, deps,
+		contracts.DownloadMaxRetry(maxRetry),
+		contracts.DownloadQuickVerification(quickVerification),
+		contracts.DownloadProgress(downloadProgress),
 	), nil
 }
 
-func parseUpload(args []string) (configuration.UploadConfiguration, error) {
+func parseUpload(args []string) (contracts.UploadConfiguration, error) {
 	flags := flag.NewFlagSet("satisfy upload", flag.ContinueOnError)
 	flags.SetOutput(logger.WriterErr())
 
@@ -213,25 +213,25 @@ func parseUpload(args []string) (configuration.UploadConfiguration, error) {
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(configuration.Warning, "Unable to parse command line flags: %v", err)
-		return configuration.UploadConfiguration{}, err
+		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
+		return contracts.UploadConfiguration{}, err
 	}
 
 	pkgConfig, err := readPackageConfig(jsonPath)
 	if err != nil {
-		logger.LogLine(configuration.Error, "Error parsing configuration file: %v", err)
-		return configuration.UploadConfiguration{}, err
+		logger.LogLine(contracts.Error, "Error parsing configuration file: [%v]", err)
+		return contracts.UploadConfiguration{}, err
 	}
 
 	credReader := newVaultCredentialsReader()
 	creds, err := credReader.Read(context.Background(), "")
 	if err != nil {
-		logger.LogLine(configuration.Error, "Google authentication failed: [%v]", err)
-		return configuration.UploadConfiguration{}, err
+		logger.LogLine(contracts.Error, "Google authentication failed: [%v]", err)
+		return contracts.UploadConfiguration{}, err
 	}
 
 	if err = validatePackageConfig(pkgConfig, maxRetry); err != nil {
-		return configuration.UploadConfiguration{}, err
+		return contracts.UploadConfiguration{}, err
 	}
 
 	var uploadProgress func(int64) io.WriteCloser
@@ -247,14 +247,14 @@ func parseUpload(args []string) (configuration.UploadConfiguration, error) {
 		}
 	}
 
-	return configuration.NewUploadConfiguration(creds, credReader, pkgConfig,
-		configuration.UploadMaxRetry(maxRetry),
-		configuration.UploadOverwrite(overwrite),
-		configuration.UploadProgress(uploadProgress),
+	return contracts.NewUploadConfiguration(creds, credReader, pkgConfig,
+		contracts.UploadMaxRetry(maxRetry),
+		contracts.UploadOverwrite(overwrite),
+		contracts.UploadProgress(uploadProgress),
 	), nil
 }
 
-func readDependencyListing(path string) (configuration.DependencyListing, error) {
+func readDependencyListing(path string) (contracts.DependencyListing, error) {
 	if path == stdInPath {
 		return decodeDependencyListing(os.Stdin)
 	}
@@ -262,18 +262,18 @@ func readDependencyListing(path string) (configuration.DependencyListing, error)
 	file, err := os.Open(path)
 	if os.IsNotExist(err) {
 		emitExampleDependenciesFile()
-		return configuration.DependencyListing{}, fmt.Errorf("specified dependency file (%q) not found: %w", path, err)
+		return contracts.DependencyListing{}, fmt.Errorf("specified dependency file (%q) not found: %w", path, err)
 	}
 
 	if err != nil {
-		return configuration.DependencyListing{}, fmt.Errorf("could not open specified dependency file (%q): %w", path, err)
+		return contracts.DependencyListing{}, fmt.Errorf("could not open specified dependency file (%q): %w", path, err)
 	}
 
 	defer func() { _ = file.Close() }()
 	return decodeDependencyListing(file)
 }
 
-func readPackageConfig(path string) (configuration.PackageConfig, error) {
+func readPackageConfig(path string) (contracts.PackageConfig, error) {
 	var data []byte
 	var err error
 	if path == stdInPath {
@@ -283,40 +283,40 @@ func readPackageConfig(path string) (configuration.PackageConfig, error) {
 	}
 
 	if err != nil {
-		return configuration.PackageConfig{}, fmt.Errorf("could not read config file (%q): %w", path, err)
+		return contracts.PackageConfig{}, fmt.Errorf("could not read config file (%q): %w", path, err)
 	}
 
-	var config configuration.PackageConfig
+	var config contracts.PackageConfig
 	if err = json.Unmarshal(data, &config); err != nil {
-		return configuration.PackageConfig{}, fmt.Errorf("could not parse config file (%q): %w", path, err)
+		return contracts.PackageConfig{}, err
 	}
 
 	return config, nil
 }
 
-func validatePackageConfig(config configuration.PackageConfig, maxRetry int) error {
+func validatePackageConfig(config contracts.PackageConfig, maxRetry int) error {
 	if maxRetry < 0 {
-		return configuration.ErrMaxRetry
+		return contracts.ErrMaxRetry
 	}
 
 	if config.CompressionAlgorithm == "" {
-		return configuration.ErrBlankCompressionAlgorithm
+		return contracts.ErrBlankCompressionAlgorithm
 	}
 
 	if config.SourceDirectory == "" && config.SourceFile == "" && config.SourcePath == "" {
-		return configuration.ErrBlankSourceDirectory
+		return contracts.ErrBlankSourceDirectory
 	}
 
 	if config.PackageName == "" {
-		return configuration.ErrBlankPackageName
+		return contracts.ErrBlankPackageName
 	}
 
 	if config.PackageVersion == "" {
-		return configuration.ErrBlankPackageVersion
+		return contracts.ErrBlankPackageVersion
 	}
 
 	if config.RemoteAddressPrefix == nil {
-		return configuration.ErrNilRemoteAddressPrefix
+		return contracts.ErrNilRemoteAddressPrefix
 	}
 
 	return nil

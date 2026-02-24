@@ -11,7 +11,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestRetryFixture(t *testing.T) {
@@ -33,7 +33,7 @@ func (this *RetryFixture) Setup() {
 }
 
 func (this *RetryFixture) TestUploadCallsInner() {
-	sent := contracts.UploadRequest{ContentType: "test"}
+	sent := legacy_contracts.UploadRequest{ContentType: "test"}
 
 	err := this.client.Upload(sent)
 
@@ -44,7 +44,7 @@ func (this *RetryFixture) TestUploadCallsInner() {
 func (this *RetryFixture) TestUploadRetryOnError() {
 	this.fakeClient.error = aRetryError
 
-	err := this.client.Upload(contracts.UploadRequest{})
+	err := this.client.Upload(legacy_contracts.UploadRequest{})
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
@@ -59,7 +59,7 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
 	this.fakeClient.error = aRegularError
 
-	err := this.client.Upload(contracts.UploadRequest{})
+	err := this.client.Upload(legacy_contracts.UploadRequest{})
 
 	this.So(err, should.Equal, aRegularError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 1)
@@ -104,14 +104,14 @@ func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
 }
 
 var (
-	aRetryError   = fmt.Errorf("this is a retry error %w", contracts.RetryErr)
+	aRetryError   = fmt.Errorf("this is a retry error %w", legacy_contracts.RetryErr)
 	aRegularError = errors.New("this is a regular error")
 )
 
 /////////////////////////////////////////////////////////////////////////////////
 
 type FakeClient struct {
-	uploadRequest  contracts.UploadRequest
+	uploadRequest  legacy_contracts.UploadRequest
 	uploadAttempts int
 
 	downloadRequest  url.URL
@@ -139,7 +139,7 @@ func (this *FakeClient) Size(request url.URL) (int64, error) {
 
 //TODO: Implement tests for seek and size
 
-func (this *FakeClient) Upload(request contracts.UploadRequest) error {
+func (this *FakeClient) Upload(request legacy_contracts.UploadRequest) error {
 	this.uploadRequest = request
 	this.uploadAttempts++
 	return this.error

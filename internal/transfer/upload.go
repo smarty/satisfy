@@ -15,31 +15,31 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/internal/core"
 	"github.com/smarty/satisfy/internal/shell"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 const ForceAccessTokenRefreshInSeconds = 1800
 
 type UploadApp struct {
-	config        configuration.UploadConfiguration
-	packageConfig configuration.PackageConfig
+	config        contracts.UploadConfiguration
+	packageConfig contracts.PackageConfig
 	file          *os.File
 	hasher        hash.Hash
 	compressor    io.WriteCloser
 	builder       core.PackageBuilder
-	manifest      contracts.Manifest
-	client        contracts.RemoteStorage
+	manifest      legacy_contracts.Manifest
+	client        legacy_contracts.RemoteStorage
 }
 
-func NewUploadApp(config configuration.UploadConfiguration) *UploadApp {
+func NewUploadApp(config contracts.UploadConfiguration) *UploadApp {
 	runPreUploadCheck(config)
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
-func runPreUploadCheck(config configuration.UploadConfiguration) {
+func runPreUploadCheck(config contracts.UploadConfiguration) {
 	if config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return
@@ -49,14 +49,14 @@ func runPreUploadCheck(config configuration.UploadConfiguration) {
 	gcsClient := shell.NewGoogleCloudStorageClient(client, config.GoogleCredentials, []int{http.StatusNotFound})
 	retryClient := core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)
 
-	address := config.PackageConfig.ComposeRemoteAddress(configuration.RemoteManifestFilename)
+	address := config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
 	body, err := retryClient.Download(address)
 	if err == nil {
 		_ = body.Close()
 		return
 	}
 
-	statusError, ok := err.(*contracts.StatusCodeError)
+	statusError, ok := err.(*legacy_contracts.StatusCodeError)
 	if ok && statusError.StatusCode() == http.StatusOK {
 		log.Println("[INFO] Package already exists on remote storage.")
 		os.Exit(2)
@@ -98,14 +98,14 @@ func (this *UploadApp) Run() {
 	this.deleteLocalArchiveFile()
 
 	log.Println("Uploading the manifest...")
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(configuration.RemoteManifestFilename)))
+	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
 	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
 }
 
-func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
+func (this *UploadApp) buildArchiveUploadRequest() legacy_contracts.UploadRequest {
 	this.openArchiveFile()
-	return contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(configuration.RemoteArchiveFilename),
+	return legacy_contracts.UploadRequest{
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		Body:          NewFileWrapper(this.file),
 		Size:          int64(this.manifest.Archive.Size),
 		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
@@ -184,9 +184,9 @@ var contentType = map[string]string{
 	"zip":  "application/zip",
 }
 
-func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contracts.UploadRequest {
+func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) legacy_contracts.UploadRequest {
 	buffer := this.writeManifestToBuffer()
-	return contracts.UploadRequest{
+	return legacy_contracts.UploadRequest{
 		RemoteAddress: remoteAddress,
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
@@ -206,11 +206,11 @@ func (this *UploadApp) completeManifest() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	this.manifest = contracts.Manifest{
+	this.manifest = legacy_contracts.Manifest{
 		Name:    this.packageConfig.PackageName,
 		Version: this.packageConfig.PackageVersion,
-		Archive: contracts.Archive{
-			Filename:             configuration.RemoteArchiveFilename,
+		Archive: legacy_contracts.Archive{
+			Filename:             contracts.RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
 			Contents:             this.builder.Contents(),
@@ -241,7 +241,7 @@ func (this *UploadApp) openArchiveFile() {
 	}
 }
 
-func (this *UploadApp) upload(request contracts.UploadRequest) {
+func (this *UploadApp) upload(request legacy_contracts.UploadRequest) {
 	err := this.client.Upload(request)
 	if err != nil {
 		log.Fatal(err)

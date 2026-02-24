@@ -1,4 +1,4 @@
-package configuration
+package contracts
 
 import "github.com/smarty/satisfy/internal/logging"
 

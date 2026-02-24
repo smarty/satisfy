@@ -1,4 +1,4 @@
-package contracts
+package legacy_contracts
 
 type Manifest struct {
 	Name    string  `json:"name"` //a-z 0-9 _-/

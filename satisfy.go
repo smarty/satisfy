@@ -1,7 +1,7 @@
 package satisfy
 
 import (
-	"github.com/smarty/satisfy/configuration"
+	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/internal/transfer"
 )
 
@@ -16,7 +16,7 @@ import (
 // Parameters:
 //   - config: the package identity and GCS credentials used to locate the
 //     remote manifest.
-func Check(config configuration.CheckConfiguration) {
+func Check(config contracts.CheckConfiguration) {
 	transfer.NewCheckApp(config).Run()
 }
 
@@ -30,7 +30,7 @@ func Check(config configuration.CheckConfiguration) {
 // Parameters:
 //   - config: the dependency listing, GCS credentials, retry limit, and
 //     verification settings that control installation behavior.
-func Download(config configuration.DownloadConfiguration) {
+func Download(config contracts.DownloadConfiguration) {
 	transfer.NewDownloadApp(config).Run()
 }
 
@@ -47,6 +47,6 @@ func Download(config configuration.DownloadConfiguration) {
 // Parameters:
 //   - config: the package metadata, source path, compression settings, GCS
 //     credentials, and upload options that control the archiving and upload.
-func Upload(config configuration.UploadConfiguration) {
+func Upload(config contracts.UploadConfiguration) {
 	transfer.NewUploadApp(config).Run()
 }

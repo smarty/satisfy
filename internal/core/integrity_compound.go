@@ -1,16 +1,16 @@
 package core
 
-import "github.com/smarty/satisfy/contracts"
+import "github.com/smarty/satisfy/legacy_contracts"
 
 type CompoundIntegrityCheck struct {
-	inners []contracts.IntegrityCheck
+	inners []legacy_contracts.IntegrityCheck
 }
 
-func NewCompoundIntegrityCheck(inners ...contracts.IntegrityCheck) *CompoundIntegrityCheck {
+func NewCompoundIntegrityCheck(inners ...legacy_contracts.IntegrityCheck) *CompoundIntegrityCheck {
 	return &CompoundIntegrityCheck{inners: inners}
 }
 
-func (this *CompoundIntegrityCheck) Verify(manifest contracts.Manifest, localPath string) error {
+func (this *CompoundIntegrityCheck) Verify(manifest legacy_contracts.Manifest, localPath string) error {
 	for _, inner := range this.inners {
 		err := inner.Verify(manifest, localPath)
 		if err != nil {

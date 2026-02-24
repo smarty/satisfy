@@ -8,12 +8,12 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type FileOpenChecker interface {
-	contracts.FileOpener
-	contracts.FileChecker
+	legacy_contracts.FileOpener
+	legacy_contracts.FileChecker
 }
 
 type FileContentIntegrityCheck struct {
@@ -26,7 +26,7 @@ func NewFileContentIntegrityCheck(hasher func() hash.Hash, fileSystem FileOpenCh
 	return &FileContentIntegrityCheck{hasher: hasher, fileSystem: fileSystem, enabled: enabled}
 }
 
-func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, localPath string) error {
+func (this *FileContentIntegrityCheck) Verify(manifest legacy_contracts.Manifest, localPath string) error {
 	if !this.enabled {
 		return nil
 	}

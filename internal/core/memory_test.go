@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type inMemoryFileSystem struct {
@@ -33,7 +33,7 @@ func (this *inMemoryFileSystem) Chmod(name string, mode os.FileMode) error {
 	return this.errChmodFile[name]
 }
 
-func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
+func (this *inMemoryFileSystem) Stat(path string) (legacy_contracts.FileInfo, error) {
 	file, found := this.fileSystem[path]
 	if found {
 		return file, nil
@@ -42,7 +42,7 @@ func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
 	}
 }
 
-func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+func (this *inMemoryFileSystem) Listing() (files []legacy_contracts.FileInfo) {
 	for _, file := range this.fileSystem {
 		files = append(files, file)
 	}

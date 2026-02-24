@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/klauspost/compress/zip"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type ZipArchiveReader struct {
@@ -17,7 +17,7 @@ type ZipArchiveReader struct {
 	currentZipFileReader io.Reader
 	zipReader            *zip.Reader
 	archiveURL           url.URL
-	downloader           contracts.Downloader
+	downloader           legacy_contracts.Downloader
 	newProgress          func(int64) io.WriteCloser
 	currentFileCount     int
 	lastBytesRetrieved   *bytes.Buffer
@@ -66,7 +66,7 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 	}, nil
 }
 
-func (this *ZipArchiveReader) SetDownloader(request url.URL, downloader contracts.Downloader) {
+func (this *ZipArchiveReader) SetDownloader(request url.URL, downloader legacy_contracts.Downloader) {
 	this.archiveURL = request
 	this.downloader = downloader
 }

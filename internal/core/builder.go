@@ -8,29 +8,29 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type PackageBuilder interface {
 	Build() error
-	Contents() []contracts.ArchiveItem
+	Contents() []legacy_contracts.ArchiveItem
 }
 
 type DirectoryPackageBuilderFileSystem interface {
-	contracts.PathLister
-	contracts.FileOpener
-	contracts.RootPath
+	legacy_contracts.PathLister
+	legacy_contracts.FileOpener
+	legacy_contracts.RootPath
 }
 
 type DirectoryPackageBuilder struct {
-	storage      DirectoryPackageBuilderFileSystem
-	archive      contracts.ArchiveWriter
-	hasher       hash.Hash
-	contents     []contracts.ArchiveItem
-	newProgress  func(int64) io.WriteCloser
+	storage     DirectoryPackageBuilderFileSystem
+	archive     legacy_contracts.ArchiveWriter
+	hasher      hash.Hash
+	contents    []legacy_contracts.ArchiveItem
+	newProgress func(int64) io.WriteCloser
 }
 
-func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash, newProgress func(int64) io.WriteCloser) PackageBuilder {
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive legacy_contracts.ArchiveWriter, hasher hash.Hash, newProgress func(int64) io.WriteCloser) PackageBuilder {
 	if newProgress == nil {
 		newProgress = noopProgress
 	}
@@ -60,7 +60,7 @@ func (this *DirectoryPackageBuilder) Build() error {
 	return this.archive.Close()
 }
 
-func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool) error {
+func (this *DirectoryPackageBuilder) add(file legacy_contracts.FileInfo, fileOnly bool) error {
 	log.Printf("Adding \"%s\" to archive.", file.Path())
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
@@ -75,7 +75,7 @@ func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool)
 	return err
 }
 
-func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, symlinkSourcePath string) error {
+func (this *DirectoryPackageBuilder) archiveContents(file legacy_contracts.FileInfo, symlinkSourcePath string) error {
 	if symlinkSourcePath != "" {
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
@@ -90,7 +90,7 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 	return err
 }
 
-func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo, fileOnly bool) (header contracts.ArchiveHeader, err error) {
+func (this *DirectoryPackageBuilder) buildHeader(file legacy_contracts.FileInfo, fileOnly bool) (header legacy_contracts.ArchiveHeader, err error) {
 	if fileOnly {
 		header.Name = filepath.Base(file.Path())
 	} else {
@@ -98,7 +98,7 @@ func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo, fileOn
 	}
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
-	header.Executable = contracts.IsExecutable(file.Mode())
+	header.Executable = legacy_contracts.IsExecutable(file.Mode())
 	if file.Symlink() == "" {
 		return header, nil
 	}
@@ -110,7 +110,7 @@ func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo, fileOn
 	return header, err
 }
 
-func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file contracts.FileInfo) (string, error) {
+func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file legacy_contracts.FileInfo) (string, error) {
 	path := file.Symlink()
 	if this.isAbsolute(path) {
 		return filepath.Rel(filepath.Dir(file.Path()), path)
@@ -120,7 +120,7 @@ func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file contracts.FileI
 	return filepath.Rel(filepath.Dir(file.Path()), path)
 }
 
-func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file contracts.FileInfo) error {
+func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file legacy_contracts.FileInfo) error {
 	return fmt.Errorf(
 		"the file \"%s\" is a symlink that refers to \"%s\" which is outside of the configured root directory: \"%s\"",
 		file.Path(),
@@ -128,7 +128,7 @@ func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file contracts.FileI
 		this.storage.RootPath())
 }
 
-func (this *DirectoryPackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) buildManifestEntry(file legacy_contracts.FileInfo, symlinkSourcePath string) legacy_contracts.ArchiveItem {
 	defer this.hasher.Reset()
 	var path string
 	if _, ok := this.fileOnly(); ok == true {
@@ -136,25 +136,26 @@ func (this *DirectoryPackageBuilder) buildManifestEntry(file contracts.FileInfo,
 	} else {
 		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
 	}
-	return contracts.ArchiveItem{
+
+	return legacy_contracts.ArchiveItem{
 		Path:        path,
 		Size:        this.determineFileSize(file, symlinkSourcePath),
 		MD5Checksum: this.hasher.Sum(nil),
 	}
 }
 
-func (this *DirectoryPackageBuilder) determineFileSize(file contracts.FileInfo, symlinkSourcePath string) int64 {
+func (this *DirectoryPackageBuilder) determineFileSize(file legacy_contracts.FileInfo, symlinkSourcePath string) int64 {
 	if symlinkSourcePath == "" {
 		return file.Size()
 	}
 	return int64(len(symlinkSourcePath))
 }
 
-func (this *DirectoryPackageBuilder) Contents() []contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) Contents() []legacy_contracts.ArchiveItem {
 	return this.contents
 }
 
-func (this *DirectoryPackageBuilder) outOfBounds(info contracts.FileInfo) bool {
+func (this *DirectoryPackageBuilder) outOfBounds(info legacy_contracts.FileInfo) bool {
 	if this.isAbsolute(info.Symlink()) {
 		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
 	}
@@ -166,7 +167,7 @@ func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 	return strings.HasPrefix(path, "/")
 }
 
-func (this *DirectoryPackageBuilder) fileOnly() (contracts.FileInfo, bool) {
+func (this *DirectoryPackageBuilder) fileOnly() (legacy_contracts.FileInfo, bool) {
 	if len(this.storage.Listing()) == 1 {
 		if this.storage.Listing()[0].Mode().IsRegular() {
 			return this.storage.Listing()[0], true

@@ -7,14 +7,14 @@ import (
 	"sort"
 
 	satisfy "github.com/smarty/satisfy"
-	"github.com/smarty/satisfy/configuration"
+	"github.com/smarty/satisfy/contracts"
 )
 
 const messageDownloadIsDefault = "Note: 'download' is the default command and doesn't need to be specified."
 
 var helpFlags = []string{"-h", "--help", "-help"}
 
-var logger = configuration.NewLogger(os.Stdout, os.Stderr, os.Exit)
+var logger = contracts.NewLogger(os.Stdout, os.Stderr, os.Exit)
 
 var validCommands = []Command{
 	{
@@ -164,7 +164,7 @@ func mainCheck(args []string) {
 
 func mainDownload(args []string) {
 	config, err := parseDownload(args)
-	if errors.Is(err, configuration.ErrNoDependenciesMatch) {
+	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
 		return
 	}
 
@@ -178,14 +178,14 @@ func mainDownload(args []string) {
 func mainUpload(args []string) {
 	config, err := parseUpload(args)
 	if err != nil {
-		logger.FatalWithLevel(configuration.Info, err)
+		logger.FatalWithLevel(contracts.Info, err)
 	}
 
 	satisfy.Upload(config)
 }
 
 func mainVersion() {
-	logger.LogLine(configuration.Info, "satisfy [debug]")
+	logger.LogLine(contracts.Info, "satisfy [debug]")
 }
 
 func printAvailableCommands() {

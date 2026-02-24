@@ -6,7 +6,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestFileContentIntegrityCheckFixture(t *testing.T) {
@@ -19,7 +19,7 @@ type FileContentIntegrityCheckFixture struct {
 	checker    *FileContentIntegrityCheck
 	fakeHasher *FakeHasher
 	fileSystem *inMemoryFileSystem
-	manifest   contracts.Manifest
+	manifest   legacy_contracts.Manifest
 }
 
 func (this *FileContentIntegrityCheckFixture) Setup() {
@@ -31,9 +31,9 @@ func (this *FileContentIntegrityCheckFixture) Setup() {
 	this.fileSystem.WriteFile("/local/dddd", []byte("dddd"))
 	this.fileSystem.CreateSymlink("cc/c", "/local/eeeee")
 
-	this.manifest = contracts.Manifest{
-		Archive: contracts.Archive{
-			Contents: []contracts.ArchiveItem{
+	this.manifest = legacy_contracts.Manifest{
+		Archive: legacy_contracts.Archive{
+			Contents: []legacy_contracts.ArchiveItem{
 				{Path: "/a", MD5Checksum: []byte("a [HASHED]")},
 				{Path: "/bb", MD5Checksum: []byte("bb [HASHED]")},
 				{Path: "/cc/c", MD5Checksum: []byte("ccc [HASHED]")},

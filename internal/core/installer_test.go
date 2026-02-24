@@ -16,7 +16,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestPackageInstallerFixture(t *testing.T) {
@@ -37,7 +37,7 @@ func (this *PackageInstallerFixture) Setup() {
 }
 
 func (this *PackageInstallerFixture) TestInstallManifest() {
-	originalManifest := contracts.Manifest{Name: "Package/Name", Version: "1.2.3"}
+	originalManifest := legacy_contracts.Manifest{Name: "Package/Name", Version: "1.2.3"}
 	this.downloader.prepareManifestDownload(originalManifest)
 
 	request := this.installationRequest(originalManifest.Name)
@@ -50,10 +50,10 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 	this.So(this.loadLocalManifest(fileName), should.Resemble, originalManifest)
 }
 
-func (this *PackageInstallerFixture) loadLocalManifest(fileName string) contracts.Manifest {
+func (this *PackageInstallerFixture) loadLocalManifest(fileName string) legacy_contracts.Manifest {
 	reader := this.filesystem.Open(fileName)
 	decoder := json.NewDecoder(reader)
-	var localManifest contracts.Manifest
+	var localManifest legacy_contracts.Manifest
 	_ = decoder.Decode(&localManifest)
 	return localManifest
 }
@@ -132,11 +132,11 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	this.So(this.filesystem.Listing(), should.BeEmpty)
 }
 
-func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) contracts.Manifest {
-	return contracts.Manifest{
-		Archive: contracts.Archive{
+func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) legacy_contracts.Manifest {
+	return legacy_contracts.Manifest{
+		Archive: legacy_contracts.Archive{
 			MD5Checksum: checksum,
-			Contents: []contracts.ArchiveItem{
+			Contents: []legacy_contracts.ArchiveItem{
 				{Path: "Hello/World"},
 				{Path: "Goodbye/World"},
 				{Path: "Link"},
@@ -146,8 +146,8 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 	}
 }
 
-func (this *PackageInstallerFixture) installationRequest(packageName string) contracts.InstallationRequest {
-	return contracts.InstallationRequest{
+func (this *PackageInstallerFixture) installationRequest(packageName string) legacy_contracts.InstallationRequest {
+	return legacy_contracts.InstallationRequest{
 		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
 		LocalPath:     "local/path",
 		PackageName:   packageName,
@@ -216,7 +216,7 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 	return hasher.Sum(nil)
 }
 
-func (this *FakeDownloader) prepareManifestDownload(manifest contracts.Manifest) {
+func (this *FakeDownloader) prepareManifestDownload(manifest legacy_contracts.Manifest) {
 	raw, _ := json.Marshal(manifest)
 	this.Body = io.NopCloser(bytes.NewReader(raw))
 }

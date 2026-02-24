@@ -6,18 +6,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type FileListingIntegrityChecker struct {
-	fileSystem contracts.FileChecker
+	fileSystem legacy_contracts.FileChecker
 }
 
-func NewFileListingIntegrityChecker(fileSystem contracts.FileChecker) *FileListingIntegrityChecker {
+func NewFileListingIntegrityChecker(fileSystem legacy_contracts.FileChecker) *FileListingIntegrityChecker {
 	return &FileListingIntegrityChecker{fileSystem: fileSystem}
 }
 
-func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, localPath string) error {
+func (this *FileListingIntegrityChecker) Verify(manifest legacy_contracts.Manifest, localPath string) error {
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		fileInfo, err := this.fileSystem.Stat(fullPath)

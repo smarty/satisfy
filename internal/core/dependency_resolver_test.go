@@ -9,8 +9,8 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/configuration"
 	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestDependencyResolverFixture(t *testing.T) {
@@ -23,17 +23,17 @@ type DependencyResolverFixture struct {
 	fileSystem       *inMemoryFileSystem
 	integrityChecker *FakeIntegrityCheck
 	packageInstaller *FakePackageInstaller
-	dependency       configuration.Dependency
+	dependency       contracts.Dependency
 }
 
 func (this *DependencyResolverFixture) Setup() {
 	this.integrityChecker = &FakeIntegrityCheck{}
 	this.fileSystem = newInMemoryFileSystem()
 	this.packageInstaller = &FakePackageInstaller{}
-	this.dependency = configuration.Dependency{
+	this.dependency = contracts.Dependency{
 		PackageName:    "B/C",
 		PackageVersion: "D",
-		RemoteAddress:  configuration.URL(this.URL("gcs://A")),
+		RemoteAddress:  contracts.URL(this.URL("gcs://A")),
 		LocalDirectory: "local",
 	}
 	this.fileSystem.WriteFile("local/manifest_B|C.json", []byte("{}"))
@@ -45,10 +45,10 @@ func (this *DependencyResolverFixture) Resolve() error {
 }
 
 func (this *DependencyResolverFixture) TestFreshInstallation() {
-	manifest := contracts.Manifest{
+	manifest := legacy_contracts.Manifest{
 		Name:    "B/C",
 		Version: "D",
-		Archive: contracts.Archive{Filename: "archive-name"},
+		Archive: legacy_contracts.Archive{Filename: "archive-name"},
 	}
 	this.packageInstaller.remote = manifest
 
@@ -146,7 +146,7 @@ func (this *DependencyResolverFixture) TestFinalInstallationFailed() {
 }
 
 func (this *DependencyResolverFixture) TestLatestIsAlreadyInstalled() {
-	manifest := contracts.Manifest{
+	manifest := legacy_contracts.Manifest{
 		Name:    "B/C",
 		Version: "D",
 	}
@@ -161,12 +161,12 @@ func (this *DependencyResolverFixture) TestLatestIsAlreadyInstalled() {
 }
 
 func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
-	this.packageInstaller.remote = contracts.Manifest{
+	this.packageInstaller.remote = legacy_contracts.Manifest{
 		Name:    "B/C",
 		Version: "D",
 	}
 
-	this.packageInstaller.remoteLatest = contracts.Manifest{
+	this.packageInstaller.remoteLatest = legacy_contracts.Manifest{
 		Name:    "B/C",
 		Version: "E",
 	}
@@ -182,10 +182,10 @@ func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
 }
 
 func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
-	manifest := contracts.Manifest{
+	manifest := legacy_contracts.Manifest{
 		Name:    "B/C",
 		Version: "D",
-		Archive: contracts.Archive{Filename: "archive-name"},
+		Archive: legacy_contracts.Archive{Filename: "archive-name"},
 	}
 	this.packageInstaller.remote = manifest
 	this.dependency.PackageVersion = "latest"
@@ -199,12 +199,12 @@ func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
 func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, name, version string) {
 	this.So(err, should.BeNil)
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
-	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
+	this.So(this.packageInstaller.manifestRequest, should.Resemble, legacy_contracts.InstallationRequest{
 		RemoteAddress: this.URL("gcs://A/B/C/manifest.json"),
 		LocalPath:     "local",
 		PackageName:   name,
 	})
-	this.So(this.packageInstaller.packageRequest, should.Resemble, contracts.InstallationRequest{
+	this.So(this.packageInstaller.packageRequest, should.Resemble, legacy_contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
 		LocalPath:     "local",
 		PackageName:   "",
@@ -228,12 +228,12 @@ func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
 
 func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version string) {
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
-	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
+	this.So(this.packageInstaller.manifestRequest, should.Resemble, legacy_contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/manifest.json", version)),
 		LocalPath:     "local",
 		PackageName:   name,
 	})
-	this.So(this.packageInstaller.packageRequest, should.Resemble, contracts.InstallationRequest{
+	this.So(this.packageInstaller.packageRequest, should.Resemble, legacy_contracts.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
 		LocalPath:     "local",
 	})
@@ -241,13 +241,13 @@ func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version s
 
 func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
 	packageName string, packageVersion string,
-) contracts.Manifest {
-	manifest := contracts.Manifest{
+) legacy_contracts.Manifest {
+	manifest := legacy_contracts.Manifest{
 		Name:    packageName,
 		Version: packageVersion,
-		Archive: contracts.Archive{
+		Archive: legacy_contracts.Archive{
 			Filename: "archive",
-			Contents: []contracts.ArchiveItem{
+			Contents: []legacy_contracts.ArchiveItem{
 				{Path: "contents1"},
 				{Path: "contents2"},
 				{Path: "contents3"},
@@ -277,11 +277,11 @@ func (this *DependencyResolverFixture) URL(address string) url.URL {
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 type FakePackageInstaller struct {
-	remote                 contracts.Manifest
-	remoteLatest           contracts.Manifest
-	installed              contracts.Manifest
-	manifestRequest        contracts.InstallationRequest
-	packageRequest         contracts.InstallationRequest
+	remote                 legacy_contracts.Manifest
+	remoteLatest           legacy_contracts.Manifest
+	installed              legacy_contracts.Manifest
+	manifestRequest        legacy_contracts.InstallationRequest
+	packageRequest         legacy_contracts.InstallationRequest
 	installManifestErr     error
 	installPackageErr      error
 	installManifestCounter int
@@ -289,17 +289,17 @@ type FakePackageInstaller struct {
 	downloadError          error
 }
 
-func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest legacy_contracts.Manifest, err error) {
 	return this.remoteLatest, this.downloadError
 }
 
-func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) InstallManifest(request legacy_contracts.InstallationRequest) (manifest legacy_contracts.Manifest, err error) {
 	this.installManifestCounter++
 	this.manifestRequest = request
 	return this.remote, this.installManifestErr
 }
 
-func (this *FakePackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
+func (this *FakePackageInstaller) InstallPackage(manifest legacy_contracts.Manifest, request legacy_contracts.InstallationRequest) error {
 	this.installPackageCounter++
 	this.installed = manifest
 	this.packageRequest = request

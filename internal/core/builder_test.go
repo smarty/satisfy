@@ -6,7 +6,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestDirectoryPackageBuilderFixture(t *testing.T) {
@@ -37,7 +37,7 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
-	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
+	this.So(this.builder.Contents(), should.Resemble, []legacy_contracts.ArchiveItem{
 		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
 		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
@@ -49,10 +49,10 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
+		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
+		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
+		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -86,7 +86,7 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed
 	if !this.So(err, should.BeNil) {
 		return
 	}
-	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: contracts.ArchiveHeader{
+	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: legacy_contracts.ArchiveHeader{
 		Name:     "inner/link.txt",
 		LinkName: "../file0.txt",
 		Size:     0,
@@ -142,7 +142,7 @@ func (this *FakeHasher) Size() int           { panic("implement me") }
 /////////////////////////
 
 type ArchiveItem struct {
-	contracts.ArchiveHeader
+	legacy_contracts.ArchiveHeader
 	contents []byte
 }
 
@@ -155,7 +155,7 @@ type FakeArchiveWriter struct {
 }
 
 func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
-func (this *FakeArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
+func (this *FakeArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
 	if this.closed {
 		return
 	}

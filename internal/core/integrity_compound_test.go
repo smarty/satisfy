@@ -6,7 +6,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 func TestCompoundIntegrityCheckFixture(t *testing.T) {
@@ -19,7 +19,7 @@ type CompoundIntegrityCheckFixture struct {
 	checker   *CompoundIntegrityCheck
 	innerA    *FakeIntegrityCheck
 	innerB    *FakeIntegrityCheck
-	manifest  contracts.Manifest
+	manifest  legacy_contracts.Manifest
 	localPath string
 }
 
@@ -27,7 +27,7 @@ func (this *CompoundIntegrityCheckFixture) Setup() {
 	this.innerA = &FakeIntegrityCheck{}
 	this.innerB = &FakeIntegrityCheck{}
 	this.checker = NewCompoundIntegrityCheck(this.innerA, this.innerB)
-	this.manifest = contracts.Manifest{Name: "package-name"}
+	this.manifest = legacy_contracts.Manifest{Name: "package-name"}
 	this.localPath = "/local"
 }
 
@@ -49,11 +49,11 @@ func (this *CompoundIntegrityCheckFixture) TestAnyIntegrityTestsFail() {
 
 type FakeIntegrityCheck struct {
 	err       error
-	manifest  contracts.Manifest
+	manifest  legacy_contracts.Manifest
 	localPath string
 }
 
-func (this *FakeIntegrityCheck) Verify(manifest contracts.Manifest, localPath string) error {
+func (this *FakeIntegrityCheck) Verify(manifest legacy_contracts.Manifest, localPath string) error {
 	this.manifest = manifest
 	this.localPath = localPath
 	return this.err

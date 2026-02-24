@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -o pipefail
 
 ##############################################################################
 # satisfy Parity Test Suite
@@ -93,28 +93,37 @@ setup_test_environment() {
 build_docker_image() {
     local branch="$1"
     local output_dir="$2"
+    local src_dir="${3:-}"  # Optional: use this directory instead of creating a worktree
     local image_name="satisfy-parity-${branch//\//-}"
 
-    log_info "Building Docker image for branch: $branch" >&2
+    local worktree
+    local owns_worktree=false
 
-    # Create a temporary git worktree for this branch
-    local worktree="$output_dir/worktree"
-    log_info "  Creating git worktree at: $worktree" >&2
+    if [[ -n "$src_dir" ]]; then
+        worktree="$src_dir"
+        log_info "Building Docker image for branch: $branch (from working directory)" >&2
+        log_info "  Using source directory: $worktree" >&2
+    else
+        log_info "Building Docker image for branch: $branch" >&2
+        worktree="$output_dir/worktree"
+        owns_worktree=true
+        log_info "  Creating git worktree at: $worktree" >&2
 
-    # Use --detach to allow checking out the current branch
-    if ! git worktree add --detach "$worktree" "$branch" > "$output_dir/worktree.log" 2>&1; then
-        log_failure "Failed to create git worktree for branch: $branch" >&2
-        cat "$output_dir/worktree.log" >&2
-        exit 1
+        # Use --detach to allow checking out the current branch
+        if ! git worktree add --detach "$worktree" "$branch" > "$output_dir/worktree.log" 2>&1; then
+            log_failure "Failed to create git worktree for branch: $branch" >&2
+            cat "$output_dir/worktree.log" >&2
+            exit 1
+        fi
+
+        # Verify worktree was created
+        if [ ! -d "$worktree" ]; then
+            log_failure "Worktree directory not found: $worktree" >&2
+            exit 1
+        fi
+
+        log_info "  Worktree created successfully" >&2
     fi
-
-    # Verify worktree was created
-    if [ ! -d "$worktree" ]; then
-        log_failure "Worktree directory not found: $worktree" >&2
-        exit 1
-    fi
-
-    log_info "  Worktree created successfully" >&2
 
     # Create a test Dockerfile that has a shell for running tests
     cat > "$output_dir/Dockerfile.test" <<'DOCKERFILE'
@@ -142,15 +151,19 @@ DOCKERFILE
         cat "$output_dir/build.log" >&2
 
         # Cleanup worktree before exiting
-        git worktree remove "$worktree" --force 2>/dev/null || true
+        if [[ "$owns_worktree" == "true" ]]; then
+            git worktree remove "$worktree" --force 2>/dev/null || true
+        fi
         exit 1
     fi
 
     log_info "  Docker image built successfully" >&2
 
-    # Cleanup worktree
-    log_info "  Cleaning up worktree" >&2
-    git worktree remove "$worktree" --force >> "$output_dir/worktree.log" 2>&1 || true
+    # Cleanup worktree if we created it
+    if [[ "$owns_worktree" == "true" ]]; then
+        log_info "  Cleaning up worktree" >&2
+        git worktree remove "$worktree" --force >> "$output_dir/worktree.log" 2>&1 || true
+    fi
 
     # Return only the image name to stdout
     echo "$image_name"
@@ -613,7 +626,8 @@ main() {
     # Build Docker images for both branches
     log_section "Building Docker images"
     BASELINE_IMAGE=$(build_docker_image "$BASELINE_BRANCH" "$BASELINE_DIR")
-    TEST_IMAGE=$(build_docker_image "$TEST_BRANCH" "$TEST_DIR")
+    REPO_ROOT=$(git rev-parse --show-toplevel)
+    TEST_IMAGE=$(build_docker_image "$TEST_BRANCH" "$TEST_DIR" "$REPO_ROOT")
 
     log_info "Baseline image: $BASELINE_IMAGE"
     log_info "Test image: $TEST_IMAGE"

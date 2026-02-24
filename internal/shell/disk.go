@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type DiskFileSystem struct{ root string }
@@ -24,7 +24,7 @@ func (this *DiskFileSystem) RootPath() string {
 	return this.root
 }
 
-func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
+func (this *DiskFileSystem) Listing() (listing []legacy_contracts.FileInfo) {
 	listingFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -65,7 +65,7 @@ func (this *DiskFileSystem) Listing() (listing []contracts.FileInfo) {
 	return listing
 }
 
-func (this *DiskFileSystem) Stat(path string) (contracts.FileInfo, error) {
+func (this *DiskFileSystem) Stat(path string) (legacy_contracts.FileInfo, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
