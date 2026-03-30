@@ -2,22 +2,26 @@ package core
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type FileListingIntegrityChecker struct {
-	fileSystem legacy_contracts.FileChecker
+	fileSystem plumbing.FileChecker
+	emit       func(contracts.Event)
 }
 
-func NewFileListingIntegrityChecker(fileSystem legacy_contracts.FileChecker) *FileListingIntegrityChecker {
-	return &FileListingIntegrityChecker{fileSystem: fileSystem}
+func NewFileListingIntegrityChecker(fileSystem plumbing.FileChecker, emit func(contracts.Event)) *FileListingIntegrityChecker {
+	if emit == nil {
+		emit = func(contracts.Event) {}
+	}
+	return &FileListingIntegrityChecker{fileSystem: fileSystem, emit: emit}
 }
 
-func (this *FileListingIntegrityChecker) Verify(manifest legacy_contracts.Manifest, localPath string) error {
+func (this *FileListingIntegrityChecker) Verify(manifest plumbing.Manifest, localPath string) error {
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		fileInfo, err := this.fileSystem.Stat(fullPath)
@@ -28,6 +32,6 @@ func (this *FileListingIntegrityChecker) Verify(manifest legacy_contracts.Manife
 			return fmt.Errorf("file size mismatch for \"%s\"(expected: [%d], actual: [%d])", fullPath, item.Size, fileInfo.Size())
 		}
 	}
-	log.Printf("Listing integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Listing integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)})
 	return nil
 }

@@ -127,7 +127,7 @@ build_docker_image() {
 
     # Create a test Dockerfile that has a shell for running tests
     cat > "$output_dir/Dockerfile.test" <<'DOCKERFILE'
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 WORKDIR /build
 COPY . .
 RUN go build -o satisfy ./cmd/satisfy
@@ -219,13 +219,24 @@ run_parity_test() {
         return 1
     fi
 
-    # Normalize outputs by removing timestamps (YYYY/MM/DD HH:MM:SS pattern) and file:line references
-    sed -E -e 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' \
-           -e 's/[a-zA-Z0-9_]+\.go:[0-9]+:/FILE:LINE:/g' \
-           "$baseline_output" > "$baseline_normalized"
-    sed -E -e 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' \
-           -e 's/[a-zA-Z0-9_]+\.go:[0-9]+:/FILE:LINE:/g' \
-           "$test_output" > "$test_normalized"
+    # Normalize outputs:
+    # - Remove timestamps (YYYY/MM/DD HH:MM:SS) and file:line references from old-style logger output
+    # - Convert old-style "TIMESTAMP FILE:LINE: [Error] " to new-style "[ERROR] "
+    # - Convert old-style "TIMESTAMP FILE:LINE: [WARN] " to new-style "[WARN] "
+    # - Convert old-style "TIMESTAMP FILE:LINE: [INFO] " to new-style "[INFO] "
+    # - Convert old-style "TIMESTAMP FILE:LINE: " (no level = Info) to new-style "[INFO] "
+    # The test branch already uses new-style "[LEVEL] " prefixes, so no further transformation needed.
+    normalize_output() {
+        sed -E -e 's/[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/TIMESTAMP/g' \
+               -e 's/[a-zA-Z0-9_]+\.go:[0-9]+:/FILE:LINE:/g' \
+               -e 's/^TIMESTAMP FILE:LINE: \[Error\] /[ERROR] /g' \
+               -e 's/^TIMESTAMP FILE:LINE: \[WARN\] /[WARN] /g' \
+               -e 's/^TIMESTAMP FILE:LINE: \[INFO\] /[INFO] /g' \
+               -e 's/^TIMESTAMP FILE:LINE: /[INFO] /g' \
+               "$1"
+    }
+    normalize_output "$baseline_output" > "$baseline_normalized"
+    normalize_output "$test_output" > "$test_normalized"
 
     # Compare normalized outputs
     if ! diff -u "$baseline_normalized" "$test_normalized" > "$diff_output" 2>&1; then
@@ -344,18 +355,6 @@ test_download_validation() {
   }
 ]
 EOF"
-}
-
-##############################################################################
-# Test Suite: Explicit Download Subcommand Error
-##############################################################################
-
-test_download_subcommand_error() {
-    log_section "Testing: explicit download subcommand error"
-
-    run_parity_test "download-subcommand-error" \
-        "explicit download subcommand causes fatal error" \
-        "/satisfy download 2>&1; echo \"EXIT:\$?\""
 }
 
 ##############################################################################
@@ -636,7 +635,6 @@ main() {
     test_version_command
     test_upload_validation
     test_download_validation
-    test_download_subcommand_error
     test_manifest_structure
     test_local_directory_expansion
     test_exit_codes

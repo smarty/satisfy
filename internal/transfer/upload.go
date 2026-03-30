@@ -6,9 +6,9 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"hash"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,8 +17,8 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/internal/core"
+	"github.com/smarty/satisfy/internal/plumbing"
 	"github.com/smarty/satisfy/internal/shell"
-	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 const ForceAccessTokenRefreshInSeconds = 1800
@@ -30,103 +30,127 @@ type UploadApp struct {
 	hasher        hash.Hash
 	compressor    io.WriteCloser
 	builder       core.PackageBuilder
-	manifest      legacy_contracts.Manifest
-	client        legacy_contracts.RemoteStorage
+	manifest      plumbing.Manifest
+	client        plumbing.RemoteStorage
 }
 
 func NewUploadApp(config contracts.UploadConfiguration) *UploadApp {
-	runPreUploadCheck(config)
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
-func runPreUploadCheck(config contracts.UploadConfiguration) {
-	if config.Overwrite {
-		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
-		return
-	}
+func (this *UploadApp) Run(yield func(contracts.Event, error) bool) {
+	emit := func(e contracts.Event) { yield(e, nil) }
 
-	client := shell.NewHTTPClient()
-	gcsClient := shell.NewGoogleCloudStorageClient(client, config.GoogleCredentials, []int{http.StatusNotFound})
-	retryClient := core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)
-
-	address := config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
-	body, err := retryClient.Download(address)
-	if err == nil {
-		_ = body.Close()
-		return
-	}
-
-	statusError, ok := err.(*legacy_contracts.StatusCodeError)
-	if ok && statusError.StatusCode() == http.StatusOK {
-		log.Println("[INFO] Package already exists on remote storage.")
-		os.Exit(2)
-	}
-
-	log.Fatalln("[WARN] Sanity check failed:", err)
-}
-
-func (this *UploadApp) Run() {
-	this.buildRemoteStorageClient()
-
-	start := time.Now().UTC()
-
-	this.buildArchiveAndManifestContents()
-	this.completeManifest()
-
-	log.Println("Manifest:", this.dumpManifest())
-
-	// TEMPORARY WORKAROUND
-	// If the compression took over 30 minutes, we need to refresh the bearer token
-	// so we have time to upload the archive and manifest before it expires.
-	// Other Resolution Thoughts:
-	// Perhaps the retry client can be modified to handle 401 errors and refresh the token,
-	// The problem with this approach is if the file to upload is large, the 401 does not occur until after
-	// the entire time is spent to upload the file, so it does not fail fast. If we attempted to upload
-	// the manifest first it could be a fast fail.
-	if time.Now().UTC().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
-		var err error
-		this.config.GoogleCredentials, err = this.config.CredentialReader.Read(context.Background(), "")
-		this.buildRemoteStorageClient()
-		if err != nil {
-			log.Println("[Error] Cannot refresh token: ", err)
+	if !this.config.Overwrite {
+		client := shell.NewHTTPClient()
+		gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusNotFound})
+		retryClient := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep, emit)
+		address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
+		body, err := retryClient.Download(address)
+		if err == nil {
+			_ = body.Close()
+		} else if code, ok := contracts.StatusCode(err); ok && code == http.StatusOK {
+			yield(contracts.Event{}, contracts.ErrPackageExists)
+			return
+		} else {
+			yield(contracts.Event{}, fmt.Errorf("sanity check failed: %w", err))
+			return
 		}
 	}
 
-	log.Println("Uploading the archive...")
-	this.upload(this.buildArchiveUploadRequest())
-	this.closeArchiveFile()
-	this.deleteLocalArchiveFile()
+	this.buildRemoteStorageClient(emit)
+	start := time.Now().UTC()
 
-	log.Println("Uploading the manifest...")
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
-}
+	if err := this.buildArchiveAndManifestContents(emit); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
 
-func (this *UploadApp) buildArchiveUploadRequest() legacy_contracts.UploadRequest {
-	this.openArchiveFile()
-	return legacy_contracts.UploadRequest{
-		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
-		Body:          NewFileWrapper(this.file),
-		Size:          int64(this.manifest.Archive.Size),
-		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
-		Checksum:      this.manifest.Archive.MD5Checksum,
+	if err := this.completeManifest(); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	manifestStr, err := this.dumpManifest()
+	if err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if !yield(contracts.Event{Type: contracts.EventInfo, Message: "Manifest: " + manifestStr}, nil) {
+		return
+	}
+
+	if time.Now().UTC().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
+		creds, refreshErr := this.config.CredentialReader.Read(context.Background(), "")
+		this.config.GoogleCredentials = creds
+		this.buildRemoteStorageClient(emit)
+		if refreshErr != nil {
+			if !yield(contracts.Event{Type: contracts.EventWarning, Message: fmt.Sprintf("Cannot refresh token: %v", refreshErr)}, nil) {
+				return
+			}
+		}
+	}
+
+	if !yield(contracts.Event{Type: contracts.EventInfo, Message: "Uploading the archive..."}, nil) {
+		return
+	}
+
+	archiveReq, err := this.buildArchiveUploadRequest()
+	if err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if err = this.client.Upload(archiveReq); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if err = this.closeArchiveFile(); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if err = this.deleteLocalArchiveFile(); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if !yield(contracts.Event{Type: contracts.EventInfo, Message: "Uploading the manifest..."}, nil) {
+		return
+	}
+
+	if err = this.client.Upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename))); err != nil {
+		yield(contracts.Event{}, err)
+		return
+	}
+
+	if err = this.client.Upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress())); err != nil {
+		yield(contracts.Event{}, err)
+		return
 	}
 }
 
-func (this *UploadApp) buildArchiveAndManifestContents() {
+func (this *UploadApp) buildArchiveAndManifestContents(emit func(contracts.Event)) error {
 	var err error
 	this.file, err = os.CreateTemp("", "")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
 	this.hasher = md5.New()
 	writer := io.MultiWriter(this.hasher, this.file)
-	this.InitializeCompressor(writer)
+
+	if err = this.initializeCompressor(writer); err != nil {
+		return err
+	}
 
 	sourcePath := this.packageConfig.SourcePath
 	if sourcePath == "" {
 		sourcePath = this.packageConfig.SourceDirectory
 	}
+
 	if sourcePath == "" {
 		sourcePath = this.packageConfig.SourceFile
 	}
@@ -136,57 +160,66 @@ func (this *UploadApp) buildArchiveAndManifestContents() {
 		shell.NewSwitchArchiveWriter(this.compressor),
 		md5.New(),
 		this.config.NewProgress,
+		emit,
 	)
 
-	err = this.builder.Build()
-	if err != nil {
-		log.Fatal(err)
+	if err = this.builder.Build(); err != nil {
+		return err
 	}
 
-	err = this.compressor.Close()
-	if err != nil {
-		log.Fatal(err)
+	if err = this.compressor.Close(); err != nil {
+		return err
 	}
 
-	this.closeArchiveFile()
+	return this.closeArchiveFile()
 }
 
-func (this *UploadApp) InitializeCompressor(writer io.Writer) {
+func (this *UploadApp) initializeCompressor(writer io.Writer) error {
 	factory, found := compression[this.packageConfig.CompressionAlgorithm]
 	if !found {
-		log.Fatalln("Unsupported compression algorithm:", this.packageConfig.CompressionAlgorithm)
+		return fmt.Errorf("unsupported compression algorithm: %s", this.packageConfig.CompressionAlgorithm)
 	}
-	this.compressor = factory(writer, this.packageConfig.CompressionLevel)
+
+	var err error
+	this.compressor, err = factory(writer, this.packageConfig.CompressionLevel)
+	return err
 }
 
-var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
-	"zstd": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
-		if err != nil {
-			log.Fatal(err)
-		}
-		return compressor
+var compression = map[string]func(_ io.Writer, level int) (io.WriteCloser, error){
+	"zstd": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		return zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 	},
-	"gzip": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := gzip.NewWriterLevel(writer, level)
-		if err != nil {
-			log.Panicln(err)
-		}
-		return compressor
+	"gzip": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		return gzip.NewWriterLevel(writer, level)
 	},
-	"zip": func(writer io.Writer, level int) io.WriteCloser {
-		return shell.NewZipArchiveWriter(writer, level)
+	"zip": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		return shell.NewZipArchiveWriter(writer, level), nil
 	},
 }
+
 var contentType = map[string]string{
 	"zstd": "application/zstd",
 	"gzip": "application/gzip",
 	"zip":  "application/zip",
 }
 
-func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) legacy_contracts.UploadRequest {
+func (this *UploadApp) buildArchiveUploadRequest() (plumbing.UploadRequest, error) {
+	if err := this.openArchiveFile(); err != nil {
+		return plumbing.UploadRequest{}, err
+	}
+
+	return plumbing.UploadRequest{
+		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
+		Body:          NewFileWrapper(this.file),
+		Size:          int64(this.manifest.Archive.Size),
+		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
+		Checksum:      this.manifest.Archive.MD5Checksum,
+	}, nil
+}
+
+func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) plumbing.UploadRequest {
 	buffer := this.writeManifestToBuffer()
-	return legacy_contracts.UploadRequest{
+	return plumbing.UploadRequest{
 		RemoteAddress: remoteAddress,
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
@@ -195,21 +228,22 @@ func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) legacy_
 	}
 }
 
-func (this *UploadApp) buildRemoteStorageClient() {
+func (this *UploadApp) buildRemoteStorageClient(emit func(contracts.Event)) {
 	client := shell.NewHTTPClient()
 	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusOK})
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep, emit)
 }
 
-func (this *UploadApp) completeManifest() {
+func (this *UploadApp) completeManifest() error {
 	fileInfo, err := os.Stat(this.file.Name())
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	this.manifest = legacy_contracts.Manifest{
+
+	this.manifest = plumbing.Manifest{
 		Name:    this.packageConfig.PackageName,
 		Version: this.packageConfig.PackageVersion,
-		Archive: legacy_contracts.Archive{
+		Archive: plumbing.Archive{
 			Filename:             contracts.RemoteArchiveFilename,
 			Size:                 uint64(fileInfo.Size()),
 			MD5Checksum:          this.hasher.Sum(nil),
@@ -217,35 +251,22 @@ func (this *UploadApp) completeManifest() {
 			CompressionAlgorithm: this.packageConfig.CompressionAlgorithm,
 		},
 	}
+
+	return nil
 }
 
-func (this *UploadApp) closeArchiveFile() {
-	err := this.file.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+func (this *UploadApp) closeArchiveFile() error {
+	return this.file.Close()
 }
 
-func (this *UploadApp) deleteLocalArchiveFile() {
-	err := os.Remove(this.file.Name())
-	if err != nil {
-		log.Fatal(err)
-	}
+func (this *UploadApp) deleteLocalArchiveFile() error {
+	return os.Remove(this.file.Name())
 }
 
-func (this *UploadApp) openArchiveFile() {
+func (this *UploadApp) openArchiveFile() error {
 	var err error
 	this.file, err = os.Open(this.file.Name())
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *UploadApp) upload(request legacy_contracts.UploadRequest) {
-	err := this.client.Upload(request)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return err
 }
 
 func (this *UploadApp) writeManifestToBuffer() *bytes.Buffer {
@@ -258,10 +279,11 @@ func (this *UploadApp) writeManifestToBuffer() *bytes.Buffer {
 	return buffer
 }
 
-func (this *UploadApp) dumpManifest() string {
+func (this *UploadApp) dumpManifest() (string, error) {
 	raw, err := json.MarshalIndent(this.manifest, "", "  ")
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
-	return "\n" + string(raw)
+
+	return "\n" + string(raw), nil
 }

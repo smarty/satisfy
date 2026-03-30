@@ -1,4 +1,4 @@
-package legacy_contracts
+package plumbing
 
 import (
 	"io"
@@ -6,22 +6,20 @@ import (
 	"time"
 )
 
-// FUTURE: make each file system path return any underlying error.
-
 type PathLister interface {
-	Listing() []FileInfo
+	Listing() ([]FileInfo, error)
 }
 
 type FileOpener interface {
-	Open(path string) io.ReadCloser
+	Open(path string) (io.ReadCloser, error)
 }
 
 type FileCreator interface {
-	Create(path string) io.WriteCloser
+	Create(path string) (io.WriteCloser, error)
 }
 
 type SymlinkCreator interface {
-	CreateSymlink(source, target string)
+	CreateSymlink(source, target string) error
 }
 
 type FileReader interface {
@@ -29,11 +27,11 @@ type FileReader interface {
 }
 
 type FileWriter interface {
-	WriteFile(path string, content []byte)
+	WriteFile(path string, content []byte) error
 }
 
 type Deleter interface {
-	Delete(path string)
+	Delete(path string) error
 }
 
 type FileChecker interface {
@@ -54,8 +52,4 @@ type RootPath interface {
 
 type Chmod interface {
 	Chmod(name string, mode os.FileMode) error
-}
-
-func IsExecutable(mode os.FileMode) bool {
-	return mode.Perm()&0111 > 0
 }

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"iter"
 	"os"
 
 	"github.com/smarty/gcs"
@@ -33,10 +34,10 @@ func emitExampleDependenciesFile() {
 
 	raw, err := json.MarshalIndent(listing, "", "  ")
 	if err != nil {
-		logger.LogClean("%v", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
 
-	logger.LogLineClean("Example json file: %s", string(raw))
+	fmt.Fprintf(os.Stderr, "Example json file: %s\n", string(raw))
 }
 
 func loadDependencyListing(path string, filter []string) (contracts.DependencyListing, error) {
@@ -51,7 +52,6 @@ func loadDependencyListing(path string, filter []string) (contracts.DependencyLi
 
 	dependencies.Listing = contracts.Filter(dependencies.Listing, filter)
 	if len(dependencies.Listing) == 0 {
-		logger.LogLine(contracts.Warning, "No dependencies provided. You can go about your business. Move along.")
 		return dependencies, contracts.ErrNoDependenciesMatch
 	}
 
@@ -64,9 +64,9 @@ func newVaultCredentialsReader() gcs.CredentialsReader {
 	)
 }
 
-func parseCheck(args []string) (contracts.CheckConfiguration, error) {
+func parseCheck(args []string) (contracts.CheckConfiguration, iter.Seq2[contracts.Event, error]) {
 	flags := flag.NewFlagSet("satisfy check", flag.ContinueOnError)
-	flags.SetOutput(logger.WriterErr())
+	flags.SetOutput(os.Stderr)
 
 	var jsonPath string
 	var maxRetry int
@@ -79,45 +79,48 @@ func parseCheck(args []string) (contracts.CheckConfiguration, error) {
 		"When set, always upload package, even when it already exists at specified remote location.")
 
 	flags.Usage = func() {
-		logger.LogLineClean("Usage of %s:", flags.Name())
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", flags.Name())
 		flags.PrintDefaults()
-		logger.LogLineClean("")
-		logger.LogLineClean("exit code 0: success")
-		logger.LogLineClean("exit code 1: general failure (see stderr for details)")
-		logger.LogLineClean("exit code 2: package has already been uploaded")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "exit code 0: success")
+		fmt.Fprintln(os.Stderr, "exit code 1: general failure (see stderr for details)")
+		fmt.Fprintln(os.Stderr, "exit code 2: package has already been uploaded")
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
-		return contracts.CheckConfiguration{}, err
+		return contracts.CheckConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventWarning, Message: fmt.Sprintf("Unable to parse command line flags: %v", err),
+		}, err)
 	}
 
 	pkgConfig, err := readPackageConfig(jsonPath)
 	if err != nil {
-		logger.LogLine(contracts.Error, "Error parsing configuration file: %v", err)
-		return contracts.CheckConfiguration{}, err
-	}
-
-	if err = validatePackageConfig(pkgConfig, maxRetry); err != nil {
-		return contracts.CheckConfiguration{}, err
+		return contracts.CheckConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventFailure, Message: fmt.Sprintf("Error parsing configuration file: [%v]", err),
+		}, err)
 	}
 
 	credReader := newVaultCredentialsReader()
 	creds, err := credReader.Read(context.Background(), "")
 	if err != nil {
-		logger.LogLine(contracts.Error, "Google authentication failed: %v", err)
-		return contracts.CheckConfiguration{}, err
+		return contracts.CheckConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventFailure, Message: fmt.Sprintf("Google authentication failed: [%v]", err),
+		}, err)
+	}
+
+	if err = validatePackageConfig(pkgConfig, maxRetry); err != nil {
+		return contracts.CheckConfiguration{}, errSeq(err)
 	}
 
 	return contracts.NewCheckConfiguration(creds, credReader, pkgConfig,
 		contracts.CheckMaxRetry(maxRetry),
 		contracts.CheckOverwrite(overwrite),
-	), nil
+	), func(yield func(contracts.Event, error) bool) {}
 }
 
-func parseDownload(args []string) (contracts.DownloadConfiguration, error) {
+func parseDownload(args []string) (contracts.DownloadConfiguration, iter.Seq2[contracts.Event, error]) {
 	flags := flag.NewFlagSet("satisfy", flag.ContinueOnError)
-	flags.SetOutput(logger.WriterErr())
+	flags.SetOutput(os.Stderr)
 
 	var jsonPath string
 	var maxRetry int
@@ -133,37 +136,48 @@ func parseDownload(args []string) (contracts.DownloadConfiguration, error) {
 		fmt.Sprintf("Path to dependency listing or, if equal to %q, read from stdin.", stdInPath))
 
 	flags.Usage = func() {
-		logger.LogLineClean("Usage of %s:", flags.Name())
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", flags.Name())
 		flags.PrintDefaults()
-		logger.LogLineClean("")
-		logger.LogLineClean("  Package names may be passed as non-flag arguments and will serve as a filter " +
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "  Package names may be passed as non-flag arguments and will serve as a filter "+
 			"against the provided dependency listing.")
-		logger.LogLineClean("  The satisfy tool also provides 2 additional subcommands:")
-		logger.LogLineClean("")
-		logger.LogLineClean("	check	Has package@version already been uploaded according to json config?")
-		logger.LogLineClean("	upload	Upload package contents according to json config.")
-		logger.LogLineClean("")
+		fmt.Fprintln(os.Stderr, "  The satisfy tool also provides 2 additional subcommands:")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "\tcheck\tHas package@version already been uploaded according to json config?")
+		fmt.Fprintln(os.Stderr, "\tupload\tUpload package contents according to json config.")
+		fmt.Fprintln(os.Stderr, "")
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
-		return contracts.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventWarning, Message: fmt.Sprintf("Unable to parse command line flags: %v", err),
+		}, err)
 	}
 
 	deps, err := loadDependencyListing(jsonPath, flags.Args())
 	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
-		emitExampleDependenciesFile()
-		return contracts.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, func(yield func(contracts.Event, error) bool) {
+			if !yield(contracts.Event{
+				Type:    contracts.EventWarning,
+				Message: "No dependencies provided. You can go about your business. Move along.",
+			}, nil) {
+				return
+			}
+
+			emitExampleDependenciesFile()
+			yield(contracts.Event{}, err)
+		}
 	}
 
 	if err != nil {
-		logger.LogLine(contracts.Warning, "Unable to load dependency listing: %v", err)
-		return contracts.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventWarning, Message: fmt.Sprintf("Unable to load dependency listing: %v", err),
+		}, err)
 	}
 
 	creds, err := gcs.NewCredentialsReader().Read(context.Background(), deps.Credentials)
 	if err != nil {
-		return contracts.DownloadConfiguration{}, err
+		return contracts.DownloadConfiguration{}, errSeq(err)
 	}
 
 	var downloadProgress func(int64) io.WriteCloser
@@ -183,12 +197,12 @@ func parseDownload(args []string) (contracts.DownloadConfiguration, error) {
 		contracts.DownloadMaxRetry(maxRetry),
 		contracts.DownloadQuickVerification(quickVerification),
 		contracts.DownloadProgress(downloadProgress),
-	), nil
+	), func(yield func(contracts.Event, error) bool) {}
 }
 
-func parseUpload(args []string) (contracts.UploadConfiguration, error) {
+func parseUpload(args []string) (contracts.UploadConfiguration, iter.Seq2[contracts.Event, error]) {
 	flags := flag.NewFlagSet("satisfy upload", flag.ContinueOnError)
-	flags.SetOutput(logger.WriterErr())
+	flags.SetOutput(os.Stderr)
 
 	var jsonPath string
 	var maxRetry int
@@ -204,34 +218,37 @@ func parseUpload(args []string) (contracts.UploadConfiguration, error) {
 		"Displays progress stats as files are added to the archive.")
 
 	flags.Usage = func() {
-		logger.LogLineClean("Usage of %s:", flags.Name())
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", flags.Name())
 		flags.PrintDefaults()
-		logger.LogLineClean("")
-		logger.LogLineClean("exit code 0: success")
-		logger.LogLineClean("exit code 1: general failure (see stderr for details)")
-		logger.LogLineClean("exit code 2: package has already been uploaded")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "exit code 0: success")
+		fmt.Fprintln(os.Stderr, "exit code 1: general failure (see stderr for details)")
+		fmt.Fprintln(os.Stderr, "exit code 2: package has already been uploaded")
 	}
 
 	if err := flags.Parse(args); err != nil {
-		logger.LogLine(contracts.Warning, "Unable to parse command line flags: %v", err)
-		return contracts.UploadConfiguration{}, err
+		return contracts.UploadConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventWarning, Message: fmt.Sprintf("Unable to parse command line flags: %v", err),
+		}, err)
 	}
 
 	pkgConfig, err := readPackageConfig(jsonPath)
 	if err != nil {
-		logger.LogLine(contracts.Error, "Error parsing configuration file: [%v]", err)
-		return contracts.UploadConfiguration{}, err
+		return contracts.UploadConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventFailure, Message: fmt.Sprintf("Error parsing configuration file: [%v]", err),
+		}, err)
 	}
 
 	credReader := newVaultCredentialsReader()
 	creds, err := credReader.Read(context.Background(), "")
 	if err != nil {
-		logger.LogLine(contracts.Error, "Google authentication failed: [%v]", err)
-		return contracts.UploadConfiguration{}, err
+		return contracts.UploadConfiguration{}, eventErrSeq(contracts.Event{
+			Type: contracts.EventFailure, Message: fmt.Sprintf("Google authentication failed: [%v]", err),
+		}, err)
 	}
 
 	if err = validatePackageConfig(pkgConfig, maxRetry); err != nil {
-		return contracts.UploadConfiguration{}, err
+		return contracts.UploadConfiguration{}, errSeq(err)
 	}
 
 	var uploadProgress func(int64) io.WriteCloser
@@ -251,7 +268,7 @@ func parseUpload(args []string) (contracts.UploadConfiguration, error) {
 		contracts.UploadMaxRetry(maxRetry),
 		contracts.UploadOverwrite(overwrite),
 		contracts.UploadProgress(uploadProgress),
-	), nil
+	), func(yield func(contracts.Event, error) bool) {}
 }
 
 func readDependencyListing(path string) (contracts.DependencyListing, error) {

@@ -7,7 +7,8 @@ import (
 	"net/url"
 
 	"github.com/smarty/gcs"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type GoogleCloudStorageClient struct {
@@ -20,7 +21,7 @@ func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credential
 	return &GoogleCloudStorageClient{client: client, credentials: credentials, expectedStatus: expectedStatus}
 }
 
-func (this *GoogleCloudStorageClient) Upload(request legacy_contracts.UploadRequest) error {
+func (this *GoogleCloudStorageClient) Upload(request plumbing.UploadRequest) error {
 	gcsRequest, err := gcs.NewRequest("PUT",
 		gcs.WithCredentials(this.credentials),
 		gcs.WithBucket(request.RemoteAddress.Host),
@@ -35,7 +36,7 @@ func (this *GoogleCloudStorageClient) Upload(request legacy_contracts.UploadRequ
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return fmt.Errorf("http error: %s (%w)", err, legacy_contracts.RetryErr)
+		return fmt.Errorf("http error: %s (%w)", err, contracts.ErrRetry)
 	}
 	defer func() { _ = response.Body.Close() }()
 
@@ -43,9 +44,9 @@ func (this *GoogleCloudStorageClient) Upload(request legacy_contracts.UploadRequ
 
 	if this.isExpectedStatus(response.StatusCode) == false {
 		if this.isSafeRetryStatus(response.StatusCode) {
-			return fmt.Errorf("http error: %d (%w)", response.StatusCode, legacy_contracts.RetryErr)
+			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.ErrRetry)
 		}
-		return legacy_contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
+		return contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
 	}
 	return nil
 }
@@ -61,10 +62,10 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return nil, fmt.Errorf("http error: %s (%w)", err, legacy_contracts.RetryErr)
+		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.ErrRetry)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
-		return nil, legacy_contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
+		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
 	}
 	return response.Body, nil
 }
@@ -81,10 +82,10 @@ func (this *GoogleCloudStorageClient) Seek(request url.URL, start, end int64) (i
 	gcsRequest.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return nil, fmt.Errorf("http error: %s (%w)", err, legacy_contracts.RetryErr)
+		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.ErrRetry)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
-		return nil, legacy_contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
+		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
 	}
 	return response.Body, nil
 }
@@ -101,10 +102,10 @@ func (this *GoogleCloudStorageClient) Size(request url.URL) (int64, error) {
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return 0, fmt.Errorf("http error: %s (%w)", err, legacy_contracts.RetryErr)
+		return 0, fmt.Errorf("http error: %s (%w)", err, contracts.ErrRetry)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
-		return 0, legacy_contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
+		return 0, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
 	}
 	return response.ContentLength, nil
 }

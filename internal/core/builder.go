@@ -4,69 +4,83 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"log"
 	"path/filepath"
 	"strings"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type PackageBuilder interface {
 	Build() error
-	Contents() []legacy_contracts.ArchiveItem
+	Contents() []plumbing.ArchiveItem
 }
 
 type DirectoryPackageBuilderFileSystem interface {
-	legacy_contracts.PathLister
-	legacy_contracts.FileOpener
-	legacy_contracts.RootPath
+	plumbing.PathLister
+	plumbing.FileOpener
+	plumbing.RootPath
 }
 
 type DirectoryPackageBuilder struct {
 	storage     DirectoryPackageBuilderFileSystem
-	archive     legacy_contracts.ArchiveWriter
+	archive     plumbing.ArchiveWriter
 	hasher      hash.Hash
-	contents    []legacy_contracts.ArchiveItem
+	contents    []plumbing.ArchiveItem
+	emit        func(contracts.Event)
 	newProgress func(int64) io.WriteCloser
+	listing     []plumbing.FileInfo
 }
 
-func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive legacy_contracts.ArchiveWriter, hasher hash.Hash, newProgress func(int64) io.WriteCloser) PackageBuilder {
+func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive plumbing.ArchiveWriter, hasher hash.Hash, newProgress func(int64) io.WriteCloser, emit func(contracts.Event)) PackageBuilder {
 	if newProgress == nil {
 		newProgress = noopProgress
+	}
+
+	if emit == nil {
+		emit = func(contracts.Event) {}
 	}
 
 	return &DirectoryPackageBuilder{
 		storage:     storage,
 		archive:     archive,
 		hasher:      hasher,
+		emit:        emit,
 		newProgress: newProgress,
 	}
 }
 
 func (this *DirectoryPackageBuilder) Build() error {
-	if fileInfo, ok := this.fileOnly(); ok == true {
-		err := this.add(fileInfo, true)
-		if err != nil {
+	var err error
+	this.listing, err = this.storage.Listing()
+	if err != nil {
+		return err
+	}
+
+	if fileInfo, ok := this.fileOnly(); ok {
+		if err = this.add(fileInfo, true); err != nil {
 			return err
 		}
 	} else {
-		for _, file := range this.storage.Listing() {
-			err := this.add(file, false)
-			if err != nil {
+		for _, file := range this.listing {
+			if err = this.add(file, false); err != nil {
 				return err
 			}
 		}
 	}
+
 	return this.archive.Close()
 }
 
-func (this *DirectoryPackageBuilder) add(file legacy_contracts.FileInfo, fileOnly bool) error {
-	log.Printf("Adding \"%s\" to archive.", file.Path())
+func (this *DirectoryPackageBuilder) add(file plumbing.FileInfo, fileOnly bool) error {
+	this.emit(contracts.Event{Type: contracts.EventProgress, Message: fmt.Sprintf("Adding %q to archive.", file.Path())})
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
 		return err
 	}
-	this.archive.WriteHeader(header)
+	if err = this.archive.WriteHeader(header); err != nil {
+		return err
+	}
 	err = this.archiveContents(file, header.LinkName)
 	if err != nil {
 		return err
@@ -75,7 +89,7 @@ func (this *DirectoryPackageBuilder) add(file legacy_contracts.FileInfo, fileOnl
 	return err
 }
 
-func (this *DirectoryPackageBuilder) archiveContents(file legacy_contracts.FileInfo, symlinkSourcePath string) error {
+func (this *DirectoryPackageBuilder) archiveContents(file plumbing.FileInfo, symlinkSourcePath string) error {
 	if symlinkSourcePath != "" {
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
@@ -83,14 +97,17 @@ func (this *DirectoryPackageBuilder) archiveContents(file legacy_contracts.FileI
 	progressWriter := this.newProgress(file.Size())
 	defer closeResource(progressWriter)
 	writer := io.MultiWriter(this.hasher, this.archive, progressWriter)
-	reader := this.storage.Open(file.Path())
+	reader, err := this.storage.Open(file.Path())
+	if err != nil {
+		return err
+	}
 	defer closeResource(reader)
-	_, err := io.Copy(writer, reader)
+	_, err = io.Copy(writer, reader)
 
 	return err
 }
 
-func (this *DirectoryPackageBuilder) buildHeader(file legacy_contracts.FileInfo, fileOnly bool) (header legacy_contracts.ArchiveHeader, err error) {
+func (this *DirectoryPackageBuilder) buildHeader(file plumbing.FileInfo, fileOnly bool) (header plumbing.ArchiveHeader, err error) {
 	if fileOnly {
 		header.Name = filepath.Base(file.Path())
 	} else {
@@ -98,7 +115,7 @@ func (this *DirectoryPackageBuilder) buildHeader(file legacy_contracts.FileInfo,
 	}
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
-	header.Executable = legacy_contracts.IsExecutable(file.Mode())
+	header.Executable = IsExecutable(file.Mode())
 	if file.Symlink() == "" {
 		return header, nil
 	}
@@ -110,7 +127,7 @@ func (this *DirectoryPackageBuilder) buildHeader(file legacy_contracts.FileInfo,
 	return header, err
 }
 
-func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file legacy_contracts.FileInfo) (string, error) {
+func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file plumbing.FileInfo) (string, error) {
 	path := file.Symlink()
 	if this.isAbsolute(path) {
 		return filepath.Rel(filepath.Dir(file.Path()), path)
@@ -120,7 +137,7 @@ func (this *DirectoryPackageBuilder) relativeLinkSourcePath(file legacy_contract
 	return filepath.Rel(filepath.Dir(file.Path()), path)
 }
 
-func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file legacy_contracts.FileInfo) error {
+func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file plumbing.FileInfo) error {
 	return fmt.Errorf(
 		"the file \"%s\" is a symlink that refers to \"%s\" which is outside of the configured root directory: \"%s\"",
 		file.Path(),
@@ -128,7 +145,7 @@ func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file legacy_contract
 		this.storage.RootPath())
 }
 
-func (this *DirectoryPackageBuilder) buildManifestEntry(file legacy_contracts.FileInfo, symlinkSourcePath string) legacy_contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) buildManifestEntry(file plumbing.FileInfo, symlinkSourcePath string) plumbing.ArchiveItem {
 	defer this.hasher.Reset()
 	var path string
 	if _, ok := this.fileOnly(); ok == true {
@@ -137,25 +154,25 @@ func (this *DirectoryPackageBuilder) buildManifestEntry(file legacy_contracts.Fi
 		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
 	}
 
-	return legacy_contracts.ArchiveItem{
+	return plumbing.ArchiveItem{
 		Path:        path,
 		Size:        this.determineFileSize(file, symlinkSourcePath),
 		MD5Checksum: this.hasher.Sum(nil),
 	}
 }
 
-func (this *DirectoryPackageBuilder) determineFileSize(file legacy_contracts.FileInfo, symlinkSourcePath string) int64 {
+func (this *DirectoryPackageBuilder) determineFileSize(file plumbing.FileInfo, symlinkSourcePath string) int64 {
 	if symlinkSourcePath == "" {
 		return file.Size()
 	}
 	return int64(len(symlinkSourcePath))
 }
 
-func (this *DirectoryPackageBuilder) Contents() []legacy_contracts.ArchiveItem {
+func (this *DirectoryPackageBuilder) Contents() []plumbing.ArchiveItem {
 	return this.contents
 }
 
-func (this *DirectoryPackageBuilder) outOfBounds(info legacy_contracts.FileInfo) bool {
+func (this *DirectoryPackageBuilder) outOfBounds(info plumbing.FileInfo) bool {
 	if this.isAbsolute(info.Symlink()) {
 		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
 	}
@@ -167,10 +184,10 @@ func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 	return strings.HasPrefix(path, "/")
 }
 
-func (this *DirectoryPackageBuilder) fileOnly() (legacy_contracts.FileInfo, bool) {
-	if len(this.storage.Listing()) == 1 {
-		if this.storage.Listing()[0].Mode().IsRegular() {
-			return this.storage.Listing()[0], true
+func (this *DirectoryPackageBuilder) fileOnly() (plumbing.FileInfo, bool) {
+	if len(this.listing) == 1 {
+		if this.listing[0].Mode().IsRegular() {
+			return this.listing[0], true
 		}
 	}
 	return nil, false

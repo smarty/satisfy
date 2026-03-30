@@ -9,46 +9,51 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 	"github.com/smarty/satisfy/internal/shell"
-	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 // Compile-time check of interface implementations.
-var _ legacy_contracts.DownloadSetter = (*shell.ZipArchiveReader)(nil)
+var _ plumbing.DownloadSetter = (*shell.ZipArchiveReader)(nil)
 
 type PackageInstallerFileSystem interface {
-	legacy_contracts.FileCreator
-	legacy_contracts.FileWriter
-	legacy_contracts.Deleter
-	legacy_contracts.SymlinkCreator
-	legacy_contracts.Chmod
+	plumbing.FileCreator
+	plumbing.FileWriter
+	plumbing.Deleter
+	plumbing.SymlinkCreator
+	plumbing.Chmod
 }
 
 type PackageInstaller struct {
-	downloader  legacy_contracts.Downloader
+	downloader  plumbing.Downloader
 	filesystem  PackageInstallerFileSystem
+	emit        func(contracts.Event)
 	newProgress func(int64) io.WriteCloser
 }
 
-func NewPackageInstaller(downloader legacy_contracts.Downloader, filesystem PackageInstallerFileSystem, newProgress func(int64) io.WriteCloser) *PackageInstaller {
+func NewPackageInstaller(downloader plumbing.Downloader, filesystem PackageInstallerFileSystem, newProgress func(int64) io.WriteCloser, emit func(contracts.Event)) *PackageInstaller {
 	if newProgress == nil {
 		newProgress = noopProgress
 	}
 
-	return &PackageInstaller{downloader: downloader, filesystem: filesystem, newProgress: newProgress}
+	if emit == nil {
+		emit = func(contracts.Event) {}
+	}
+
+	return &PackageInstaller{downloader: downloader, filesystem: filesystem, emit: emit, newProgress: newProgress}
 }
 
-func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest legacy_contracts.Manifest, err error) {
+func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest plumbing.Manifest, err error) {
 	body, err := this.downloader.Download(remoteAddress)
 	if err != nil {
-		return legacy_contracts.Manifest{}, err
+		return plumbing.Manifest{}, err
 	}
 
 	defer closeResource(body)
@@ -59,23 +64,25 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 	return manifest, err
 }
 
-func (this *PackageInstaller) InstallManifest(request legacy_contracts.InstallationRequest) (manifest legacy_contracts.Manifest, err error) {
+func (this *PackageInstaller) InstallManifest(request plumbing.InstallationRequest) (manifest plumbing.Manifest, err error) {
 	manifest, err = this.DownloadManifest(request.RemoteAddress)
 	if err != nil {
-		return legacy_contracts.Manifest{}, err
+		return plumbing.Manifest{}, err
 	}
 
 	manifest.Name = request.PackageName
 	rawManifest, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return legacy_contracts.Manifest{}, err
+		return plumbing.Manifest{}, err
 	}
 
-	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest)
+	if err = this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest); err != nil {
+		return plumbing.Manifest{}, err
+	}
 	return manifest, nil
 }
 
-func (this *PackageInstaller) InstallPackage(manifest legacy_contracts.Manifest, request legacy_contracts.InstallationRequest) error {
+func (this *PackageInstaller) InstallPackage(manifest plumbing.Manifest, request plumbing.InstallationRequest) error {
 	body, err := this.downloader.Download(request.RemoteAddress)
 	if err != nil {
 		return err
@@ -106,7 +113,7 @@ func (this *PackageInstaller) InstallPackage(manifest legacy_contracts.Manifest,
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request legacy_contracts.InstallationRequest, itemCount int) (paths []string, err error) {
+func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request plumbing.InstallationRequest, itemCount int) (paths []string, err error) {
 	defer closeResource(decompressor)
 	var reader ArchiveReader
 	if archiveReader, ok := decompressor.(ArchiveReader); ok {
@@ -115,8 +122,8 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		reader = archiveFormats[""](decompressor)
 	}
 
-	if _, ok := reader.(legacy_contracts.DownloadSetter); ok {
-		reader.(legacy_contracts.DownloadSetter).SetDownloader(request.RemoteAddress, this.downloader)
+	if _, ok := reader.(plumbing.DownloadSetter); ok {
+		reader.(plumbing.DownloadSetter).SetDownloader(request.RemoteAddress, this.downloader)
 	}
 
 	for i := 0; ; i++ {
@@ -129,13 +136,20 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		}
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
-		log.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
-			i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem)
+		this.emit(contracts.Event{
+			Type:    contracts.EventProgress,
+			Message: fmt.Sprintf("Extracting archive item [%d/%d] %q [%s] to %q.", i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem),
+		})
 
 		if header.Typeflag == tar.TypeSymlink {
-			this.filesystem.CreateSymlink(header.Linkname, pathItem)
+			if err = this.filesystem.CreateSymlink(header.Linkname, pathItem); err != nil {
+				return paths, err
+			}
 		} else {
-			writer := this.filesystem.Create(pathItem)
+			writer, err := this.filesystem.Create(pathItem)
+			if err != nil {
+				return paths, err
+			}
 			progressReader := this.newProgress(header.Size)
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
@@ -144,11 +158,10 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			if err != nil {
 				return paths, err
 			}
-			if !legacy_contracts.IsExecutable(os.FileMode(header.Mode)) {
+			if !IsExecutable(os.FileMode(header.Mode)) {
 				continue
 			}
-			err := this.filesystem.Chmod(pathItem, 0755)
-			if err != nil {
+			if err = this.filesystem.Chmod(pathItem, 0755); err != nil {
 				return paths, err
 			}
 		}
@@ -174,7 +187,7 @@ func byteCountToString(size int64) string {
 
 func (this *PackageInstaller) revertFileSystem(paths []string) {
 	for _, path := range paths {
-		this.filesystem.Delete(path)
+		_ = this.filesystem.Delete(path)
 	}
 }
 
@@ -189,7 +202,11 @@ func ComposeManifestPath(localPath, packageName string) string {
 func (this *PackageInstaller) decompressor(algorithm string) (func(io.Reader) (io.ReadCloser, error), bool) {
 	if algorithm == "zip" {
 		return func(r io.Reader) (io.ReadCloser, error) {
-			return shell.NewZipArchiveReader(r, this.newProgress), nil
+			reader, err := shell.NewZipArchiveReader(r, this.newProgress)
+			if err != nil {
+				return nil, err
+			}
+			return reader, nil
 		}, true
 	}
 
@@ -226,11 +243,15 @@ var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
 
 // //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 type DownloadSetter interface {
-	SetDownloader(url.URL, legacy_contracts.Downloader)
+	SetDownloader(url.URL, plumbing.Downloader)
 }
 
 func closeResource(closer io.Closer) {
 	if closer != nil {
 		_ = closer.Close()
 	}
+}
+
+func IsExecutable(mode os.FileMode) bool {
+	return mode.Perm()&0111 > 0
 }

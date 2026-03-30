@@ -3,7 +3,6 @@ package transfer
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -11,70 +10,83 @@ import (
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/internal/core"
 	"github.com/smarty/satisfy/internal/shell"
-	"github.com/smarty/satisfy/legacy_contracts"
 )
 
 type DownloadApp struct {
-	listing   contracts.DependencyListing
-	installer *core.PackageInstaller
-	integrity legacy_contracts.IntegrityCheck
-	waiter    *sync.WaitGroup
-	results   chan error
+	config  contracts.DownloadConfiguration
+	listing contracts.DependencyListing
 }
 
 func NewDownloadApp(config contracts.DownloadConfiguration) *DownloadApp {
-	disk := shell.NewDiskFileSystem("")
-	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusPartialContent, http.StatusOK})
-	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, time.Sleep), disk, config.NewProgress)
-	integrity := core.NewCompoundIntegrityCheck(
-		core.NewFileListingIntegrityChecker(disk),
-		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
-	)
-	waiter := new(sync.WaitGroup)
-	waiter.Add(len(config.Dependencies.Listing))
 	return &DownloadApp{
-		listing:   config.Dependencies,
-		installer: installer,
-		integrity: integrity,
-		waiter:    waiter,
-		results:   make(chan error),
+		config:  config,
+		listing: config.Dependencies,
 	}
 }
 
-func (this *DownloadApp) Run() {
-	err := this.TryRun()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+func (this *DownloadApp) Run(yield func(contracts.Event, error) bool) {
+	orch := newDownloadOrchestrator(len(this.listing.Listing))
 
-func (this *DownloadApp) TryRun() error {
-	for _, dependency := range this.listing.Listing {
-		go this.install(dependency)
+	disk := shell.NewDiskFileSystem("")
+	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusPartialContent, http.StatusOK})
+	downloader := core.NewRetryClient(client, this.config.MaxRetry, time.Sleep, orch.emitEvent)
+	integrity := core.NewCompoundIntegrityCheck(
+		core.NewFileListingIntegrityChecker(disk, orch.emitEvent),
+		core.NewFileContentIntegrityCheck(md5.New, disk, !this.config.QuickVerification, orch.emitEvent),
+	)
+	installer := core.NewPackageInstaller(downloader, disk, this.config.NewProgress, orch.emitEvent)
+
+	waiter := new(sync.WaitGroup)
+	waiter.Add(len(this.listing.Listing))
+
+	for _, dep := range this.listing.Listing {
+		go func() {
+			defer waiter.Done()
+			resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), integrity, installer, dep, orch.emitEvent)
+			if err := resolver.Resolve(); err != nil {
+				orch.emitError(err)
+			}
+		}()
 	}
-	go this.awaitCompletion()
+
+	go func() {
+		waiter.Wait()
+		close(orch.results)
+		close(orch.events)
+	}()
+
+	results := orch.results
+	events := orch.events
 	failed := 0
-	for err := range this.results {
-		failed++
-		log.Println("[WARN]", err)
+
+	for results != nil || events != nil {
+		select {
+		case err, ok := <-results:
+			if !ok {
+				results = nil
+				continue
+			}
+
+			failed++
+			if !yield(contracts.Event{Type: contracts.EventFailure, Message: err.Error()}, nil) {
+				orch.cancel()
+				return
+			}
+
+		case event, ok := <-events:
+			if !ok {
+				events = nil
+				continue
+			}
+
+			if !yield(event, nil) {
+				orch.cancel()
+				return
+			}
+		}
 	}
+
 	if failed > 0 {
-		return fmt.Errorf("[WARN] %d packages failed to install.", failed)
-	}
-	return nil
-}
-
-func (this *DownloadApp) awaitCompletion() {
-	this.waiter.Wait()
-	close(this.results)
-}
-
-func (this *DownloadApp) install(dependency contracts.Dependency) {
-	defer this.waiter.Done()
-
-	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
-	err := resolver.Resolve()
-	if err != nil {
-		this.results <- err
+		yield(contracts.Event{}, fmt.Errorf("%d package(s) failed to install", failed))
 	}
 }

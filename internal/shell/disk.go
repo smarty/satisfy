@@ -2,12 +2,11 @@ package shell
 
 import (
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type DiskFileSystem struct{ root string }
@@ -24,7 +23,7 @@ func (this *DiskFileSystem) RootPath() string {
 	return this.root
 }
 
-func (this *DiskFileSystem) Listing() (listing []legacy_contracts.FileInfo) {
+func (this *DiskFileSystem) Listing() (listing []plumbing.FileInfo, err error) {
 	listingFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -49,23 +48,23 @@ func (this *DiskFileSystem) Listing() (listing []legacy_contracts.FileInfo) {
 	}
 	stat, err := os.Stat(this.root)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
-	if stat.IsDir() == false {
-		err = listingFunc(this.root, stat, err)
+	if !stat.IsDir() {
+		err = listingFunc(this.root, stat, nil)
 		if err != nil {
-			log.Panic(err)
+			return nil, err
 		}
 	} else {
 		err = filepath.Walk(this.root, listingFunc)
 		if err != nil {
-			log.Panic(err)
+			return nil, err
 		}
 	}
-	return listing
+	return listing, nil
 }
 
-func (this *DiskFileSystem) Stat(path string) (legacy_contracts.FileInfo, error) {
+func (this *DiskFileSystem) Stat(path string) (plumbing.FileInfo, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -81,54 +80,35 @@ func (this *DiskFileSystem) Stat(path string) (legacy_contracts.FileInfo, error)
 	return fileInfo, nil
 }
 
-func (this *DiskFileSystem) CreateSymlink(source, target string) {
+func (this *DiskFileSystem) CreateSymlink(source, target string) error {
 	_ = os.Remove(target)
-	err := os.Symlink(source, target)
-	if err != nil {
-		log.Panic(err)
-	}
+	return os.Symlink(source, target)
 }
 
-func (this *DiskFileSystem) Open(path string) io.ReadCloser {
-	reader, err := os.Open(path)
-	if err != nil {
-		log.Panic(err)
-	}
-	return reader
+func (this *DiskFileSystem) Open(path string) (io.ReadCloser, error) {
+	return os.Open(path)
 }
 
-func (this *DiskFileSystem) Create(path string) io.WriteCloser {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		log.Panic(err)
+func (this *DiskFileSystem) Create(path string) (io.WriteCloser, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
 	}
-	writer, err := os.Create(path)
-	if err != nil {
-		log.Panic(err)
-	}
-	return writer
+	return os.Create(path)
 }
 
 func (this *DiskFileSystem) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func (this *DiskFileSystem) WriteFile(path string, content []byte) {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		log.Panic(err)
+func (this *DiskFileSystem) WriteFile(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
 	}
-	err = os.WriteFile(path, content, 0644)
-	if err != nil {
-		log.Panic(err)
-	}
+	return os.WriteFile(path, content, 0644)
 }
 
-func (this *DiskFileSystem) Delete(path string) {
-	err := os.Remove(path)
-	if err != nil {
-		log.Println(err)
-	}
+func (this *DiskFileSystem) Delete(path string) error {
+	return os.Remove(path)
 }
 
 ////////////////////////////////////////

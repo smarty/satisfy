@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type ZipArchiveWriter struct {
@@ -15,7 +15,7 @@ type ZipArchiveWriter struct {
 	once    sync.Once
 }
 
-func NewZipArchiveWriter(writer io.Writer, level int) legacy_contracts.ArchiveWriter {
+func NewZipArchiveWriter(writer io.Writer, level int) plumbing.ArchiveWriter {
 	inner := zip.NewWriter(writer)
 	inner.RegisterCompressor(zip.Deflate, func(target io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(target, level)
@@ -23,19 +23,15 @@ func NewZipArchiveWriter(writer io.Writer, level int) legacy_contracts.ArchiveWr
 	return &ZipArchiveWriter{inner: inner}
 }
 
-func (this *ZipArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
+func (this *ZipArchiveWriter) WriteHeader(header plumbing.ArchiveHeader) error {
 	var err error
-
 	this.current, err = this.inner.CreateHeader(&zip.FileHeader{
 		Name:               header.Name,
 		Modified:           header.ModTime,
 		UncompressedSize64: uint64(header.Size),
 		Method:             zip.Deflate,
 	})
-
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 func (this *ZipArchiveWriter) Write(buffer []byte) (int, error) {
 	return this.current.Write(buffer)

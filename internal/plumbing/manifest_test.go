@@ -1,4 +1,4 @@
-package legacy_contracts
+package plumbing
 
 import (
 	"encoding/json"

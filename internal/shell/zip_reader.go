@@ -4,12 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
-	"log"
 	"net/url"
 	"os"
 
 	"github.com/klauspost/compress/zip"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type ZipArchiveReader struct {
@@ -17,7 +16,7 @@ type ZipArchiveReader struct {
 	currentZipFileReader io.Reader
 	zipReader            *zip.Reader
 	archiveURL           url.URL
-	downloader           legacy_contracts.Downloader
+	downloader           plumbing.Downloader
 	newProgress          func(int64) io.WriteCloser
 	currentFileCount     int
 	lastBytesRetrieved   *bytes.Buffer
@@ -66,7 +65,7 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 	}, nil
 }
 
-func (this *ZipArchiveReader) SetDownloader(request url.URL, downloader legacy_contracts.Downloader) {
+func (this *ZipArchiveReader) SetDownloader(request url.URL, downloader plumbing.Downloader) {
 	this.archiveURL = request
 	this.downloader = downloader
 }
@@ -121,15 +120,14 @@ func (this *ZipArchiveReader) Close() error {
 	return nil
 }
 
-func NewZipArchiveReader(reader io.Reader, newProgress func(int64) io.WriteCloser) io.ReadCloser {
+func NewZipArchiveReader(reader io.Reader, newProgress func(int64) io.WriteCloser) (*ZipArchiveReader, error) {
 	if newProgress == nil {
 		newProgress = noopProgress
 	}
 
 	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, newProgress: newProgress}
-	err := zipArchiveReader.DownloadArchiveToTemp(reader)
-	if err != nil {
-		log.Fatalf("failed to download zip archive: %s", err)
+	if err := zipArchiveReader.DownloadArchiveToTemp(reader); err != nil {
+		return nil, err
 	}
-	return zipArchiveReader
+	return zipArchiveReader, nil
 }

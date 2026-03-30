@@ -2,35 +2,40 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"time"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type RetryClient struct {
-	inner    legacy_contracts.RemoteStorage
+	inner    plumbing.RemoteStorage
 	maxRetry int
 	sleep    func(duration time.Duration)
+	emit     func(contracts.Event)
 }
 
-func NewRetryClient(inner legacy_contracts.RemoteStorage, maxRetry int, sleep func(duration time.Duration)) *RetryClient {
-	return &RetryClient{inner: inner, maxRetry: maxRetry, sleep: sleep}
+func NewRetryClient(inner plumbing.RemoteStorage, maxRetry int, sleep func(duration time.Duration), emit func(contracts.Event)) *RetryClient {
+	if emit == nil {
+		emit = func(contracts.Event) {}
+	}
+	return &RetryClient{inner: inner, maxRetry: maxRetry, sleep: sleep, emit: emit}
 }
 
-func (this *RetryClient) Upload(request legacy_contracts.UploadRequest) (err error) {
+func (this *RetryClient) Upload(request plumbing.UploadRequest) (err error) {
 	for x := 0; x <= this.maxRetry; x++ {
 		err = this.inner.Upload(request)
 		if err == nil {
 			return nil
 		}
-		if !errors.Is(err, legacy_contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetry) {
 			return err
 		}
 		if x < this.maxRetry {
-			log.Printf("[WARN] upload failed; retry imminent: %v", err)
+			this.emit(contracts.Event{Type: contracts.EventWarning, Message: fmt.Sprintf("upload failed; retry imminent: %v", err)})
 			this.sleep(time.Second * 3)
 		}
 	}
@@ -43,11 +48,11 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 		if err == nil {
 			return body, nil
 		}
-		if !errors.Is(err, legacy_contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetry) {
 			return nil, err
 		}
 		if x < this.maxRetry {
-			log.Println("[WARN] download failed, retry imminent.")
+			this.emit(contracts.Event{Type: contracts.EventWarning, Message: "download failed, retry imminent."})
 			this.sleep(time.Second * 3)
 		}
 	}
@@ -60,11 +65,11 @@ func (this *RetryClient) Seek(request url.URL, start, end int64) (body io.ReadCl
 		if err == nil {
 			return body, nil
 		}
-		if !errors.Is(err, legacy_contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetry) {
 			return nil, err
 		}
 		if x < this.maxRetry {
-			log.Println("[WARN] seek failed, retry imminent.")
+			this.emit(contracts.Event{Type: contracts.EventWarning, Message: "seek failed, retry imminent."})
 			this.sleep(time.Second * 3)
 		}
 	}
@@ -77,11 +82,11 @@ func (this *RetryClient) Size(request url.URL) (size int64, err error) {
 		if err == nil {
 			return size, nil
 		}
-		if !errors.Is(err, legacy_contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetry) {
 			return 0, err
 		}
 		if x < this.maxRetry {
-			log.Println("[WARN] size failed, retry imminent.")
+			this.emit(contracts.Event{Type: contracts.EventWarning, Message: "size failed, retry imminent."})
 			this.sleep(time.Second * 3)
 		}
 	}

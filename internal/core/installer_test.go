@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/url"
 	"strings"
 	"testing"
@@ -16,7 +15,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 func TestPackageInstallerFixture(t *testing.T) {
@@ -33,11 +32,11 @@ type PackageInstallerFixture struct {
 func (this *PackageInstallerFixture) Setup() {
 	this.downloader = &FakeDownloader{}
 	this.filesystem = newInMemoryFileSystem()
-	this.installer = NewPackageInstaller(this.downloader, this.filesystem, noopProgress)
+	this.installer = NewPackageInstaller(this.downloader, this.filesystem, noopProgress, nil)
 }
 
 func (this *PackageInstallerFixture) TestInstallManifest() {
-	originalManifest := legacy_contracts.Manifest{Name: "Package/Name", Version: "1.2.3"}
+	originalManifest := plumbing.Manifest{Name: "Package/Name", Version: "1.2.3"}
 	this.downloader.prepareManifestDownload(originalManifest)
 
 	request := this.installationRequest(originalManifest.Name)
@@ -50,10 +49,10 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 	this.So(this.loadLocalManifest(fileName), should.Resemble, originalManifest)
 }
 
-func (this *PackageInstallerFixture) loadLocalManifest(fileName string) legacy_contracts.Manifest {
-	reader := this.filesystem.Open(fileName)
+func (this *PackageInstallerFixture) loadLocalManifest(fileName string) plumbing.Manifest {
+	reader, _ := this.filesystem.Open(fileName)
 	decoder := json.NewDecoder(reader)
-	var localManifest legacy_contracts.Manifest
+	var localManifest plumbing.Manifest
 	_ = decoder.Decode(&localManifest)
 	return localManifest
 }
@@ -74,9 +73,10 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
-	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	checksum, err := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	this.So(err, should.BeNil)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+	err = this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -86,9 +86,10 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 }
 
 func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
-	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
+	checksum, err := this.downloader.prepareArchiveDownload(zstdAlgorithm)
+	this.So(err, should.BeNil)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
+	err = this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -97,10 +98,10 @@ func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsin
 }
 
 func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
+	checksum, err := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	this.So(err, should.BeNil)
 
-	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
-
-	err := this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest(""))
+	err = this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 }
@@ -111,7 +112,8 @@ func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	listing1, _ := this.filesystem.Listing()
+	this.So(listing1, should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
@@ -120,23 +122,26 @@ func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	listing2, _ := this.filesystem.Listing()
+	this.So(listing2, should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
-	this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	_, err := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	this.So(err, should.BeNil)
 
-	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
+	err = this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	listing3, _ := this.filesystem.Listing()
+	this.So(listing3, should.BeEmpty)
 }
 
-func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) legacy_contracts.Manifest {
-	return legacy_contracts.Manifest{
-		Archive: legacy_contracts.Archive{
+func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) plumbing.Manifest {
+	return plumbing.Manifest{
+		Archive: plumbing.Archive{
 			MD5Checksum: checksum,
-			Contents: []legacy_contracts.ArchiveItem{
+			Contents: []plumbing.ArchiveItem{
 				{Path: "Hello/World"},
 				{Path: "Goodbye/World"},
 				{Path: "Link"},
@@ -146,8 +151,8 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 	}
 }
 
-func (this *PackageInstallerFixture) installationRequest(packageName string) legacy_contracts.InstallationRequest {
-	return legacy_contracts.InstallationRequest{
+func (this *PackageInstallerFixture) installationRequest(packageName string) plumbing.InstallationRequest {
+	return plumbing.InstallationRequest{
 		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
 		LocalPath:     "local/path",
 		PackageName:   packageName,
@@ -185,11 +190,14 @@ func (this *FakeDownloader) Size(request url.URL) (int64, error) {
 	return io.Copy(buff, this.Body)
 }
 
-func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) []byte {
+func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) ([]byte, error) {
 	hasher := md5.New()
 	writer := bytes.NewBuffer(nil)
 	multi := io.MultiWriter(hasher, writer)
-	compressor := compression[compressionAlgorithm](multi, 4)
+	compressor, err := compression[compressionAlgorithm](multi, 4)
+	if err != nil {
+		return nil, err
+	}
 	archiveWriter := tar.NewWriter(compressor)
 
 	_ = archiveWriter.WriteHeader(&tar.Header{
@@ -213,10 +221,10 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 
 	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
 }
 
-func (this *FakeDownloader) prepareManifestDownload(manifest legacy_contracts.Manifest) {
+func (this *FakeDownloader) prepareManifestDownload(manifest plumbing.Manifest) {
 	raw, _ := json.Marshal(manifest)
 	this.Body = io.NopCloser(bytes.NewReader(raw))
 }
@@ -225,20 +233,12 @@ func (this *FakeDownloader) prepareMalformedDownload() {
 	this.Body = io.NopCloser(strings.NewReader("malformed"))
 }
 
-var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
-	"zstd": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
-		if err != nil {
-			log.Fatal(err)
-		}
-		return compressor
+var compression = map[string]func(_ io.Writer, level int) (io.WriteCloser, error){
+	"zstd": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		return zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
 	},
-	gzipAlgorithm: func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := gzip.NewWriterLevel(writer, level)
-		if err != nil {
-			log.Panicln(err)
-		}
-		return compressor
+	gzipAlgorithm: func(writer io.Writer, level int) (io.WriteCloser, error) {
+		return gzip.NewWriterLevel(writer, level)
 	},
 }
 

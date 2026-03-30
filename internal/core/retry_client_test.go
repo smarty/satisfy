@@ -11,7 +11,8 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 func TestRetryFixture(t *testing.T) {
@@ -29,11 +30,11 @@ func (this *RetryFixture) Setup() {
 	this.fakeClient = &FakeClient{}
 	this.client = NewRetryClient(this.fakeClient, 4, func(duration time.Duration) {
 		this.naps = append(this.naps, duration)
-	})
+	}, nil)
 }
 
 func (this *RetryFixture) TestUploadCallsInner() {
-	sent := legacy_contracts.UploadRequest{ContentType: "test"}
+	sent := plumbing.UploadRequest{ContentType: "test"}
 
 	err := this.client.Upload(sent)
 
@@ -44,7 +45,7 @@ func (this *RetryFixture) TestUploadCallsInner() {
 func (this *RetryFixture) TestUploadRetryOnError() {
 	this.fakeClient.error = aRetryError
 
-	err := this.client.Upload(legacy_contracts.UploadRequest{})
+	err := this.client.Upload(plumbing.UploadRequest{})
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
@@ -59,7 +60,7 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
 	this.fakeClient.error = aRegularError
 
-	err := this.client.Upload(legacy_contracts.UploadRequest{})
+	err := this.client.Upload(plumbing.UploadRequest{})
 
 	this.So(err, should.Equal, aRegularError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 1)
@@ -104,14 +105,14 @@ func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
 }
 
 var (
-	aRetryError   = fmt.Errorf("this is a retry error %w", legacy_contracts.RetryErr)
+	aRetryError   = fmt.Errorf("this is a retry error %w", contracts.ErrRetry)
 	aRegularError = errors.New("this is a regular error")
 )
 
 /////////////////////////////////////////////////////////////////////////////////
 
 type FakeClient struct {
-	uploadRequest  legacy_contracts.UploadRequest
+	uploadRequest  plumbing.UploadRequest
 	uploadAttempts int
 
 	downloadRequest  url.URL
@@ -139,7 +140,7 @@ func (this *FakeClient) Size(request url.URL) (int64, error) {
 
 //TODO: Implement tests for seek and size
 
-func (this *FakeClient) Upload(request legacy_contracts.UploadRequest) error {
+func (this *FakeClient) Upload(request plumbing.UploadRequest) error {
 	this.uploadRequest = request
 	this.uploadAttempts++
 	return this.error

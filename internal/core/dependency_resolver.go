@@ -3,44 +3,49 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type DependencyResolverFileSystem interface {
-	legacy_contracts.FileChecker
-	legacy_contracts.FileReader
-	legacy_contracts.Deleter
+	plumbing.FileChecker
+	plumbing.FileReader
+	plumbing.Deleter
 }
 
 type DependencyResolver struct {
 	fileSystem       DependencyResolverFileSystem
-	integrityChecker legacy_contracts.IntegrityCheck
-	packageInstaller legacy_contracts.PackageInstaller
+	integrityChecker plumbing.IntegrityCheck
+	packageInstaller plumbing.PackageInstaller
 	dependency       contracts.Dependency
+	emit             func(contracts.Event)
 }
 
 func NewDependencyResolver(
 	fileSystem DependencyResolverFileSystem,
-	integrityChecker legacy_contracts.IntegrityCheck,
-	packageInstaller legacy_contracts.PackageInstaller,
+	integrityChecker plumbing.IntegrityCheck,
+	packageInstaller plumbing.PackageInstaller,
 	dependency contracts.Dependency,
+	emit func(contracts.Event),
 ) *DependencyResolver {
+	if emit == nil {
+		emit = func(contracts.Event) {}
+	}
 	return &DependencyResolver{
 		fileSystem:       fileSystem,
 		integrityChecker: integrityChecker,
 		packageInstaller: packageInstaller,
 		dependency:       dependency,
+		emit:             emit,
 	}
 }
 
 func (this *DependencyResolver) Resolve() error {
-	log.Printf("Installing dependency: %s", this.dependency.Title())
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Installing dependency: %s", this.dependency.Title())})
 
 	manifestPath := ComposeManifestPath(this.dependency.LocalDirectory, this.dependency.PackageName)
 	if !this.localManifestExists(manifestPath) {
@@ -60,7 +65,7 @@ func (this *DependencyResolver) Resolve() error {
 	return this.installPackage()
 }
 
-func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest legacy_contracts.Manifest, err error) {
+func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest plumbing.Manifest, err error) {
 	file, err := this.fileSystem.ReadFile(manifestPath)
 	if err != nil {
 		return localManifest, err
@@ -69,7 +74,7 @@ func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localMan
 	if err == nil {
 		return localManifest, nil
 	}
-	return legacy_contracts.Manifest{}, fmt.Errorf(
+	return plumbing.Manifest{}, fmt.Errorf(
 		"existing manifest found but malformed at %q (%s);"+
 			" the corresponding package must be uninstalled manually"+
 			" before installation of %q at version %q can be attempted",
@@ -81,39 +86,42 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (this *DependencyResolver) isInstalledCorrectly(localManifest legacy_contracts.Manifest) bool {
+func (this *DependencyResolver) isInstalledCorrectly(localManifest plumbing.Manifest) bool {
 	if localManifest.Name != this.dependency.PackageName {
 		if strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
 			// no-op
 		} else {
-			log.Printf("incorrect package installed (%s), proceeding to installation of specified package: %s",
-				localManifest.Name, this.dependency.Title())
+			this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf(
+				"incorrect package installed (%s), proceeding to installation of specified package: %s",
+				localManifest.Name, this.dependency.Title())})
 			return false
 		}
 	}
 	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(localManifest) {
-		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
-			localManifest.Version, this.dependency.Title())
+		this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf(
+			"incorrect version installed (%s), proceeding to installation of specified package: %s",
+			localManifest.Version, this.dependency.Title())})
 		return false
 	} else if this.dependency.PackageVersion != "latest" && localManifest.Version != this.dependency.PackageVersion {
-		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
-			localManifest.Version, this.dependency.Title())
+		this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf(
+			"incorrect version installed (%s), proceeding to installation of specified package: %s",
+			localManifest.Version, this.dependency.Title())})
 		return false
 	}
 
 	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
 	if verifyErr != nil {
-		log.Printf("%s in %s", verifyErr.Error(), this.dependency.Title())
+		this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("%s in %s", verifyErr.Error(), this.dependency.Title())})
 		return false
 	}
 
-	log.Printf("Dependency already installed: %s", this.dependency.Title())
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Dependency already installed: %s", this.dependency.Title())})
 	return true
 }
 
 func (this *DependencyResolver) installPackage() error {
-	log.Printf("Downloading manifest for %s", this.dependency.Title())
-	manifest, err := this.packageInstaller.InstallManifest(legacy_contracts.InstallationRequest{
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Downloading manifest for %s", this.dependency.Title())})
+	manifest, err := this.packageInstaller.InstallManifest(plumbing.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
 		PackageName:   this.dependency.PackageName,
@@ -121,7 +129,7 @@ func (this *DependencyResolver) installPackage() error {
 	if err != nil {
 		return fmt.Errorf("failed to install manifest for %s: %w", this.dependency.Title(), err)
 	}
-	log.Printf("Downloading and extracting package contents for %s", this.dependency.Title())
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Downloading and extracting package contents for %s", this.dependency.Title())})
 
 	if this.dependency.PackageVersion == "latest" {
 		this.dependency.PackageVersion = manifest.Version
@@ -133,7 +141,7 @@ func (this *DependencyResolver) installPackage() error {
 	//    exists, we can change the archive filename in the configuration and all previously uploaded manifests using the
 	//    older name are still recognized and understood.
 
-	err = this.packageInstaller.InstallPackage(manifest, legacy_contracts.InstallationRequest{
+	err = this.packageInstaller.InstallPackage(manifest, plumbing.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
@@ -141,20 +149,20 @@ func (this *DependencyResolver) installPackage() error {
 		return fmt.Errorf("failed to install package contents for %s: %w", this.dependency.Title(), err)
 	}
 
-	log.Printf("Dependency installed: %s", this.dependency.Title())
+	this.emit(contracts.Event{Type: contracts.EventInfo, Message: fmt.Sprintf("Dependency installed: %s", this.dependency.Title())})
 	return nil
 }
 
-func (this *DependencyResolver) uninstallPackage(manifest legacy_contracts.Manifest) {
+func (this *DependencyResolver) uninstallPackage(manifest plumbing.Manifest) {
 	for _, item := range manifest.Archive.Contents {
-		this.fileSystem.Delete(filepath.Join(this.dependency.LocalDirectory, item.Path))
+		_ = this.fileSystem.Delete(filepath.Join(this.dependency.LocalDirectory, item.Path))
 	}
 }
 
-func (this *DependencyResolver) localManifestIsLatest(manifest legacy_contracts.Manifest) bool {
+func (this *DependencyResolver) localManifestIsLatest(manifest plumbing.Manifest) bool {
 	remoteManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteManifestAddress())
 	if err != nil {
-		log.Println("Failed to download the latest manifest file:", err)
+		this.emit(contracts.Event{Type: contracts.EventWarning, Message: fmt.Sprintf("Failed to download the latest manifest file: %v", err)})
 		return false
 	}
 	this.dependency.PackageVersion = remoteManifest.Version

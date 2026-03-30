@@ -1,20 +1,17 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"sort"
 
 	satisfy "github.com/smarty/satisfy"
-	"github.com/smarty/satisfy/contracts"
 )
 
 const messageDownloadIsDefault = "Note: 'download' is the default command and doesn't need to be specified."
 
 var helpFlags = []string{"-h", "--help", "-help"}
-
-var logger = contracts.NewLogger(os.Stdout, os.Stderr, os.Exit)
 
 var validCommands = []Command{
 	{
@@ -30,7 +27,7 @@ var validCommands = []Command{
 		Description: "Download and install package dependencies (default)",
 		Usage:       "satisfy [-json=<deps.json>] [-max-retry=5] [-quick] [-progress]",
 		Function: func() {
-			logger.LogLineClean("%s\n", messageDownloadIsDefault)
+			fmt.Fprintf(os.Stderr, "[INFO] there is no need to supply 'download' as a sub-command\n")
 			mainDownload(os.Args[2:])
 		},
 	},
@@ -85,7 +82,7 @@ func main() {
 func handleMalformedSubcommand(input string) {
 	const threshold = 2
 
-	logger.LogLineClean("Error: Unknown subcommand '%s'\n", input)
+	fmt.Fprintf(os.Stderr, "Error: Unknown subcommand '%s'\n", input)
 
 	var suggestions []suggestion
 	for _, command := range validCommands {
@@ -99,7 +96,7 @@ func handleMalformedSubcommand(input string) {
 
 	closestDistance := suggestions[0].Distance
 	if closestDistance <= threshold {
-		logger.LogLineClean("Did you mean '%s'?\n", suggestions[0].Command.Name)
+		fmt.Fprintf(os.Stderr, "Did you mean '%s'?\n", suggestions[0].Command.Name)
 	}
 
 	printAvailableCommands()
@@ -154,46 +151,33 @@ func looksLikeFlag(arg string) bool {
 }
 
 func mainCheck(args []string) {
-	config, err := parseCheck(args)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	satisfy.Check(config)
+	config, seq := parseCheck(args)
+	handleParsing(seq)
+	handleCheck(satisfy.Check(config))
 }
 
 func mainDownload(args []string) {
-	config, err := parseDownload(args)
-	if errors.Is(err, contracts.ErrNoDependenciesMatch) {
-		return
-	}
-
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	satisfy.Download(config)
+	config, seq := parseDownload(args)
+	handleParsing(seq)
+	handleDownload(satisfy.Download(config))
 }
 
 func mainUpload(args []string) {
-	config, err := parseUpload(args)
-	if err != nil {
-		logger.FatalWithLevel(contracts.Info, err)
-	}
-
-	satisfy.Upload(config)
+	config, seq := parseUpload(args)
+	handleParsing(seq)
+	handleUpload(satisfy.Upload(config))
 }
 
 func mainVersion() {
-	logger.LogLine(contracts.Info, "satisfy [debug]")
+	fmt.Fprintln(os.Stderr, "[INFO] satisfy [debug]")
 }
 
 func printAvailableCommands() {
-	logger.LogLineClean("Available commands:\n")
+	fmt.Fprintf(os.Stderr, "Available commands:\n\n")
 	for _, cmd := range validCommands {
-		logger.LogLineClean("  %-12s %s", cmd.Name, cmd.Description)
-		logger.LogLineClean("  %-12s Usage: %s\n", "", cmd.Usage)
+		fmt.Fprintf(os.Stderr, "  %-12s %s\n", cmd.Name, cmd.Description)
+		fmt.Fprintf(os.Stderr, "  %-12s Usage: %s\n\n", "", cmd.Usage)
 	}
 
-	logger.LogLineClean("%s", messageDownloadIsDefault)
+	fmt.Fprintf(os.Stderr, "%s\n", messageDownloadIsDefault)
 }

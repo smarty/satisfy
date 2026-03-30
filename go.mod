@@ -1,6 +1,6 @@
 module github.com/smarty/satisfy
 
-go 1.22
+go 1.23
 
 require (
 	github.com/klauspost/compress v1.17.9

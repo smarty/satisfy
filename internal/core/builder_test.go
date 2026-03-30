@@ -6,7 +6,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 func TestDirectoryPackageBuilderFixture(t *testing.T) {
@@ -25,7 +25,7 @@ func (this *DirectoryPackageBuilderFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress, nil)
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	_ = this.fileSystem.Chmod("/in/file0.txt", 0755)
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
@@ -37,7 +37,7 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 	err := this.builder.Build()
 
 	this.So(err, should.BeNil)
-	this.So(this.builder.Contents(), should.Resemble, []legacy_contracts.ArchiveItem{
+	this.So(this.builder.Contents(), should.Resemble, []plumbing.ArchiveItem{
 		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
 		{Path: "file1.txt", Size: 2, MD5Checksum: []byte("bb [HASHED]")},
 		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
@@ -49,10 +49,10 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
-		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
-		{ArchiveHeader: legacy_contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
+		{ArchiveHeader: plumbing.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
+		{ArchiveHeader: plumbing.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
+		{ArchiveHeader: plumbing.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
+		{ArchiveHeader: plumbing.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -86,7 +86,7 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed
 	if !this.So(err, should.BeNil) {
 		return
 	}
-	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: legacy_contracts.ArchiveHeader{
+	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: plumbing.ArchiveHeader{
 		Name:     "inner/link.txt",
 		LinkName: "../file0.txt",
 		Size:     0,
@@ -97,7 +97,7 @@ func (this *DirectoryPackageBuilderFixture) TestFileOnlyEnsureNoPath() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress, nil)
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
 	err := this.builder.Build()
 	if !this.So(err, should.BeNil) {
@@ -110,7 +110,7 @@ func (this *DirectoryPackageBuilderFixture) TestMultipleFilesEnsurePath() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, noopProgress, nil)
 	this.fileSystem.WriteDirectory("/out")
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("/out/in/file1.txt", []byte("a"))
@@ -142,7 +142,7 @@ func (this *FakeHasher) Size() int           { panic("implement me") }
 /////////////////////////
 
 type ArchiveItem struct {
-	legacy_contracts.ArchiveHeader
+	plumbing.ArchiveHeader
 	contents []byte
 }
 
@@ -155,12 +155,13 @@ type FakeArchiveWriter struct {
 }
 
 func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
-func (this *FakeArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
+func (this *FakeArchiveWriter) WriteHeader(header plumbing.ArchiveHeader) error {
 	if this.closed {
-		return
+		return nil
 	}
 	this.current = &ArchiveItem{ArchiveHeader: header}
 	this.items = append(this.items, this.current)
+	return nil
 }
 func (this *FakeArchiveWriter) Write(p []byte) (int, error) {
 	this.current.contents = append(this.current.contents, p...)

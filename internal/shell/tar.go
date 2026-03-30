@@ -3,17 +3,16 @@ package shell
 import (
 	"archive/tar"
 	"io"
-	"log"
 
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 type TarArchiveWriter struct {
 	*tar.Writer
 }
 
-func NewSwitchArchiveWriter(writer io.Writer) legacy_contracts.ArchiveWriter {
-	if inner, ok := writer.(legacy_contracts.ArchiveWriter); ok {
+func NewSwitchArchiveWriter(writer io.Writer) plumbing.ArchiveWriter {
+	if inner, ok := writer.(plumbing.ArchiveWriter); ok {
 		return inner
 	} else {
 		return NewTarArchiveWriter(writer)
@@ -24,7 +23,7 @@ func NewTarArchiveWriter(writer io.Writer) *TarArchiveWriter {
 	return &TarArchiveWriter{Writer: tar.NewWriter(writer)}
 }
 
-func (this *TarArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader) {
+func (this *TarArchiveWriter) WriteHeader(header plumbing.ArchiveHeader) error {
 	tarHeader := &tar.Header{
 		Name:    header.Name,
 		Size:    header.Size,
@@ -38,8 +37,5 @@ func (this *TarArchiveWriter) WriteHeader(header legacy_contracts.ArchiveHeader)
 	if header.Executable {
 		tarHeader.Mode = 0755
 	}
-	err := this.Writer.WriteHeader(tarHeader)
-	if err != nil {
-		log.Panic(err)
-	}
+	return this.Writer.WriteHeader(tarHeader)
 }

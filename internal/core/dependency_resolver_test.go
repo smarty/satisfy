@@ -10,7 +10,7 @@ import (
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
 	"github.com/smarty/satisfy/contracts"
-	"github.com/smarty/satisfy/legacy_contracts"
+	"github.com/smarty/satisfy/internal/plumbing"
 )
 
 func TestDependencyResolverFixture(t *testing.T) {
@@ -40,15 +40,15 @@ func (this *DependencyResolverFixture) Setup() {
 }
 
 func (this *DependencyResolverFixture) Resolve() error {
-	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency)
+	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency, nil)
 	return this.resolver.Resolve()
 }
 
 func (this *DependencyResolverFixture) TestFreshInstallation() {
-	manifest := legacy_contracts.Manifest{
+	manifest := plumbing.Manifest{
 		Name:    "B/C",
 		Version: "D",
-		Archive: legacy_contracts.Archive{Filename: "archive-name"},
+		Archive: plumbing.Archive{Filename: "archive-name"},
 	}
 	this.packageInstaller.remote = manifest
 
@@ -146,7 +146,7 @@ func (this *DependencyResolverFixture) TestFinalInstallationFailed() {
 }
 
 func (this *DependencyResolverFixture) TestLatestIsAlreadyInstalled() {
-	manifest := legacy_contracts.Manifest{
+	manifest := plumbing.Manifest{
 		Name:    "B/C",
 		Version: "D",
 	}
@@ -161,12 +161,12 @@ func (this *DependencyResolverFixture) TestLatestIsAlreadyInstalled() {
 }
 
 func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
-	this.packageInstaller.remote = legacy_contracts.Manifest{
+	this.packageInstaller.remote = plumbing.Manifest{
 		Name:    "B/C",
 		Version: "D",
 	}
 
-	this.packageInstaller.remoteLatest = legacy_contracts.Manifest{
+	this.packageInstaller.remoteLatest = plumbing.Manifest{
 		Name:    "B/C",
 		Version: "E",
 	}
@@ -182,10 +182,10 @@ func (this *DependencyResolverFixture) TestLocalPackageIsBehindLatest() {
 }
 
 func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
-	manifest := legacy_contracts.Manifest{
+	manifest := plumbing.Manifest{
 		Name:    "B/C",
 		Version: "D",
-		Archive: legacy_contracts.Archive{Filename: "archive-name"},
+		Archive: plumbing.Archive{Filename: "archive-name"},
 	}
 	this.packageInstaller.remote = manifest
 	this.dependency.PackageVersion = "latest"
@@ -199,12 +199,12 @@ func (this *DependencyResolverFixture) TestLatestFreshInstallation() {
 func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, name, version string) {
 	this.So(err, should.BeNil)
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
-	this.So(this.packageInstaller.manifestRequest, should.Resemble, legacy_contracts.InstallationRequest{
+	this.So(this.packageInstaller.manifestRequest, should.Resemble, plumbing.InstallationRequest{
 		RemoteAddress: this.URL("gcs://A/B/C/manifest.json"),
 		LocalPath:     "local",
 		PackageName:   name,
 	})
-	this.So(this.packageInstaller.packageRequest, should.Resemble, legacy_contracts.InstallationRequest{
+	this.So(this.packageInstaller.packageRequest, should.Resemble, plumbing.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
 		LocalPath:     "local",
 		PackageName:   "",
@@ -228,12 +228,12 @@ func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
 
 func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version string) {
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
-	this.So(this.packageInstaller.manifestRequest, should.Resemble, legacy_contracts.InstallationRequest{
+	this.So(this.packageInstaller.manifestRequest, should.Resemble, plumbing.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/manifest.json", version)),
 		LocalPath:     "local",
 		PackageName:   name,
 	})
-	this.So(this.packageInstaller.packageRequest, should.Resemble, legacy_contracts.InstallationRequest{
+	this.So(this.packageInstaller.packageRequest, should.Resemble, plumbing.InstallationRequest{
 		RemoteAddress: this.URL(fmt.Sprintf("gcs://A/B/C/%s/archive", version)),
 		LocalPath:     "local",
 	})
@@ -241,13 +241,13 @@ func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version s
 
 func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
 	packageName string, packageVersion string,
-) legacy_contracts.Manifest {
-	manifest := legacy_contracts.Manifest{
+) plumbing.Manifest {
+	manifest := plumbing.Manifest{
 		Name:    packageName,
 		Version: packageVersion,
-		Archive: legacy_contracts.Archive{
+		Archive: plumbing.Archive{
 			Filename: "archive",
-			Contents: []legacy_contracts.ArchiveItem{
+			Contents: []plumbing.ArchiveItem{
 				{Path: "contents1"},
 				{Path: "contents2"},
 				{Path: "contents3"},
@@ -277,11 +277,11 @@ func (this *DependencyResolverFixture) URL(address string) url.URL {
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 type FakePackageInstaller struct {
-	remote                 legacy_contracts.Manifest
-	remoteLatest           legacy_contracts.Manifest
-	installed              legacy_contracts.Manifest
-	manifestRequest        legacy_contracts.InstallationRequest
-	packageRequest         legacy_contracts.InstallationRequest
+	remote                 plumbing.Manifest
+	remoteLatest           plumbing.Manifest
+	installed              plumbing.Manifest
+	manifestRequest        plumbing.InstallationRequest
+	packageRequest         plumbing.InstallationRequest
 	installManifestErr     error
 	installPackageErr      error
 	installManifestCounter int
@@ -289,17 +289,17 @@ type FakePackageInstaller struct {
 	downloadError          error
 }
 
-func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest legacy_contracts.Manifest, err error) {
+func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest plumbing.Manifest, err error) {
 	return this.remoteLatest, this.downloadError
 }
 
-func (this *FakePackageInstaller) InstallManifest(request legacy_contracts.InstallationRequest) (manifest legacy_contracts.Manifest, err error) {
+func (this *FakePackageInstaller) InstallManifest(request plumbing.InstallationRequest) (manifest plumbing.Manifest, err error) {
 	this.installManifestCounter++
 	this.manifestRequest = request
 	return this.remote, this.installManifestErr
 }
 
-func (this *FakePackageInstaller) InstallPackage(manifest legacy_contracts.Manifest, request legacy_contracts.InstallationRequest) error {
+func (this *FakePackageInstaller) InstallPackage(manifest plumbing.Manifest, request plumbing.InstallationRequest) error {
 	this.installPackageCounter++
 	this.installed = manifest
 	this.packageRequest = request
