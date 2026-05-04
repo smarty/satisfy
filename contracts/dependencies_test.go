@@ -116,6 +116,32 @@ func (this *DependencyListingFixture) TestAppendRemoteAddressLatest() {
 	this.So(actual.String(), should.Equal, "https://www.google.com/folder/package-name/manifest")
 }
 
+func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddress() {
+	dependency := Dependency{
+		PackageName:   "master-address-list/2026/04/premium/az",
+		RemoteAddress: URL{Scheme: "gcs", Host: "my-bucket"},
+	}
+	address := dependency.ComposeLatestManifestRemoteAddress()
+	this.So(address, should.Resemble, url.URL{
+		Scheme: "gcs",
+		Host:   "my-bucket",
+		Path:   "/master-address-list/2026/04/premium/az/manifest.json",
+	})
+}
+
+func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddressWithPathPrefix() {
+	dependency := Dependency{
+		PackageName:   "master-address-list/2026/04/premium/az",
+		RemoteAddress: URL{Scheme: "gcs", Host: "my-bucket", Path: "/releases"},
+	}
+	address := dependency.ComposeLatestManifestRemoteAddress()
+	this.So(address, should.Resemble, url.URL{
+		Scheme: "gcs",
+		Host:   "my-bucket",
+		Path:   "/releases/master-address-list/2026/04/premium/az/manifest.json",
+	})
+}
+
 func (this *DependencyListingFixture) TestTitleString() {
 	dependency := Dependency{
 		PackageName:    "package-name",

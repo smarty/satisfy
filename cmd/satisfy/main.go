@@ -12,21 +12,24 @@ import (
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	if isSubCommand("upload") {
+	sub := ""
+	if len(os.Args) > 1 {
+		sub = os.Args[1]
+	}
+	switch sub {
+	case "upload":
 		uploadMain(os.Args[2:])
-	} else if isSubCommand("check") {
+	case "check":
 		checkMain(os.Args[2:])
-	} else if isSubCommand("version") {
+	case "latest":
+		latestMain(os.Args[2:])
+	case "version":
 		versionMain()
-	} else if isSubCommand("download") {
+	case "download":
 		log.Fatal("there is no need to supply 'download' as a sub-command")
-	} else {
+	default:
 		downloadMain(os.Args[1:])
 	}
-}
-
-func isSubCommand(name string) bool {
-	return len(os.Args) > 1 && os.Args[1] == name
 }
 
 func uploadMain(args []string) {
@@ -53,6 +56,14 @@ func downloadMain(args []string) {
 		log.Fatal(err)
 	}
 	transfer.NewDownloadApp(config).Run()
+}
+
+func latestMain(args []string) {
+	config, err := transfer.ParseLatestConfig(args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	transfer.NewLatestApp(config).Run()
 }
 
 func versionMain() {

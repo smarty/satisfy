@@ -55,9 +55,11 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		_, _ = fmt.Fprintln(output, "  Package names may be passed as non-flag arguments and will serve as a filter "+
 			"against the provided dependency listing.")
 		_, _ = fmt.Fprintln(output)
-		_, _ = fmt.Fprintln(output, "  The satisfy tool also provides 2 additional subcommands:")
+		_, _ = fmt.Fprintln(output, "  The satisfy tool also provides 4 additional subcommands:")
 		_, _ = fmt.Fprintln(output, "	check	Has package@version already been uploaded according to json config?")
+		_, _ = fmt.Fprintln(output, "	latest	Print the latest published version of a package to stdout.")
 		_, _ = fmt.Fprintln(output, "	upload	Upload package contents according to json config.")
+		_, _ = fmt.Fprintln(output, "	version	Print the satisfy tool version to stdout.")
 		_, _ = fmt.Fprintln(output)
 	}
 
