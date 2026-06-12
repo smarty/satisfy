@@ -71,8 +71,37 @@ func (this *UploadApp) Run() {
 	this.deleteLocalArchiveFile()
 
 	log.Println("Uploading the manifest...")
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
-	this.upload(this.buildManifestUploadRequest(this.packageConfig.ComposeLatestManifestRemoteAddress()))
+	this.upload(this.buildManifestUploadRequest(this.manifest, this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)))
+	this.upload(this.buildManifestUploadRequest(this.buildRootManifest(), this.packageConfig.ComposeLatestManifestRemoteAddress()))
+}
+
+// buildRootManifest carries the tag listing forward from the existing root
+// manifest and points any tags named in the upload config at the version being
+// uploaded. The versioned manifest never includes tags.
+func (this *UploadApp) buildRootManifest() contracts.Manifest {
+	rootManifest := this.manifest
+	rootManifest.Tags = core.MergeTags(this.downloadExistingTags(), this.packageConfig.Tags, this.packageConfig.PackageVersion)
+	for _, name := range this.packageConfig.Tags {
+		log.Printf("Tagging version %q as %q", this.packageConfig.PackageVersion, name)
+	}
+	return rootManifest
+}
+
+func (this *UploadApp) downloadExistingTags() []contracts.Tag {
+	body, err := this.client.Download(this.packageConfig.ComposeLatestManifestRemoteAddress())
+	if contracts.IsNotFound(err) {
+		return nil // first upload of this package
+	}
+	if err != nil {
+		log.Fatal("Could not download existing root manifest (needed to preserve tags): ", err)
+	}
+	defer func() { _ = body.Close() }()
+
+	var existing contracts.Manifest
+	if err = json.NewDecoder(body).Decode(&existing); err != nil {
+		log.Fatal("Could not decode existing root manifest (needed to preserve tags): ", err)
+	}
+	return existing.Tags
 }
 
 func (this *UploadApp) buildArchiveUploadRequest() contracts.UploadRequest {
@@ -157,8 +186,8 @@ var contentType = map[string]string{
 	"zip":  "application/zip",
 }
 
-func (this *UploadApp) buildManifestUploadRequest(remoteAddress url.URL) contracts.UploadRequest {
-	buffer := this.writeManifestToBuffer()
+func (this *UploadApp) buildManifestUploadRequest(manifest contracts.Manifest, remoteAddress url.URL) contracts.UploadRequest {
+	buffer := this.writeManifestToBuffer(manifest)
 	return contracts.UploadRequest{
 		RemoteAddress: remoteAddress,
 		Body:          bytes.NewReader(buffer.Bytes()),
@@ -221,13 +250,13 @@ func (this *UploadApp) upload(request contracts.UploadRequest) {
 	}
 }
 
-func (this *UploadApp) writeManifestToBuffer() *bytes.Buffer {
+func (this *UploadApp) writeManifestToBuffer(manifest contracts.Manifest) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
 	this.hasher.Reset()
 	writer := io.MultiWriter(buffer, this.hasher)
 	encoder := json.NewEncoder(writer)
 	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(this.manifest)
+	_ = encoder.Encode(manifest)
 	return buffer
 }
 

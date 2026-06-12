@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -225,6 +226,116 @@ func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
 	this.So(this.fileSystem.fileSystem, should.NotContainKey, "local/contents3")
 }
 
+func (this *DependencyResolverFixture) TestTagFreshInstallation() {
+	manifest := contracts.Manifest{
+		Name:    "B/C",
+		Version: "D",
+		Archive: contracts.Archive{Filename: "archive-name"},
+	}
+	this.packageInstaller.remote = manifest
+	this.dependency.PackageVersion = "stable"
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/stable/manifest.json": this.notFound("gcs://A/B/C/stable/manifest.json"),
+	}
+	this.packageInstaller.manifestsByAddress = map[string]contracts.Manifest{
+		"gcs://A/B/C/manifest.json": {Name: "B/C", Version: "E", Tags: []contracts.Tag{{Name: "stable", Version: "D"}}},
+	}
+
+	err := this.Resolve()
+
+	this.So(err, should.BeNil)
+	this.assertNewPackageInstalled(manifest.Name, "D")
+}
+
+func (this *DependencyResolverFixture) TestTagAlreadyInstalledCorrectly() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "D")
+	this.dependency.PackageVersion = "stable"
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/stable/manifest.json": this.notFound("gcs://A/B/C/stable/manifest.json"),
+	}
+	this.packageInstaller.manifestsByAddress = map[string]contracts.Manifest{
+		"gcs://A/B/C/manifest.json": {Name: "B/C", Version: "E", Tags: []contracts.Tag{{Name: "stable", Version: "D"}}},
+	}
+
+	err := this.Resolve()
+
+	this.So(err, should.BeNil)
+	this.So(this.packageInstaller.installManifestCounter, should.Equal, 0)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+}
+
+func (this *DependencyResolverFixture) TestTagPointsToDifferentVersion() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "D")
+	this.dependency.PackageVersion = "stable"
+	this.packageInstaller.remote = contracts.Manifest{Name: "B/C", Version: "E"}
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/stable/manifest.json": this.notFound("gcs://A/B/C/stable/manifest.json"),
+	}
+	this.packageInstaller.manifestsByAddress = map[string]contracts.Manifest{
+		"gcs://A/B/C/manifest.json": {Name: "B/C", Version: "E", Tags: []contracts.Tag{{Name: "stable", Version: "E"}}},
+	}
+
+	err := this.Resolve()
+
+	this.So(err, should.BeNil)
+	this.assertPreviouslyInstalledPackageUninstalled()
+	this.assertNewPackageInstalled("B/C", "E")
+}
+
+func (this *DependencyResolverFixture) TestUnknownVersionOrTagPreservesLocalInstallation() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "D")
+	this.dependency.PackageVersion = "no-such-version-or-tag"
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/no-such-version-or-tag/manifest.json": this.notFound("gcs://A/B/C/no-such-version-or-tag/manifest.json"),
+	}
+	this.packageInstaller.manifestsByAddress = map[string]contracts.Manifest{
+		"gcs://A/B/C/manifest.json": {Name: "B/C", Version: "E", Tags: []contracts.Tag{{Name: "stable", Version: "D"}}},
+	}
+
+	err := this.Resolve()
+
+	this.So(err, should.NotBeNil)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents2")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents3")
+}
+
+func (this *DependencyResolverFixture) TestLiteralVersionShadowsTagOfSameName() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "D")
+	this.dependency.PackageVersion = "stable"
+	this.packageInstaller.remote = contracts.Manifest{Name: "B/C", Version: "stable"}
+	this.packageInstaller.manifestsByAddress = map[string]contracts.Manifest{
+		"gcs://A/B/C/stable/manifest.json": {Name: "B/C", Version: "stable"},
+		"gcs://A/B/C/manifest.json":        {Name: "B/C", Version: "E", Tags: []contracts.Tag{{Name: "stable", Version: "D"}}},
+	}
+
+	err := this.Resolve()
+
+	this.So(err, should.BeNil)
+	this.assertPreviouslyInstalledPackageUninstalled()
+	this.assertNewPackageInstalled("B/C", "stable")
+}
+
+func (this *DependencyResolverFixture) TestTagResolutionFailsWhenRootManifestUnavailable() {
+	rootErr := errors.New("root manifest unavailable")
+	this.dependency.PackageVersion = "stable"
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/stable/manifest.json": this.notFound("gcs://A/B/C/stable/manifest.json"),
+		"gcs://A/B/C/manifest.json":        rootErr,
+	}
+
+	err := this.Resolve()
+
+	this.So(errors.Is(err, rootErr), should.BeTrue)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+}
+
+func (this *DependencyResolverFixture) notFound(address string) error {
+	return contracts.NewStatusCodeError(http.StatusNotFound, []int{http.StatusOK}, this.URL(address))
+}
+
 func (this *DependencyResolverFixture) assertNewPackageInstalled(name, version string) {
 	this.So(this.packageInstaller.installed, should.Resemble, this.packageInstaller.remote)
 	this.So(this.packageInstaller.manifestRequest, should.Resemble, contracts.InstallationRequest{
@@ -286,15 +397,29 @@ type FakePackageInstaller struct {
 	installManifestCounter int
 	installPackageCounter  int
 	downloadError          error
+	manifestsByAddress     map[string]contracts.Manifest
+	errsByAddress          map[string]error
 }
 
-func (this *FakePackageInstaller) DownloadManifest(url.URL) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) DownloadManifest(address url.URL) (manifest contracts.Manifest, err error) {
+	if err, found := this.errsByAddress[address.String()]; found {
+		return contracts.Manifest{}, err
+	}
+	if manifest, found := this.manifestsByAddress[address.String()]; found {
+		return manifest, nil
+	}
 	return this.remoteLatest, this.downloadError
 }
 
 func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	this.installManifestCounter++
 	this.manifestRequest = request
+	if err, found := this.errsByAddress[request.RemoteAddress.String()]; found {
+		return contracts.Manifest{}, err
+	}
+	if manifest, found := this.manifestsByAddress[request.RemoteAddress.String()]; found {
+		return manifest, nil
+	}
 	return this.remote, this.installManifestErr
 }
 

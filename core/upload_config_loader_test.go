@@ -221,6 +221,40 @@ func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil()
 	this.So(err, should.Resemble, nilRemoteAddressPrefixErr)
 }
 
+func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
+	this.pkgConfig.Tags = []string{"stable", ""}
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, blankTagNameErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
+	this.pkgConfig.Tags = []string{"latest"}
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	_, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.Resemble, reservedTagNameErr)
+}
+
+func (this *UploadConfigLoaderFixture) TestValidTagsAccepted() {
+	this.pkgConfig.Tags = []string{"stable", "experimental"}
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	args := []string{"-json", "config.json"}
+
+	config, err := this.loader.LoadConfig("upload", args)
+
+	this.So(err, should.BeNil)
+	this.So(config.PackageConfig.Tags, should.Resemble, []string{"stable", "experimental"})
+}
+
 func (this *UploadConfigLoaderFixture) prepareValidJSONConfigFile() contracts.PackageConfig {
 	packageConfig := this.pkgConfig.configure()
 	raw, _ := json.Marshal(packageConfig)
@@ -236,6 +270,7 @@ type FakePackageConfig struct {
 	PackageName          string
 	PackageVersion       string
 	RemoteAddressPrefix  *contracts.URL
+	Tags                 []string
 }
 
 func NewFakePackageConfig() *FakePackageConfig {
@@ -256,6 +291,7 @@ func (this *FakePackageConfig) configure() contracts.PackageConfig {
 		PackageName:          this.PackageName,
 		PackageVersion:       this.PackageVersion,
 		RemoteAddressPrefix:  this.RemoteAddressPrefix,
+		Tags:                 this.Tags,
 	}
 }
 

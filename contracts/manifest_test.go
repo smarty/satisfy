@@ -34,6 +34,42 @@ func (this *ManifestFixture) TestMarshalManifest() {
 	this.So(clone, should.Resemble, original)
 }
 
+func (this *ManifestFixture) TestMarshalManifestWithTags() {
+	original := Manifest{
+		Name:    "package-name",
+		Version: "1.2.3",
+		Tags: []Tag{
+			{Name: "stable", Version: "1.2.2"},
+			{Name: "experimental", Version: "1.2.3"},
+		},
+	}
+	clone := this.unmarshal(this.marshal(original))
+	this.So(clone, should.Resemble, original)
+}
+
+func (this *ManifestFixture) TestTagsOmittedFromJSONWhenEmpty() {
+	raw := this.marshal(Manifest{Name: "package-name", Version: "1.2.3"})
+	this.So(string(raw), should.NotContainSubstring, "tags")
+}
+
+func (this *ManifestFixture) TestTagVersion() {
+	manifest := Manifest{
+		Version: "1.2.3",
+		Tags: []Tag{
+			{Name: "stable", Version: "1.2.2"},
+			{Name: "experimental", Version: "1.2.3"},
+		},
+	}
+
+	version, found := manifest.TagVersion("stable")
+	this.So(found, should.BeTrue)
+	this.So(version, should.Equal, "1.2.2")
+
+	version, found = manifest.TagVersion("nope")
+	this.So(found, should.BeFalse)
+	this.So(version, should.BeBlank)
+}
+
 func (this *ManifestFixture) unmarshal(raw []byte) Manifest {
 	var clone Manifest
 	err := json.Unmarshal(raw, &clone)

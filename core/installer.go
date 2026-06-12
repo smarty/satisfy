@@ -63,6 +63,7 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 	}
 
 	manifest.Name = request.PackageName
+	manifest.Tags = nil // the tag listing only belongs in the remote root manifest
 	rawManifest, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return contracts.Manifest{}, err
