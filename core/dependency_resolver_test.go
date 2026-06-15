@@ -318,6 +318,23 @@ func (this *DependencyResolverFixture) TestLiteralVersionShadowsTagOfSameName() 
 	this.assertNewPackageInstalled("B/C", "stable")
 }
 
+func (this *DependencyResolverFixture) TestVersionProbeFailurePreservesLocalInstallation() {
+	probeErr := errors.New("remote storage unavailable")
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "D")
+	this.dependency.PackageVersion = "E"
+	this.packageInstaller.errsByAddress = map[string]error{
+		"gcs://A/B/C/E/manifest.json": probeErr,
+	}
+
+	err := this.Resolve()
+
+	this.So(errors.Is(err, probeErr), should.BeTrue)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents2")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents3")
+}
+
 func (this *DependencyResolverFixture) TestTagResolutionFailsWhenRootManifestUnavailable() {
 	rootErr := errors.New("root manifest unavailable")
 	this.dependency.PackageVersion = "stable"
@@ -409,6 +426,16 @@ func (this *FakePackageInstaller) DownloadManifest(address url.URL) (manifest co
 		return manifest, nil
 	}
 	return this.remoteLatest, this.downloadError
+}
+
+func (this *FakePackageInstaller) ManifestExists(address url.URL) (bool, error) {
+	if err, found := this.errsByAddress[address.String()]; found {
+		if contracts.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {

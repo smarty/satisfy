@@ -125,12 +125,12 @@ func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Man
 // version path takes precedence over a tag of the same name; only when no such
 // version exists is the requested string resolved against the root manifest tags.
 func (this *DependencyResolver) localManifestMatchesRequestedTag(localManifest contracts.Manifest) (bool, error) {
-	_, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename))
-	if err == nil {
-		return false, nil
+	exists, err := this.packageInstaller.ManifestExists(this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename))
+	if err != nil {
+		return false, fmt.Errorf("failed to check for manifest of %s: %w", this.dependency.Title(), err)
 	}
-	if !contracts.IsNotFound(err) {
-		return false, fmt.Errorf("failed to download manifest for %s: %w", this.dependency.Title(), err)
+	if exists {
+		return false, nil
 	}
 
 	version, err := this.resolveTag()

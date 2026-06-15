@@ -56,6 +56,19 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 	return manifest, err
 }
 
+// ManifestExists performs a HEAD request, sparing the cost of downloading the
+// manifest body when only its presence matters.
+func (this *PackageInstaller) ManifestExists(remoteAddress url.URL) (bool, error) {
+	_, err := this.downloader.Size(remoteAddress)
+	if contracts.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	manifest, err = this.DownloadManifest(request.RemoteAddress)
 	if err != nil {
