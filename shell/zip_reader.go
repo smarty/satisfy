@@ -3,6 +3,7 @@ package shell
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -92,11 +93,7 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 	this.size, err = io.Copy(multiWriter, reader)
 
 	if err != nil {
-		err := tmp.Close()
-		if err != nil {
-			return err
-		}
-		return err
+		return errors.Join(err, tmp.Close())
 	}
 
 	err = progress.Close()
