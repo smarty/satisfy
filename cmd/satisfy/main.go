@@ -23,6 +23,8 @@ func main() {
 		checkMain(os.Args[2:])
 	case "latest":
 		latestMain(os.Args[2:])
+	case "tags":
+		tagsMain(os.Args[2:])
 	case "version":
 		versionMain()
 	case "download":
@@ -56,6 +58,38 @@ func downloadMain(args []string) {
 		log.Fatal(err)
 	}
 	transfer.NewDownloadApp(config).Run()
+}
+
+func tagsMain(args []string) {
+	sub := ""
+	if len(args) > 0 {
+		sub = args[0]
+	}
+	switch sub {
+	case "list":
+		tagsListMain(args[1:])
+	case "modify":
+		tagsModifyMain(args[1:])
+	default:
+		log.Fatal("usage: satisfy tags <list|modify> [options] (try 'satisfy tags list -h' or 'satisfy tags modify -h')")
+	}
+}
+
+func tagsModifyMain(args []string) {
+	loader := core.NewTagsConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
+	config, err := loader.LoadConfig(args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	transfer.NewTagsApp(config).Run()
+}
+
+func tagsListMain(args []string) {
+	config, err := transfer.ParseTagsListConfig(args)
+	if err != nil {
+		log.Fatal(err)
+	}
+	transfer.NewTagsListApp(config).Run()
 }
 
 func latestMain(args []string) {

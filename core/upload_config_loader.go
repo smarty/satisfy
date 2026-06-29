@@ -112,13 +112,17 @@ func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.P
 }
 
 func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error) {
+	return readRawJSON(this.storage, this.stdin, path)
+}
+
+func readRawJSON(storage contracts.FileReader, stdin io.Reader, path string) (data []byte, err error) {
 	if path == "" {
 		return nil, blankJSONPathErr
 	}
 	if path == "_STDIN_" {
-		return io.ReadAll(this.stdin)
+		return io.ReadAll(stdin)
 	} else {
-		return this.storage.ReadFile(path)
+		return storage.ReadFile(path)
 	}
 }
 
@@ -141,6 +145,21 @@ func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.Upload
 	if config.PackageConfig.RemoteAddressPrefix == nil {
 		return nilRemoteAddressPrefixErr
 	}
+	for _, tag := range config.PackageConfig.Tags {
+		if err := validateTagName(tag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateTagName(name string) error {
+	if name == "" {
+		return blankTagNameErr
+	}
+	if name == "latest" {
+		return reservedTagNameErr
+	}
 	return nil
 }
 
@@ -152,4 +171,10 @@ var (
 	blankPackageNameErr          = errors.New("package name should not be blank")
 	blankPackageVersionErr       = errors.New("package version should not be blank")
 	nilRemoteAddressPrefixErr    = errors.New("remote address prefix should not be nil")
+	blankTagNameErr              = errors.New("tag name should not be blank")
+	reservedTagNameErr           = errors.New("'latest' is a reserved tag name")
+	blankTagVersionErr           = errors.New("tag version should not be blank")
+	duplicateTagNameErr          = errors.New("tag name listed more than once")
+	conflictingTagNameErr        = errors.New("tag name appears in both add and delete lists")
+	noTagModificationsErr        = errors.New("at least one tag addition or deletion is required")
 )
