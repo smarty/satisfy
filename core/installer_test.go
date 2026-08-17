@@ -12,11 +12,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
 	"github.com/smarty/satisfy/contracts"
+	"github.com/smarty/satisfy/shell"
 )
 
 func TestPackageInstallerFixture(t *testing.T) {
@@ -85,7 +87,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 	this.So(this.filesystem.fileSystem["local/path/Goodbye/World"].Mode(), should.Equal, 0755)
 }
 
-func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsingZstdCompression() {
+func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZstdCompression() {
 	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
 
 	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
@@ -94,6 +96,34 @@ func (this *PackageInstallerFixture) LongTestInstallPackageToLocalFileSystemUsin
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
 	this.So(this.filesystem.readFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
 	this.So(this.filesystem.readFile("local/path/Link"), should.Resemble, []byte("Hello World"))
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZipCompression() {
+	checksum := this.downloader.prepareZipArchiveDownload()
+
+	err := this.installer.InstallPackage(this.buildZipManifest(checksum), this.installationRequest(""))
+
+	this.So(err, should.BeNil)
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+	this.So(this.filesystem.readFile("local/path/Goodbye/World"), should.Resemble, []byte("Goodbye World"))
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageZipChecksumMismatch() {
+	this.downloader.prepareZipArchiveDownload()
+
+	err := this.installer.InstallPackage(this.buildZipManifest([]byte("mismatch")), this.installationRequest(""))
+
+	this.So(err, should.NotBeNil)
+	this.So(this.filesystem.Listing(), should.BeEmpty)
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageMalformedZipArchive() {
+	this.downloader.prepareMalformedDownload()
+
+	err := this.installer.InstallPackage(this.buildZipManifest(nil), this.installationRequest(""))
+
+	this.So(err, should.NotBeNil)
+	this.So(this.filesystem.Listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
@@ -142,6 +172,21 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 				{Path: "Link"},
 			},
 			CompressionAlgorithm: compressionAlgorithm,
+		},
+	}
+}
+
+// The zip format serves as both archive and compression, so there is no tar
+// stream inside and symlinks cannot be represented.
+func (this *PackageInstallerFixture) buildZipManifest(checksum []byte) contracts.Manifest {
+	return contracts.Manifest{
+		Archive: contracts.Archive{
+			MD5Checksum: checksum,
+			Contents: []contracts.ArchiveItem{
+				{Path: "Hello/World"},
+				{Path: "Goodbye/World"},
+			},
+			CompressionAlgorithm: zipAlgorithm,
 		},
 	}
 }
@@ -216,6 +261,30 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 	return hasher.Sum(nil)
 }
 
+func (this *FakeDownloader) prepareZipArchiveDownload() []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	archiveWriter := shell.NewZipArchiveWriter(io.MultiWriter(hasher, writer), 4)
+
+	archiveWriter.WriteHeader(contracts.ArchiveHeader{
+		Name:    "Hello/World",
+		Size:    int64(len("Hello World")),
+		ModTime: time.Now(),
+	})
+	_, _ = archiveWriter.Write([]byte("Hello World"))
+	archiveWriter.WriteHeader(contracts.ArchiveHeader{
+		Name:    "Goodbye/World",
+		Size:    int64(len("Goodbye World")),
+		ModTime: time.Now(),
+	})
+	_, _ = archiveWriter.Write([]byte("Goodbye World"))
+	_ = archiveWriter.Close()
+
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
+
+	return hasher.Sum(nil)
+}
+
 func (this *FakeDownloader) prepareManifestDownload(manifest contracts.Manifest) {
 	raw, _ := json.Marshal(manifest)
 	this.Body = io.NopCloser(bytes.NewReader(raw))
@@ -245,4 +314,5 @@ var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 const (
 	gzipAlgorithm = "gzip"
 	zstdAlgorithm = "zstd"
+	zipAlgorithm  = "zip"
 )
