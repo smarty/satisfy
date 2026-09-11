@@ -131,7 +131,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 
 	for i := 0; ; i++ {
 		header, err := reader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

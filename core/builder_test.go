@@ -49,10 +49,10 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true}, contents: []byte("a")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime}, contents: []byte("bb")},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime}, contents: nil},
-		{ArchiveHeader: contracts.ArchiveHeader{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime}, contents: []byte("ccc")},
+		{Name: "file0.txt", Size: 1, ModTime: InMemoryModTime, Executable: true, contents: []byte("a")},
+		{Name: "file1.txt", Size: 2, ModTime: InMemoryModTime, contents: []byte("bb")},
+		{Name: "inner/link.txt", LinkName: "../file0.txt", Size: 0, ModTime: InMemoryModTime, contents: nil},
+		{Name: "sub/file0.txt", Size: 3, ModTime: InMemoryModTime, contents: []byte("ccc")},
 	})
 	this.So(this.archive.closed, should.BeTrue)
 }
@@ -86,12 +86,13 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed
 	if !this.So(err, should.BeNil) {
 		return
 	}
-	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{ArchiveHeader: contracts.ArchiveHeader{
+	this.So(this.archive.items[2], should.Resemble, &ArchiveItem{
 		Name:     "inner/link.txt",
 		LinkName: "../file0.txt",
 		Size:     0,
 		ModTime:  InMemoryModTime,
-	}, contents: nil})
+		contents: nil,
+	})
 }
 func (this *DirectoryPackageBuilderFixture) TestFileOnlyEnsureNoPath() {
 	this.fileSystem = newInMemoryFileSystem()

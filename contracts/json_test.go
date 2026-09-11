@@ -23,8 +23,7 @@ func (this *URLFixture) TestMarshal() {
 	address, err := url.Parse("https://google.com")
 	this.So(err, should.BeNil)
 	url := URL(*address)
-	pointer := &url
-	raw, err := pointer.MarshalJSON()
+	raw, err := url.MarshalJSON()
 	this.So(err, should.BeNil)
 	this.So(string(raw), should.Equal, `"https://google.com"`)
 }

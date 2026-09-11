@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,7 +47,7 @@ func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
 		files = append(files, file)
 	}
 
-	sort.Slice(files, func(i, j int) bool { return files[i].Path() < files[j].Path() })
+	slices.SortFunc(files, func(a, b contracts.FileInfo) int { return strings.Compare(a.Path(), b.Path()) })
 	return files
 }
 

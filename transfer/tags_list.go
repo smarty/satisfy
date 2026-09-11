@@ -10,7 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -148,7 +148,7 @@ func (this *TagsListApp) TryRun() error {
 // empty string so that scripts see no output and a zero exit code.
 func FormatTags(tags []contracts.Tag, asJSON bool) (string, error) {
 	sorted := append([]contracts.Tag(nil), tags...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	slices.SortFunc(sorted, func(a, b contracts.Tag) int { return strings.Compare(a.Name, b.Name) })
 
 	if asJSON {
 		if sorted == nil {

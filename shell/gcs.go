@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/contracts"
@@ -124,10 +125,5 @@ func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
 }
 
 func (this *GoogleCloudStorageClient) isExpectedStatus(statusCode int) bool {
-	for _, expectedStatus := range this.expectedStatus {
-		if expectedStatus == statusCode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(this.expectedStatus, statusCode)
 }

@@ -53,8 +53,8 @@ func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url
 var RetryErr = errors.New("retry")
 
 func IsNotFound(err error) bool {
-	var statusError *StatusCodeError
-	return errors.As(err, &statusError) && statusError.StatusCode() == http.StatusNotFound
+	statusError, ok := errors.AsType[*StatusCodeError](err)
+	return ok && statusError.StatusCode() == http.StatusNotFound
 }
 
 type StatusCodeError struct {

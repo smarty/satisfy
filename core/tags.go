@@ -1,7 +1,8 @@
 package core
 
 import (
-	"sort"
+	"slices"
+	"strings"
 
 	"github.com/smarty/satisfy/contracts"
 )
@@ -51,5 +52,5 @@ func removeTag(tags []contracts.Tag, name string) []contracts.Tag {
 }
 
 func sortTags(tags []contracts.Tag) {
-	sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
+	slices.SortFunc(tags, func(a, b contracts.Tag) int { return strings.Compare(a.Name, b.Name) })
 }

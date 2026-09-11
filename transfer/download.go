@@ -30,7 +30,6 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
 	)
 	waiter := new(sync.WaitGroup)
-	waiter.Add(len(config.Dependencies.Listing))
 	return &DownloadApp{
 		listing:   config.Dependencies,
 		installer: installer,
@@ -49,7 +48,7 @@ func (this *DownloadApp) Run() {
 
 func (this *DownloadApp) TryRun() error {
 	for _, dependency := range this.listing.Listing {
-		go this.install(dependency)
+		this.waiter.Go(func() { this.install(dependency) })
 	}
 	go this.awaitCompletion()
 	failed := 0
@@ -69,8 +68,6 @@ func (this *DownloadApp) awaitCompletion() {
 }
 
 func (this *DownloadApp) install(dependency contracts.Dependency) {
-	defer this.waiter.Done()
-
 	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
 	err := resolver.Resolve()
 	if err != nil {
