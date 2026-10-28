@@ -25,6 +25,7 @@ type ZipArchiveReader struct {
 	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
 	file                 *os.File
+	showProgress         bool
 }
 
 func (this *ZipArchiveReader) Next() (*tar.Header, error) {
@@ -82,10 +83,12 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 	this.file = tmp
 
 	progress := archive_progress.NewArchiveProgressCounter(this.size, func(archived, total string, done bool) {
-		if done {
-			fmt.Printf("\nDone downloading archive %s.\n", archived)
-		} else {
-			fmt.Printf("\033[2K\rDownloading archive... %s.", archived)
+		if this.showProgress {
+			if done {
+				fmt.Printf("\nDone downloading archive %s.\n", archived)
+			} else {
+				fmt.Printf("\033[2K\rDownloading archive... %s.", archived)
+			}
 		}
 	})
 
@@ -125,8 +128,8 @@ func (this *ZipArchiveReader) Close() error {
 	return nil
 }
 
-func NewZipArchiveReader(reader io.Reader) io.ReadCloser {
-	zipArchiveReader := &ZipArchiveReader{checksumReader: reader}
+func NewZipArchiveReader(reader io.Reader, showProgress bool) io.ReadCloser {
+	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, showProgress: showProgress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
 		log.Fatalf("failed to download zip archive: %s", err)

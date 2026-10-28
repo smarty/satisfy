@@ -29,7 +29,7 @@ func (this *ZipArchiveFixture) Setup() {
 
 func (this *ZipArchiveFixture) TestWrittenArchiveCanBeReadBack() {
 	this.writeArchive(flate.BestCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes())).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
 	defer func() { _ = reader.Close() }()
 
 	for _, entry := range zipFixtureEntries {
@@ -55,7 +55,7 @@ func (this *ZipArchiveFixture) TestWrittenArchiveCanBeReadBack() {
 
 func (this *ZipArchiveFixture) TestCloseRemovesTemporaryArchiveFile() {
 	this.writeArchive(flate.DefaultCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes())).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
 	tempName := reader.file.Name()
 
 	_, statErr := os.Stat(tempName)
@@ -71,7 +71,7 @@ func (this *ZipArchiveFixture) TestEmptyArchiveYieldsEOF() {
 	writer := NewZipArchiveWriter(this.buffer, flate.DefaultCompression)
 	this.So(writer.Close(), should.BeNil)
 
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes())).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
 	defer func() { _ = reader.Close() }()
 
 	_, err := reader.Next()
@@ -79,7 +79,7 @@ func (this *ZipArchiveFixture) TestEmptyArchiveYieldsEOF() {
 }
 
 func (this *ZipArchiveFixture) TestMalformedArchiveReportsErrorFromNext() {
-	reader := NewZipArchiveReader(strings.NewReader("this is not a zip archive")).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(strings.NewReader("this is not a zip archive"), false).(*ZipArchiveReader)
 	defer func() { _ = reader.Close() }()
 
 	_, err := reader.Next()
@@ -107,7 +107,7 @@ func (this *ZipArchiveFixture) TestWriterCloseIsIdempotent() {
 	this.So(writer.Close(), should.BeNil)
 	this.So(writer.Close(), should.BeNil)
 
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes())).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
 	defer func() { _ = reader.Close() }()
 
 	header, err := reader.Next()
@@ -122,7 +122,7 @@ func (this *ZipArchiveFixture) TestWriterCloseIsIdempotent() {
 
 func (this *ZipArchiveFixture) TestReadAtServesTheDownloadedArchive() {
 	this.writeArchive(flate.DefaultCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes())).(*ZipArchiveReader)
+	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
 	defer func() { _ = reader.Close() }()
 
 	signature := make([]byte, 4)

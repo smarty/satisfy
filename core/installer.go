@@ -98,7 +98,7 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	if !found {
 		return errors.New("invalid compression algorithm")
 	}
-	decompressor, err := factory(checksumReader)
+	decompressor, err := factory(checksumReader, this.showProgress)
 	if err != nil {
 		return err
 	}
@@ -204,23 +204,23 @@ func ComposeManifestPath(localPath, packageName string) string {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var decompressors = map[string]func(_ io.Reader) (io.ReadCloser, error){
+var decompressors = map[string]func(source io.Reader, showProgress bool) (io.ReadCloser, error){
 	"zstd": newZStdReader,
 	"zip":  newZipReader,
 	"gzip": newGZipReader,
 }
 
-func newZStdReader(source io.Reader) (io.ReadCloser, error) {
+func newZStdReader(source io.Reader, _ bool) (io.ReadCloser, error) {
 	if reader, err := zstd.NewReader(source); err != nil {
 		return nil, err
 	} else {
 		return reader.IOReadCloser(), nil
 	}
 }
-func newZipReader(source io.Reader) (io.ReadCloser, error) {
-	return shell.NewZipArchiveReader(source).(io.ReadCloser), nil
+func newZipReader(source io.Reader, showProgress bool) (io.ReadCloser, error) {
+	return shell.NewZipArchiveReader(source, showProgress), nil
 }
-func newGZipReader(source io.Reader) (io.ReadCloser, error) {
+func newGZipReader(source io.Reader, _ bool) (io.ReadCloser, error) {
 	return gzip.NewReader(source)
 }
 

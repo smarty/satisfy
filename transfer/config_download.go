@@ -39,7 +39,7 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 	flags.BoolVar(&config.ShowProgress,
 		"progress",
 		true,
-		"Displays progress stats as files are extracted from the archive.",
+		"Displays progress stats as files are added or extracted.",
 	)
 	flags.StringVar(&config.jsonPath,
 		"json",
