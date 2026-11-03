@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"runtime/debug"
 
 	"github.com/smarty/satisfy/core"
 	"github.com/smarty/satisfy/shell"
@@ -101,7 +102,19 @@ func latestMain(args []string) {
 }
 
 func versionMain() {
-	log.Printf("satisfy [%s]\n", ldflagsSoftwareVersion)
+	log.Printf("satisfy [%s]\n", softwareVersion())
+}
+
+// softwareVersion prefers the version set at build time with -ldflags, falling back to the
+// module version Go records in the binary
+func softwareVersion() string {
+	if ldflagsSoftwareVersion != "" && ldflagsSoftwareVersion != "debug" {
+		return ldflagsSoftwareVersion
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return "debug"
 }
 
 var ldflagsSoftwareVersion = "debug"
