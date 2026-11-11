@@ -3,7 +3,6 @@ package core
 import (
 	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -15,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/cmd/archive_progress"
 	"github.com/smarty/satisfy/contracts"

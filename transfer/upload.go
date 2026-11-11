@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/contracts"
 	"github.com/smarty/satisfy/core"
@@ -163,7 +163,7 @@ func (this *UploadApp) InitializeCompressor(writer io.Writer) {
 
 var compression = map[string]func(_ io.Writer, level int) io.WriteCloser{
 	"zstd": func(writer io.Writer, level int) io.WriteCloser {
-		compressor, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(level)))
+		compressor, err := shell.NewParallelZstdWriter(writer, zstd.EncoderLevelFromZstd(level), shell.DefaultParallelZstdChunkSize)
 		if err != nil {
 			log.Fatal(err)
 		}
