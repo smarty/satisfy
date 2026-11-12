@@ -2,10 +2,10 @@ package shell
 
 import (
 	"archive/zip"
-	"compress/flate"
 	"io"
 	"sync"
 
+	"github.com/klauspost/compress/flate"
 	"github.com/smarty/satisfy/contracts"
 )
 
