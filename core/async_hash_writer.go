@@ -1,21 +1,25 @@
 package core
 
 import (
+	"errors"
 	"hash"
 	"sync"
 )
+
+var ErrAsyncHashWriterClosed = errors.New("async hash writer: write after close")
 
 // AsyncHashWriter feeds a hash on its own goroutine so hashing overlaps with
 // whatever else consumes the same data (e.g. archiving and compression)
 // instead of running in series with it. Each Write copies its input, so
 // callers may reuse their buffers immediately. Close must be called before
-// reading the hash's Sum.
+// reading the hash's Sum. Like the hash it wraps, an AsyncHashWriter is not
+// safe for concurrent use.
 type AsyncHashWriter struct {
 	hasher   hash.Hash
 	pending  chan []byte
 	buffers  sync.Pool
 	finished chan struct{}
-	once     sync.Once
+	closed   bool
 }
 
 // asyncHashQueueDepth bounds how far the hasher may fall behind, which caps
@@ -33,6 +37,9 @@ func NewAsyncHashWriter(hasher hash.Hash) *AsyncHashWriter {
 }
 
 func (this *AsyncHashWriter) Write(p []byte) (int, error) {
+	if this.closed {
+		return 0, ErrAsyncHashWriterClosed
+	}
 	buffer := this.takeBuffer()
 	buffer = append(buffer, p...)
 	this.pending <- buffer
@@ -42,10 +49,12 @@ func (this *AsyncHashWriter) Write(p []byte) (int, error) {
 // Close waits until every written byte has been hashed. It is safe to call
 // more than once.
 func (this *AsyncHashWriter) Close() error {
-	this.once.Do(func() {
-		close(this.pending)
-		<-this.finished
-	})
+	if this.closed {
+		return nil
+	}
+	this.closed = true
+	close(this.pending)
+	<-this.finished
 	return nil
 }
 

@@ -55,11 +55,25 @@ type parallelZstdFrame struct {
 	encoded chan struct{}
 }
 
+// NewParallelZstdWriter sizes its worker pool to the available cores, reduced
+// only when the memory available to this process could not hold that many
+// workers (see ParallelZstdConcurrency).
 func NewParallelZstdWriter(target io.Writer, level zstd.EncoderLevel, chunkSize int) (*ParallelZstdWriter, error) {
 	if chunkSize <= 0 {
 		chunkSize = DefaultParallelZstdChunkSize
 	}
-	concurrency := min(runtime.GOMAXPROCS(0), MaxParallelZstdConcurrency)
+	cores := min(runtime.GOMAXPROCS(0), MaxParallelZstdConcurrency)
+	concurrency := ParallelZstdConcurrency(cores, level, chunkSize, AvailableMemory())
+	return NewParallelZstdWriterWithConcurrency(target, level, chunkSize, concurrency)
+}
+
+// NewParallelZstdWriterWithConcurrency uses exactly the given number of
+// workers (minimum 1).
+func NewParallelZstdWriterWithConcurrency(target io.Writer, level zstd.EncoderLevel, chunkSize, concurrency int) (*ParallelZstdWriter, error) {
+	if chunkSize <= 0 {
+		chunkSize = DefaultParallelZstdChunkSize
+	}
+	concurrency = max(concurrency, 1)
 	encoder, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(level), zstd.WithEncoderConcurrency(concurrency))
 	if err != nil {
 		return nil, err

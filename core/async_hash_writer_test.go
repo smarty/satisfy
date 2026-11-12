@@ -47,3 +47,17 @@ func (this *AsyncHashWriterFixture) TestCloseIsIdempotentAndHandlesNoWrites() {
 	expected := md5.Sum(nil)
 	this.So(hasher.Sum(nil), should.Resemble, expected[:])
 }
+
+func (this *AsyncHashWriterFixture) TestWriteAfterCloseReturnsErrorInsteadOfPanicking() {
+	hasher := md5.New()
+	writer := NewAsyncHashWriter(hasher)
+	_, _ = writer.Write([]byte("Hello"))
+	this.So(writer.Close(), should.BeNil)
+
+	written, err := writer.Write([]byte("World"))
+
+	this.So(written, should.Equal, 0)
+	this.So(err, should.Equal, ErrAsyncHashWriterClosed)
+	expected := md5.Sum([]byte("Hello"))
+	this.So(hasher.Sum(nil), should.Resemble, expected[:])
+}
