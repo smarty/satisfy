@@ -1,6 +1,9 @@
 package shell
 
 import (
+	"io"
+	"math"
+	"runtime/debug"
 	"testing"
 	"testing/fstest"
 
@@ -55,6 +58,33 @@ func (this *AvailableMemoryFixture) TestCgroupV2UnlimitedIsIgnored() {
 	this.file("sys/fs/cgroup/memory.current", "1\n")
 
 	this.So(availableMemory(this.root, 0), should.Equal, 1024000*1024)
+}
+
+func (this *AvailableMemoryFixture) TestCgroupV2MemoryHighBelowMaxIsTheLimit() {
+	this.file("proc/self/cgroup", "0::/\n")
+	this.file("sys/fs/cgroup/memory.max", "8589934592\n")  // 8GB OOM limit...
+	this.file("sys/fs/cgroup/memory.high", "2147483648\n") // ...but throttled above 2GB
+	this.file("sys/fs/cgroup/memory.current", "536870912\n")
+
+	this.So(availableMemory(this.root, 0), should.Equal, 2048*mebibyte-512*mebibyte)
+}
+
+func (this *AvailableMemoryFixture) TestCgroupV2MemoryHighAloneIsALimit() {
+	this.file("proc/self/cgroup", "0::/\n")
+	this.file("sys/fs/cgroup/memory.max", "max\n")
+	this.file("sys/fs/cgroup/memory.high", "1073741824\n")
+	this.file("sys/fs/cgroup/memory.current", "104857600\n")
+
+	this.So(availableMemory(this.root, 0), should.Equal, 1024*mebibyte-100*mebibyte)
+}
+
+func (this *AvailableMemoryFixture) TestCgroupV2MemoryMaxBelowHighIsTheLimit() {
+	this.file("proc/self/cgroup", "0::/\n")
+	this.file("sys/fs/cgroup/memory.max", "1073741824\n")
+	this.file("sys/fs/cgroup/memory.high", "max\n")
+	this.file("sys/fs/cgroup/memory.current", "0\n")
+
+	this.So(availableMemory(this.root, 0), should.Equal, 1024*mebibyte)
 }
 
 func (this *AvailableMemoryFixture) TestCgroupV2TightestAncestorLimitApplies() {
@@ -118,4 +148,51 @@ func (this *ParallelZstdConcurrencyFixture) TestConstrainedMemoryReducesWorkers(
 func (this *ParallelZstdConcurrencyFixture) TestTinyMemoryStillUsesOneWorker() {
 	this.So(ParallelZstdConcurrency(16, zstd.SpeedBestCompression, DefaultParallelZstdChunkSize, 1), should.Equal, 1)
 	this.So(ParallelZstdConcurrency(0, zstd.SpeedFastest, DefaultParallelZstdChunkSize, 0), should.Equal, 1)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// GoMemoryLimitFixture changes the process-wide GOMEMLIMIT, so it must not run
+// alongside other tests.
+func TestGoMemoryLimitFixture(t *testing.T) {
+	gunit.Run(new(GoMemoryLimitFixture), t, gunit.Options.AllSequential())
+}
+
+type GoMemoryLimitFixture struct {
+	*gunit.Fixture
+	original int64
+}
+
+func (this *GoMemoryLimitFixture) Setup() {
+	this.original = debug.SetMemoryLimit(-1)
+}
+func (this *GoMemoryLimitFixture) Teardown() {
+	debug.SetMemoryLimit(this.original)
+}
+
+func (this *GoMemoryLimitFixture) TestNoLimitMeansUnknown() {
+	debug.SetMemoryLimit(math.MaxInt64)
+
+	this.So(goMemoryHeadroom(), should.Equal, 0)
+}
+
+func (this *GoMemoryLimitFixture) TestHeadroomIsLimitMinusRuntimeUsage() {
+	const limit = 64 << 30
+	debug.SetMemoryLimit(limit)
+
+	headroom := goMemoryHeadroom()
+
+	this.So(headroom, should.BeGreaterThan, 0)
+	this.So(headroom, should.BeLessThan, uint64(limit))
+	this.So(headroom, should.BeGreaterThan, uint64(limit)-(1<<30)) // a test binary uses far less than 1GB
+}
+
+func (this *GoMemoryLimitFixture) TestWriterUsesOneWorkerWhenGoMemoryLimitIsExhausted() {
+	debug.SetMemoryLimit(1) // far below what the runtime already holds
+
+	writer, err := NewParallelZstdWriter(io.Discard, zstd.SpeedBestCompression, DefaultParallelZstdChunkSize)
+	this.So(err, should.BeNil)
+	defer func() { _ = writer.Close() }()
+
+	this.So(writer.concurrency, should.Equal, 1)
 }

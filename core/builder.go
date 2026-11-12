@@ -90,14 +90,16 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		fmt.Printf("\n")
 	}()
 	defer closeResource(progressWriter)
-	// Hashing runs on its own goroutine so it overlaps with archiving and
-	// compression; it must finish before buildManifestEntry reads the sum.
-	hasher := NewAsyncHashWriter(this.hasher)
-	writer := io.MultiWriter(hasher, this.archive, progressWriter)
 	reader := this.storage.Open(file.Path())
 	defer closeResource(reader)
+	// Hashing runs on its own goroutine so it overlaps with archiving and
+	// compression. It starts only after Open (which may panic) succeeds, and the
+	// deferred Close both stops the goroutine and finishes hashing before
+	// buildManifestEntry reads the sum.
+	hasher := NewAsyncHashWriter(this.hasher)
+	defer closeResource(hasher)
+	writer := io.MultiWriter(hasher, this.archive, progressWriter)
 	_, err := io.Copy(writer, reader)
-	_ = hasher.Close()
 
 	return err
 }

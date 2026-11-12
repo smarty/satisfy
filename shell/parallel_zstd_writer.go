@@ -14,12 +14,6 @@ import (
 // better but cannot reference data in neighboring chunks.
 const DefaultParallelZstdChunkSize = 8 << 20
 
-// MaxParallelZstdConcurrency caps the worker count so memory stays bounded on
-// hosts with many cores. Each worker holds an input chunk, an output frame,
-// and its own encoder state; beyond this many workers, archive building is
-// limited by per-file hashing rather than compression anyway.
-const MaxParallelZstdConcurrency = 16
-
 var ErrParallelZstdWriterClosed = errors.New("parallel zstd writer: write after close")
 
 // ParallelZstdWriter compresses its input on several cores by splitting it into
@@ -33,20 +27,21 @@ var ErrParallelZstdWriterClosed = errors.New("parallel zstd writer: write after 
 //
 // Like zstd.Encoder, a ParallelZstdWriter is not safe for concurrent use.
 type ParallelZstdWriter struct {
-	encoder   *zstd.Encoder
-	target    io.Writer
-	chunkSize int
-	buffer    []byte
-	inputs    sync.Pool
-	outputs   sync.Pool
-	jobs      chan *parallelZstdFrame
-	ordered   chan *parallelZstdFrame
-	workers   sync.WaitGroup
-	finished  chan struct{}
-	closed    bool
-	closeErr  error
-	mutex     sync.Mutex
-	err       error
+	encoder     *zstd.Encoder
+	target      io.Writer
+	chunkSize   int
+	concurrency int
+	buffer      []byte
+	inputs      sync.Pool
+	outputs     sync.Pool
+	jobs        chan *parallelZstdFrame
+	ordered     chan *parallelZstdFrame
+	workers     sync.WaitGroup
+	finished    chan struct{}
+	closed      bool
+	closeErr    error
+	mutex       sync.Mutex
+	err         error
 }
 
 type parallelZstdFrame struct {
@@ -59,32 +54,28 @@ type parallelZstdFrame struct {
 // only when the memory available to this process could not hold that many
 // workers (see ParallelZstdConcurrency).
 func NewParallelZstdWriter(target io.Writer, level zstd.EncoderLevel, chunkSize int) (*ParallelZstdWriter, error) {
-	if chunkSize <= 0 {
-		chunkSize = DefaultParallelZstdChunkSize
-	}
-	cores := min(runtime.GOMAXPROCS(0), MaxParallelZstdConcurrency)
-	concurrency := ParallelZstdConcurrency(cores, level, chunkSize, AvailableMemory())
+	chunkSize = resolveParallelZstdChunkSize(chunkSize)
+	concurrency := ParallelZstdConcurrency(runtime.GOMAXPROCS(0), level, chunkSize, AvailableMemory())
 	return NewParallelZstdWriterWithConcurrency(target, level, chunkSize, concurrency)
 }
 
 // NewParallelZstdWriterWithConcurrency uses exactly the given number of
 // workers (minimum 1).
 func NewParallelZstdWriterWithConcurrency(target io.Writer, level zstd.EncoderLevel, chunkSize, concurrency int) (*ParallelZstdWriter, error) {
-	if chunkSize <= 0 {
-		chunkSize = DefaultParallelZstdChunkSize
-	}
+	chunkSize = resolveParallelZstdChunkSize(chunkSize)
 	concurrency = max(concurrency, 1)
 	encoder, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(level), zstd.WithEncoderConcurrency(concurrency))
 	if err != nil {
 		return nil, err
 	}
 	this := &ParallelZstdWriter{
-		encoder:   encoder,
-		target:    target,
-		chunkSize: chunkSize,
-		jobs:      make(chan *parallelZstdFrame, concurrency),
-		ordered:   make(chan *parallelZstdFrame, concurrency),
-		finished:  make(chan struct{}),
+		encoder:     encoder,
+		target:      target,
+		chunkSize:   chunkSize,
+		concurrency: concurrency,
+		jobs:        make(chan *parallelZstdFrame, concurrency),
+		ordered:     make(chan *parallelZstdFrame, concurrency),
+		finished:    make(chan struct{}),
 	}
 	this.inputs.New = func() any { buffer := make([]byte, 0, chunkSize); return &buffer }
 	this.outputs.New = func() any { buffer := make([]byte, 0, encoder.MaxEncodedSize(chunkSize)); return &buffer }
@@ -94,6 +85,13 @@ func NewParallelZstdWriterWithConcurrency(target io.Writer, level zstd.EncoderLe
 	}
 	go this.writeFramesInOrder()
 	return this, nil
+}
+
+func resolveParallelZstdChunkSize(chunkSize int) int {
+	if chunkSize <= 0 {
+		return DefaultParallelZstdChunkSize
+	}
+	return chunkSize
 }
 
 // Write buffers p and hands each completed chunk to the workers. Because data

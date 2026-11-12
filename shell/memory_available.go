@@ -49,15 +49,23 @@ func goMemoryHeadroom() uint64 {
 	if limit <= 0 || limit == math.MaxInt64 {
 		return 0
 	}
-	sample := []metrics.Sample{{Name: "/memory/classes/total:bytes"}}
-	metrics.Read(sample)
-	return headroom(uint64(limit), sample[0].Value.Uint64())
+	// The runtime enforces GOMEMLIMIT against mapped memory minus heap pages
+	// already returned to the OS, so released pages are not counted as used.
+	samples := []metrics.Sample{
+		{Name: "/memory/classes/total:bytes"},
+		{Name: "/memory/classes/heap/released:bytes"},
+	}
+	metrics.Read(samples)
+	total, released := samples[0].Value.Uint64(), samples[1].Value.Uint64()
+	return headroom(uint64(limit), total-min(released, total))
 }
 
 // cgroupV2Headroom walks from this process's cgroup up to the root (limits on
-// an enclosing slice apply too) and returns the smallest memory.max minus
-// working set. Working set excludes inactive page cache, which the kernel
-// reclaims before OOM-killing (the same measure Kubernetes uses for eviction).
+// an enclosing slice apply too) and returns the smallest limit minus working
+// set. The limit is the lower of memory.max (OOM-kill) and memory.high (heavy
+// reclaim throttling, e.g. systemd MemoryHigh= or Kubernetes MemoryQoS).
+// Working set excludes inactive page cache, which the kernel reclaims before
+// OOM-killing (the same measure Kubernetes uses for eviction).
 func cgroupV2Headroom(root fs.FS) uint64 {
 	group, found := ownCgroup(root, func(hierarchy, controllers string) bool { return hierarchy == "0" && controllers == "" })
 	if !found {
@@ -65,9 +73,17 @@ func cgroupV2Headroom(root fs.FS) uint64 {
 	}
 	smallest := uint64(0)
 	for directory := range cgroupAncestors("sys/fs/cgroup", group) {
-		limit, ok := readCgroupNumber(root, path.Join(directory, "memory.max"))
-		if !ok {
+		hardLimit, hasHard := readCgroupNumber(root, path.Join(directory, "memory.max"))
+		softLimit, hasSoft := readCgroupNumber(root, path.Join(directory, "memory.high"))
+		if !hasHard && !hasSoft {
 			continue
+		}
+		limit := uint64(0)
+		if hasHard {
+			limit = hardLimit
+		}
+		if hasSoft {
+			limit = tighter(limit, softLimit)
 		}
 		usage, _ := readCgroupNumber(root, path.Join(directory, "memory.current"))
 		inactive := readCgroupStat(root, path.Join(directory, "memory.stat"), "inactive_file")
