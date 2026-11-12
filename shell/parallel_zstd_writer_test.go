@@ -30,8 +30,10 @@ func (this *ParallelZstdWriterFixture) TestOutputSpanningManyFramesDecodesToOrig
 	writer := this.newWriter(this.buffer, 4<<10)
 
 	// Uneven writes exercise chunk boundaries that don't line up with Write calls.
+	// A fixed seed keeps any boundary-specific failure reproducible.
+	random := rand.New(rand.NewPCG(3, 4))
 	for remaining := input; len(remaining) > 0; {
-		count := min(len(remaining), 1+rand.IntN(10_000))
+		count := min(len(remaining), 1+random.IntN(10_000))
 		written, err := writer.Write(remaining[:count])
 		this.So(err, should.BeNil)
 		this.So(written, should.Equal, count)
@@ -81,8 +83,50 @@ func (this *ParallelZstdWriterFixture) TestTargetWriteFailureIsReported() {
 	err := writer.Close()
 
 	this.So(errors.Is(err, failure), should.BeTrue)
-	_, err = writer.Write([]byte("more"))
+	this.So(errors.Is(writer.Close(), failure), should.BeTrue)
+}
+
+func (this *ParallelZstdWriterFixture) TestTargetWriteFailureStopsWritesPromptly() {
+	failure := errors.New("disk full")
+	writer := this.newWriter(&failingWriter{err: failure}, 1<<10)
+	chunk := parallelZstdFixtureInput(1 << 10)
+
+	// Dispatch blocks once the bounded queues are full, so the failure from the
+	// first frame must surface long before this many chunks are accepted.
+	var err error
+	accepted := 0
+	for ; accepted < 1000 && err == nil; accepted++ {
+		_, err = writer.Write(chunk)
+	}
+
 	this.So(errors.Is(err, failure), should.BeTrue)
+	this.So(accepted, should.BeLessThan, 1000)
+	this.So(errors.Is(writer.Close(), failure), should.BeTrue)
+}
+
+func (this *ParallelZstdWriterFixture) TestWriteAfterCloseReturnsErrorInsteadOfPanicking() {
+	writer := this.newWriter(this.buffer, 1<<10)
+	this.So(writer.Close(), should.BeNil)
+
+	written, err := writer.Write(parallelZstdFixtureInput(4 << 10))
+
+	this.So(written, should.Equal, 0)
+	this.So(err, should.Equal, ErrParallelZstdWriterClosed)
+	this.So(writer.Close(), should.BeNil)
+}
+
+func (this *ParallelZstdWriterFixture) TestIncompressibleInputRoundTrips() {
+	input := make([]byte, 20<<10)
+	random := rand.New(rand.NewPCG(5, 6))
+	for i := range input {
+		input[i] = byte(random.Uint32())
+	}
+	writer := this.newWriter(this.buffer, 4<<10)
+
+	_, _ = writer.Write(input)
+	this.So(writer.Close(), should.BeNil)
+
+	this.So(this.decode(this.buffer.Bytes()), should.Equal, input)
 }
 
 func (this *ParallelZstdWriterFixture) TestNonPositiveChunkSizeUsesDefault() {
@@ -118,6 +162,10 @@ func (this *ParallelZstdWriterFixture) countFrames(compressed []byte) (frames in
 		frames++
 		offset := header.HeaderSize
 		for last := false; !last; {
+			if offset+3 > len(compressed) {
+				this.So("truncated block header", should.BeEmpty)
+				return frames
+			}
 			block := int(compressed[offset]) | int(compressed[offset+1])<<8 | int(compressed[offset+2])<<16
 			last = block&1 == 1
 			size := block >> 3
@@ -128,6 +176,10 @@ func (this *ParallelZstdWriterFixture) countFrames(compressed []byte) (frames in
 		}
 		if header.HasCheckSum {
 			offset += 4
+		}
+		if offset > len(compressed) {
+			this.So("truncated frame", should.BeEmpty)
+			return frames
 		}
 		compressed = compressed[offset:]
 	}
