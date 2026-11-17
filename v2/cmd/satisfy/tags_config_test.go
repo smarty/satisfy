@@ -68,6 +68,7 @@ func (this *TagsConfigLoaderFixture) TestValidConfigFromSpecifiedFile() {
 	this.So(config.MaxRetry, should.Equal, 10)
 	this.So(config.JSONPath, should.Equal, "tags.json")
 	this.So(config.GoogleCredentials, should.Resemble, parsedGoogleCredentials)
+	this.So(config.CredentialReader, should.NotBeNil)
 	this.So(config.Modification, should.Resemble, this.modification)
 }
 
