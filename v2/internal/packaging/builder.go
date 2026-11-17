@@ -221,12 +221,15 @@ func (this *DirectoryPackageBuilder) Contents() []model.ArchiveItem {
 	return this.contents
 }
 
+// outOfBounds reports whether a symlink points outside the root directory. A
+// bare prefix comparison would accept "/root-other/x" for root "/root".
 func (this *DirectoryPackageBuilder) outOfBounds(info model.FileInfo) bool {
-	if this.isAbsolute(info.Symlink()) {
-		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
+	target := info.Symlink()
+	if !this.isAbsolute(target) {
+		target = filepath.Join(filepath.Dir(info.Path()), target)
 	}
-	cleaned := filepath.Clean(filepath.Join(filepath.Dir(info.Path()), info.Symlink()))
-	return !strings.HasPrefix(cleaned, this.storage.RootPath())
+	relative, err := filepath.Rel(this.storage.RootPath(), filepath.Clean(target))
+	return err != nil || !filepath.IsLocal(relative)
 }
 
 func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {

@@ -147,6 +147,17 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAll
 	err := this.builder.Build(context.Background())
 	this.So(err, should.NotBeNil)
 }
+func (this *DirectoryPackageBuilderFixture) TestSymlinkIntoSiblingWithSharedPrefixNotAllowed() {
+	this.fileSystem.CreateSymlink("/in-other/file.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.NotBeNil)
+
+	this.fileSystem.CreateSymlink("../in-other/file.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.NotBeNil)
+}
+func (this *DirectoryPackageBuilderFixture) TestAbsoluteSymlinkInBoundsIsAllowed() {
+	this.fileSystem.CreateSymlink("/in/file0.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.BeNil)
+}
 func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
 	this.fileSystem.CreateSymlink("../file0.txt", "/in/inner/link.txt")
 	err := this.builder.Build(context.Background())
