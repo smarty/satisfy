@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -54,13 +55,13 @@ func (this *TagsConfigLoaderFixture) prepareConfigFile() {
 
 func (this *TagsConfigLoaderFixture) loadConfig() (contracts.TagsConfig, error) {
 	this.prepareConfigFile()
-	return this.loader.LoadConfig([]string{"-json", "tags.json"})
+	return this.loader.LoadConfig(context.Background(), []string{"-json", "tags.json"})
 }
 
 func (this *TagsConfigLoaderFixture) TestValidConfigFromSpecifiedFile() {
 	this.prepareConfigFile()
 
-	config, err := this.loader.LoadConfig([]string{"-max-retry", "10", "-json", "tags.json"})
+	config, err := this.loader.LoadConfig(context.Background(), []string{"-max-retry", "10", "-json", "tags.json"})
 
 	this.So(err, should.BeNil)
 	this.So(config.MaxRetry, should.Equal, 10)
@@ -73,14 +74,14 @@ func (this *TagsConfigLoaderFixture) TestValidConfigFromStdIn() {
 	raw, _ := json.Marshal(this.modification)
 	this.stdin.Write(raw)
 
-	config, err := this.loader.LoadConfig([]string{"-json", "_STDIN_"})
+	config, err := this.loader.LoadConfig(context.Background(), []string{"-json", "_STDIN_"})
 
 	this.So(err, should.BeNil)
 	this.So(config.Modification, should.Resemble, this.modification)
 }
 
 func (this *TagsConfigLoaderFixture) TestInvalidCLI() {
-	config, err := this.loader.LoadConfig([]string{"-max-retry", "Hello, world!"})
+	config, err := this.loader.LoadConfig(context.Background(), []string{"-max-retry", "Hello, world!"})
 
 	this.So(err, should.NotBeNil)
 	this.So(config, should.BeZeroValue)
@@ -89,7 +90,7 @@ func (this *TagsConfigLoaderFixture) TestInvalidCLI() {
 func (this *TagsConfigLoaderFixture) TestMalformedJSON() {
 	this.storage.WriteFile("tags.json", []byte("Invalid JSON"))
 
-	config, err := this.loader.LoadConfig([]string{"-json", "tags.json"})
+	config, err := this.loader.LoadConfig(context.Background(), []string{"-json", "tags.json"})
 
 	this.So(err, should.NotBeNil)
 	this.So(config.Modification, should.BeZeroValue)
@@ -98,7 +99,7 @@ func (this *TagsConfigLoaderFixture) TestMalformedJSON() {
 func (this *TagsConfigLoaderFixture) TestNegativeMaxRetry() {
 	this.prepareConfigFile()
 
-	_, err := this.loader.LoadConfig([]string{"-max-retry", "-10", "-json", "tags.json"})
+	_, err := this.loader.LoadConfig(context.Background(), []string{"-max-retry", "-10", "-json", "tags.json"})
 
 	this.So(err, should.Resemble, maxRetryErr)
 }

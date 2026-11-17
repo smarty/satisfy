@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -35,7 +36,7 @@ func (this *RetryFixture) Setup() {
 func (this *RetryFixture) TestUploadCallsInner() {
 	sent := contracts.UploadRequest{ContentType: "test"}
 
-	err := this.client.Upload(sent)
+	err := this.client.Upload(context.Background(), sent)
 
 	this.So(err, should.BeNil)
 	this.So(this.fakeClient.uploadRequest.ContentType, should.Equal, "test")
@@ -44,7 +45,7 @@ func (this *RetryFixture) TestUploadCallsInner() {
 func (this *RetryFixture) TestUploadRetryOnError() {
 	this.fakeClient.error = aRetryError
 
-	err := this.client.Upload(contracts.UploadRequest{})
+	err := this.client.Upload(context.Background(), contracts.UploadRequest{})
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 5)
@@ -59,7 +60,7 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
 	this.fakeClient.error = aRegularError
 
-	err := this.client.Upload(contracts.UploadRequest{})
+	err := this.client.Upload(context.Background(), contracts.UploadRequest{})
 
 	this.So(err, should.Equal, aRegularError)
 	this.So(this.fakeClient.uploadAttempts, should.Equal, 1)
@@ -70,7 +71,7 @@ func (this *RetryFixture) TestDownloadCallsInner() {
 	this.fakeClient.downloadContent = "content"
 	request := url.URL{Host: "host.com"}
 
-	reader, err := this.client.Download(request)
+	reader, err := this.client.Download(context.Background(), request)
 
 	all, _ := io.ReadAll(reader)
 	this.So(string(all), should.Equal, "content")
@@ -81,7 +82,7 @@ func (this *RetryFixture) TestDownloadCallsInner() {
 func (this *RetryFixture) TestDownloadRetryOnError() {
 	this.fakeClient.error = aRetryError
 
-	_, err := this.client.Download(url.URL{})
+	_, err := this.client.Download(context.Background(), url.URL{})
 
 	this.So(err, should.Equal, aRetryError)
 	this.So(this.fakeClient.downloadAttempts, should.Equal, 5)
@@ -95,7 +96,7 @@ func (this *RetryFixture) TestDownloadRetryOnError() {
 func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
 	this.fakeClient.error = aRegularError
 
-	body, err := this.client.Download(url.URL{})
+	body, err := this.client.Download(context.Background(), url.URL{})
 
 	this.So(body, should.BeNil)
 	this.So(err, should.Equal, aRegularError)
@@ -121,25 +122,25 @@ type FakeClient struct {
 	error error
 }
 
-func (this *FakeClient) Download(request url.URL) (io.ReadCloser, error) {
+func (this *FakeClient) Download(_ context.Context, request url.URL) (io.ReadCloser, error) {
 	this.downloadRequest = request
 	this.downloadAttempts++
 	return io.NopCloser(strings.NewReader(this.downloadContent)), this.error
 }
 
-func (this *FakeClient) Seek(request url.URL, begin, end int64) (io.ReadCloser, error) {
+func (this *FakeClient) Seek(_ context.Context, request url.URL, begin, end int64) (io.ReadCloser, error) {
 	this.downloadRequest = request
 	this.downloadAttempts++
 	return io.NopCloser(strings.NewReader(this.downloadContent[begin:end])), this.error
 }
 
-func (this *FakeClient) Size(request url.URL) (int64, error) {
+func (this *FakeClient) Size(_ context.Context, request url.URL) (int64, error) {
 	return int64(len(this.downloadContent)), this.error
 }
 
 //TODO: Implement tests for seek and size
 
-func (this *FakeClient) Upload(request contracts.UploadRequest) error {
+func (this *FakeClient) Upload(_ context.Context, request contracts.UploadRequest) error {
 	this.uploadRequest = request
 	this.uploadAttempts++
 	return this.error

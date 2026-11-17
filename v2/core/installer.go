@@ -3,6 +3,7 @@ package core
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -22,9 +23,6 @@ import (
 	"github.com/smarty/satisfy/v2/shell"
 )
 
-// Compile-time check of interface implementations.
-var _ contracts.DownloadSetter = (*shell.ZipArchiveReader)(nil)
-
 type PackageInstallerFileSystem interface {
 	contracts.FileCreator
 	contracts.FileWriter
@@ -43,8 +41,8 @@ func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInst
 	return &PackageInstaller{downloader: downloader, filesystem: filesystem, showProgress: showProgress}
 }
 
-func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest contracts.Manifest, err error) {
-	body, err := this.downloader.Download(remoteAddress)
+func (this *PackageInstaller) DownloadManifest(ctx context.Context, remoteAddress url.URL) (manifest contracts.Manifest, err error) {
+	body, err := this.downloader.Download(ctx, remoteAddress)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
@@ -61,8 +59,8 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 
 // ManifestExists performs a HEAD request, sparing the cost of downloading the
 // manifest body when only its presence matters.
-func (this *PackageInstaller) ManifestExists(remoteAddress url.URL) (bool, error) {
-	_, err := this.downloader.Size(remoteAddress)
+func (this *PackageInstaller) ManifestExists(ctx context.Context, remoteAddress url.URL) (bool, error) {
+	_, err := this.downloader.Size(ctx, remoteAddress)
 	if contracts.IsNotFound(err) {
 		return false, nil
 	}
@@ -72,8 +70,8 @@ func (this *PackageInstaller) ManifestExists(remoteAddress url.URL) (bool, error
 	return true, nil
 }
 
-func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
-	manifest, err = this.DownloadManifest(request.RemoteAddress)
+func (this *PackageInstaller) InstallManifest(ctx context.Context, request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
+	manifest, err = this.DownloadManifest(ctx, request.RemoteAddress)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
@@ -91,8 +89,8 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 	return manifest, nil
 }
 
-func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
-	body, err := this.downloader.Download(request.RemoteAddress)
+func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest contracts.Manifest, request contracts.InstallationRequest) error {
+	body, err := this.downloader.Download(ctx, request.RemoteAddress)
 	if err != nil {
 		return err
 	}
@@ -128,10 +126,6 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		reader = archiveReader
 	} else {
 		reader = archiveFormats[""](decompressor)
-	}
-
-	if _, ok := reader.(contracts.DownloadSetter); ok {
-		reader.(contracts.DownloadSetter).SetDownloader(request.RemoteAddress, this.downloader)
 	}
 
 	for i := 0; ; i++ {
@@ -250,11 +244,6 @@ type ArchiveReader interface {
 
 var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
 	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
-}
-
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-type DownloadSetter interface {
-	SetDownloader(url.URL, contracts.Downloader)
 }
 
 func closeResource(closer io.Closer) {

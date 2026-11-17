@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
 
 	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
@@ -14,6 +17,8 @@ import (
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	sub := ""
 	if len(os.Args) > 1 {
@@ -21,75 +26,75 @@ func main() {
 	}
 	switch sub {
 	case "upload":
-		uploadMain(os.Args[2:])
+		uploadMain(ctx, os.Args[2:])
 	case "check":
-		checkMain(os.Args[2:])
+		checkMain(ctx, os.Args[2:])
 	case "latest":
-		latestMain(os.Args[2:])
+		latestMain(ctx, os.Args[2:])
 	case "tags":
-		tagsMain(os.Args[2:])
+		tagsMain(ctx, os.Args[2:])
 	case "version":
 		versionMain()
 	case "download":
 		log.Fatal("there is no need to supply 'download' as a sub-command")
 	default:
-		downloadMain(os.Args[1:])
+		downloadMain(ctx, os.Args[1:])
 	}
 }
 
-func uploadMain(args []string) {
+func uploadMain(ctx context.Context, args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
-	config, err := loader.LoadConfig("upload", args)
+	config, err := loader.LoadConfig(ctx, "upload", args)
 	exitOnError(err)
-	exitOnError(transfer.NewCheckApp(config).Run())
-	exitOnError(transfer.NewUploadApp(config).Run())
+	exitOnError(transfer.NewCheckApp(config).Run(ctx))
+	exitOnError(transfer.NewUploadApp(config).Run(ctx))
 }
 
-func checkMain(args []string) {
+func checkMain(ctx context.Context, args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
-	config, err := loader.LoadConfig("check", args)
+	config, err := loader.LoadConfig(ctx, "check", args)
 	exitOnError(err)
-	exitOnError(transfer.NewCheckApp(config).Run())
+	exitOnError(transfer.NewCheckApp(config).Run(ctx))
 }
 
-func downloadMain(args []string) {
+func downloadMain(ctx context.Context, args []string) {
 	config, err := transfer.ParseDownloadConfig(args)
 	exitOnError(err)
-	exitOnError(transfer.NewDownloadApp(config).Run())
+	exitOnError(transfer.NewDownloadApp(config).Run(ctx))
 }
 
-func tagsMain(args []string) {
+func tagsMain(ctx context.Context, args []string) {
 	sub := ""
 	if len(args) > 0 {
 		sub = args[0]
 	}
 	switch sub {
 	case "list":
-		tagsListMain(args[1:])
+		tagsListMain(ctx, args[1:])
 	case "modify":
-		tagsModifyMain(args[1:])
+		tagsModifyMain(ctx, args[1:])
 	default:
 		log.Fatal("usage: satisfy tags <list|modify> [options] (try 'satisfy tags list -h' or 'satisfy tags modify -h')")
 	}
 }
 
-func tagsModifyMain(args []string) {
+func tagsModifyMain(ctx context.Context, args []string) {
 	loader := core.NewTagsConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
-	config, err := loader.LoadConfig(args)
+	config, err := loader.LoadConfig(ctx, args)
 	exitOnError(err)
-	exitOnError(transfer.NewTagsApp(config).Run())
+	exitOnError(transfer.NewTagsApp(config).Run(ctx))
 }
 
-func tagsListMain(args []string) {
+func tagsListMain(ctx context.Context, args []string) {
 	config, err := transfer.ParseTagsListConfig(args)
 	exitOnError(err)
-	exitOnError(transfer.NewTagsListApp(config).Run())
+	exitOnError(transfer.NewTagsListApp(config).Run(ctx))
 }
 
-func latestMain(args []string) {
+func latestMain(ctx context.Context, args []string) {
 	config, err := transfer.ParseLatestConfig(args)
 	exitOnError(err)
-	exitOnError(transfer.NewLatestApp(config).Run())
+	exitOnError(transfer.NewLatestApp(config).Run(ctx))
 }
 
 // exitOnError terminates the process for a non-nil error, using exit code 2

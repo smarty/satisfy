@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"io"
 	"math/rand/v2"
@@ -90,7 +91,7 @@ func (this *ParallelZstdRoundTripFixture) upload(level zstd.EncoderLevel, worker
 	this.So(err, should.BeNil)
 
 	builder := NewDirectoryPackageBuilder(this.source, shell.NewSwitchArchiveWriter(compressor), md5.New(), false)
-	this.So(builder.Build(), should.BeNil)
+	this.So(builder.Build(context.Background()), should.BeNil)
 	this.So(compressor.Close(), should.BeNil)
 
 	for _, item := range builder.Contents() {
@@ -109,7 +110,7 @@ func (this *ParallelZstdRoundTripFixture) upload(level zstd.EncoderLevel, worker
 func (this *ParallelZstdRoundTripFixture) install(archive []byte, manifest contracts.Manifest) error {
 	this.downloader.Body = io.NopCloser(bytes.NewReader(archive))
 	installer := NewPackageInstaller(this.downloader, this.destination, false)
-	return installer.InstallPackage(manifest, contracts.InstallationRequest{LocalPath: "out"})
+	return installer.InstallPackage(context.Background(), manifest, contracts.InstallationRequest{LocalPath: "out"})
 }
 
 func (this *ParallelZstdRoundTripFixture) assertInstalledFilesMatchSource() {

@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,11 +22,29 @@ func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credential
 	return &GoogleCloudStorageClient{client: client, credentials: credentials, expectedStatus: expectedStatus}
 }
 
-func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) error {
-	gcsRequest, err := gcs.NewRequest("PUT",
+func (this *GoogleCloudStorageClient) newRequest(ctx context.Context, method string, address url.URL, options ...gcs.Option) (*http.Request, error) {
+	options = append([]gcs.Option{
+		gcs.WithContext(ctx),
 		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.RemoteAddress.Host),
-		gcs.WithResource(request.RemoteAddress.Path),
+		gcs.WithBucket(address.Host),
+		gcs.WithResource(address.Path),
+	}, options...)
+	return gcs.NewRequest(method, options...)
+}
+
+func (this *GoogleCloudStorageClient) do(request *http.Request) (*http.Response, error) {
+	response, err := this.client.Do(request)
+	if err != nil {
+		if ctxErr := request.Context().Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		return nil, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
+	}
+	return response, nil
+}
+
+func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request contracts.UploadRequest) error {
+	gcsRequest, err := this.newRequest(ctx, "PUT", request.RemoteAddress,
 		gcs.PutWithContent(request.Body),
 		gcs.PutWithContentLength(request.Size),
 		gcs.PutWithContentMD5(request.Checksum),
@@ -34,15 +53,15 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	if err != nil {
 		return err
 	}
-	response, err := this.client.Do(gcsRequest)
+	response, err := this.do(gcsRequest)
 	if err != nil {
-		return fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
+		return err
 	}
 	defer func() { _ = response.Body.Close() }()
 
 	_, _ = io.Copy(io.Discard, response.Body)
 
-	if this.isExpectedStatus(response.StatusCode) == false {
+	if !this.isExpectedStatus(response.StatusCode) {
 		if this.isSafeRetryStatus(response.StatusCode) {
 			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.ErrRetryable)
 		}
@@ -51,61 +70,49 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	return nil
 }
 
-func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, error) {
-	gcsRequest, err := gcs.NewRequest("GET",
-		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.Host),
-		gcs.WithResource(request.Path),
-	)
+func (this *GoogleCloudStorageClient) Download(ctx context.Context, address url.URL) (io.ReadCloser, error) {
+	gcsRequest, err := this.newRequest(ctx, "GET", address)
 	if err != nil {
 		return nil, err
 	}
-	response, err := this.client.Do(gcsRequest)
-	if err != nil {
-		return nil, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
-	}
-	if this.isExpectedStatus(response.StatusCode) == false {
-		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
-	}
-	return response.Body, nil
+	return this.body(gcsRequest, address)
 }
 
-func (this *GoogleCloudStorageClient) Seek(request url.URL, start, end int64) (io.ReadCloser, error) {
-	gcsRequest, err := gcs.NewRequest("GET",
-		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.Host),
-		gcs.WithResource(request.Path),
-	)
+func (this *GoogleCloudStorageClient) Seek(ctx context.Context, address url.URL, start, end int64) (io.ReadCloser, error) {
+	gcsRequest, err := this.newRequest(ctx, "GET", address)
 	if err != nil {
 		return nil, err
 	}
 	gcsRequest.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", start, end))
-	response, err := this.client.Do(gcsRequest)
+	return this.body(gcsRequest, address)
+}
+
+func (this *GoogleCloudStorageClient) body(request *http.Request, address url.URL) (io.ReadCloser, error) {
+	response, err := this.do(request)
 	if err != nil {
-		return nil, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
+		return nil, err
 	}
-	if this.isExpectedStatus(response.StatusCode) == false {
-		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
+	if !this.isExpectedStatus(response.StatusCode) {
+		_, _ = io.Copy(io.Discard, response.Body)
+		_ = response.Body.Close()
+		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
 	}
 	return response.Body, nil
 }
 
 // Size uses an HTTP HEAD to find out how many bytes are available in total.
-func (this *GoogleCloudStorageClient) Size(request url.URL) (int64, error) {
-	gcsRequest, err := gcs.NewRequest("HEAD",
-		gcs.WithCredentials(this.credentials),
-		gcs.WithBucket(request.Host),
-		gcs.WithResource(request.Path),
-	)
+func (this *GoogleCloudStorageClient) Size(ctx context.Context, address url.URL) (int64, error) {
+	gcsRequest, err := this.newRequest(ctx, "HEAD", address)
 	if err != nil {
 		return 0, err
 	}
-	response, err := this.client.Do(gcsRequest)
+	response, err := this.do(gcsRequest)
 	if err != nil {
-		return 0, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
+		return 0, err
 	}
-	if this.isExpectedStatus(response.StatusCode) == false {
-		return 0, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
+	_ = response.Body.Close()
+	if !this.isExpectedStatus(response.StatusCode) {
+		return 0, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
 	}
 	return response.ContentLength, nil
 }

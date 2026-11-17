@@ -6,20 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 
 	"github.com/klauspost/compress/zip"
 	"github.com/smarty/satisfy/v2/cmd/archive_progress"
-	"github.com/smarty/satisfy/v2/contracts"
 )
 
 type ZipArchiveReader struct {
 	checksumReader       io.Reader
 	currentZipFileReader io.Reader
 	zipReader            *zip.Reader
-	archiveURL           url.URL
-	downloader           contracts.Downloader
 	currentFileCount     int
 	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
@@ -66,11 +62,6 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 		PAXRecords: nil,
 		Format:     0,
 	}, nil
-}
-
-func (this *ZipArchiveReader) SetDownloader(request url.URL, downloader contracts.Downloader) {
-	this.archiveURL = request
-	this.downloader = downloader
 }
 
 func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {

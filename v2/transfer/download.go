@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"log"
@@ -36,8 +37,10 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	}
 }
 
-func (this *DownloadApp) Run() error {
-	errs := runConcurrently(this.concurrency, this.listing.Listing, this.install)
+func (this *DownloadApp) Run(ctx context.Context) error {
+	errs := runConcurrently(ctx, this.concurrency, this.listing.Listing, func(dependency contracts.Dependency) error {
+		return this.install(ctx, dependency)
+	})
 	for _, err := range errs {
 		log.Println("[WARN]", err)
 	}
@@ -47,21 +50,31 @@ func (this *DownloadApp) Run() error {
 	return nil
 }
 
-func (this *DownloadApp) install(dependency contracts.Dependency) error {
+func (this *DownloadApp) install(ctx context.Context, dependency contracts.Dependency) error {
 	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
-	return resolver.Resolve()
+	return resolver.Resolve(ctx)
 }
 
 // runConcurrently calls work for each item, with at most limit calls in flight
-// at once, and returns the errors encountered.
-func runConcurrently[T any](limit int, items []T, work func(T) error) (errs []error) {
+// at once, and returns the errors encountered. Once ctx is done, no further
+// work starts and ctx's error is among those returned.
+func runConcurrently[T any](ctx context.Context, limit int, items []T, work func(T) error) (errs []error) {
 	var (
 		waiter    sync.WaitGroup
 		lock      sync.Mutex
 		semaphore = make(chan struct{}, max(limit, 1))
 	)
 	for _, item := range items {
-		semaphore <- struct{}{}
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case semaphore <- struct{}{}:
+		case <-ctx.Done():
+		}
+		if ctx.Err() != nil {
+			break
+		}
 		waiter.Go(func() {
 			defer func() { <-semaphore }()
 			if err := work(item); err != nil {
@@ -72,5 +85,8 @@ func runConcurrently[T any](limit int, items []T, work func(T) error) (errs []er
 		})
 	}
 	waiter.Wait()
+	if err := ctx.Err(); err != nil {
+		errs = append(errs, err)
+	}
 	return errs
 }

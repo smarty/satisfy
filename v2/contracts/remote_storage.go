@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,7 +18,7 @@ type RemoteStorage interface {
 }
 
 type Uploader interface {
-	Upload(UploadRequest) error
+	Upload(context.Context, UploadRequest) error
 }
 
 type UploadRequest struct {
@@ -29,13 +30,9 @@ type UploadRequest struct {
 }
 
 type Downloader interface {
-	Download(url.URL) (io.ReadCloser, error)
-	Seek(url.URL, int64, int64) (io.ReadCloser, error)
-	Size(url.URL) (int64, error)
-}
-
-type DownloadSetter interface {
-	SetDownloader(url.URL, Downloader)
+	Download(context.Context, url.URL) (io.ReadCloser, error)
+	Seek(ctx context.Context, address url.URL, start, end int64) (io.ReadCloser, error)
+	Size(context.Context, url.URL) (int64, error)
 }
 
 func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {

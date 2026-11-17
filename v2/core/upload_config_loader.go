@@ -38,7 +38,7 @@ func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environme
 	}
 }
 
-func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config contracts.UploadConfig, err error) {
+func (this *UploadConfigLoader) LoadConfig(ctx context.Context, name string, args []string) (config contracts.UploadConfig, err error) {
 	config, err = this.parseCLI(name, args)
 	if err != nil {
 		return contracts.UploadConfig{}, err
@@ -50,7 +50,7 @@ func (this *UploadConfigLoader) LoadConfig(name string, args []string) (config c
 		return contracts.UploadConfig{}, err
 	}
 
-	config.GoogleCredentials, err = this.reader.Read(context.Background(), "")
+	config.GoogleCredentials, err = this.reader.Read(ctx, "")
 	if err != nil {
 		log.Printf("[Error] Google authentication failed: [%s]", err)
 		return contracts.UploadConfig{}, err

@@ -102,7 +102,7 @@ func NewTagsListApp(config TagsListConfig) *TagsListApp {
 	return &TagsListApp{config: config, output: os.Stdout}
 }
 
-func (this *TagsListApp) Run() error {
+func (this *TagsListApp) Run(ctx context.Context) error {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
 	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 
@@ -112,7 +112,7 @@ func (this *TagsListApp) Run() error {
 	}
 
 	address := dependency.ComposeLatestManifestRemoteAddress()
-	body, err := client.Download(address)
+	body, err := client.Download(ctx, address)
 	if contracts.IsNotFound(err) {
 		return fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?)",
 			this.config.PackageName, address.String())

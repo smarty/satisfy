@@ -42,12 +42,12 @@ func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 	return &UploadApp{config: config, packageConfig: config.PackageConfig}
 }
 
-func (this *UploadApp) Run() (err error) {
+func (this *UploadApp) Run(ctx context.Context) (err error) {
 	this.buildRemoteStorageClient()
 
 	start := time.Now().UTC()
 
-	if err = this.buildArchiveAndManifestContents(); err != nil {
+	if err = this.buildArchiveAndManifestContents(ctx); err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, this.deleteLocalArchiveFile()) }()
@@ -59,7 +59,7 @@ func (this *UploadApp) Run() (err error) {
 	log.Println("Manifest:", this.dumpManifest())
 
 	if needsAccessTokenRefresh(start, time.Now().UTC()) && this.config.CredentialReader != nil {
-		credentials, err := this.config.CredentialReader.Read(context.Background(), "")
+		credentials, err := this.config.CredentialReader.Read(ctx, "")
 		if err != nil {
 			log.Println("[Error] Cannot refresh token: ", err)
 		} else {
@@ -69,19 +69,19 @@ func (this *UploadApp) Run() (err error) {
 	}
 
 	log.Println("Uploading the archive...")
-	if err = this.uploadArchive(); err != nil {
+	if err = this.uploadArchive(ctx); err != nil {
 		return err
 	}
 
 	log.Println("Uploading the manifest...")
-	if err = this.uploadManifest(this.manifest, this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)); err != nil {
+	if err = this.uploadManifest(ctx, this.manifest, this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)); err != nil {
 		return err
 	}
-	rootManifest, err := this.buildRootManifest()
+	rootManifest, err := this.buildRootManifest(ctx)
 	if err != nil {
 		return err
 	}
-	return this.uploadManifest(rootManifest, this.packageConfig.ComposeLatestManifestRemoteAddress())
+	return this.uploadManifest(ctx, rootManifest, this.packageConfig.ComposeLatestManifestRemoteAddress())
 }
 
 func needsAccessTokenRefresh(start, now time.Time) bool {
@@ -91,8 +91,8 @@ func needsAccessTokenRefresh(start, now time.Time) bool {
 // buildRootManifest carries the tag listing forward from the existing root
 // manifest and points any tags named in the upload config at the version being
 // uploaded. The versioned manifest never includes tags.
-func (this *UploadApp) buildRootManifest() (contracts.Manifest, error) {
-	existing, err := this.downloadExistingTags()
+func (this *UploadApp) buildRootManifest(ctx context.Context) (contracts.Manifest, error) {
+	existing, err := this.downloadExistingTags(ctx)
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
@@ -104,8 +104,8 @@ func (this *UploadApp) buildRootManifest() (contracts.Manifest, error) {
 	return rootManifest, nil
 }
 
-func (this *UploadApp) downloadExistingTags() ([]contracts.Tag, error) {
-	body, err := this.client.Download(this.packageConfig.ComposeLatestManifestRemoteAddress())
+func (this *UploadApp) downloadExistingTags(ctx context.Context) ([]contracts.Tag, error) {
+	body, err := this.client.Download(ctx, this.packageConfig.ComposeLatestManifestRemoteAddress())
 	if contracts.IsNotFound(err) {
 		return nil, nil // first upload of this package
 	}
@@ -121,13 +121,13 @@ func (this *UploadApp) downloadExistingTags() ([]contracts.Tag, error) {
 	return existing.Tags, nil
 }
 
-func (this *UploadApp) uploadArchive() error {
+func (this *UploadApp) uploadArchive(ctx context.Context) error {
 	file, err := os.Open(this.file.Name())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = file.Close() }()
-	return this.client.Upload(contracts.UploadRequest{
+	return this.client.Upload(ctx, contracts.UploadRequest{
 		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		Body:          NewFileWrapper(file),
 		Size:          int64(this.manifest.Archive.Size),
@@ -136,7 +136,7 @@ func (this *UploadApp) uploadArchive() error {
 	})
 }
 
-func (this *UploadApp) buildArchiveAndManifestContents() (err error) {
+func (this *UploadApp) buildArchiveAndManifestContents(ctx context.Context) (err error) {
 	this.file, err = os.CreateTemp("", "satisfy-archive-*")
 	if err != nil {
 		return err
@@ -164,7 +164,7 @@ func (this *UploadApp) buildArchiveAndManifestContents() (err error) {
 		this.config.ShowProgress,
 	)
 
-	if err = this.builder.Build(); err != nil {
+	if err = this.builder.Build(ctx); err != nil {
 		_ = compressor.Close()
 		return err
 	}
@@ -196,7 +196,7 @@ var contentType = map[string]string{
 	"zip":  "application/zip",
 }
 
-func (this *UploadApp) uploadManifest(manifest contracts.Manifest, remoteAddress url.URL) error {
+func (this *UploadApp) uploadManifest(ctx context.Context, manifest contracts.Manifest, remoteAddress url.URL) error {
 	buffer := new(bytes.Buffer)
 	hasher := md5.New()
 	encoder := json.NewEncoder(io.MultiWriter(buffer, hasher))
@@ -204,7 +204,7 @@ func (this *UploadApp) uploadManifest(manifest contracts.Manifest, remoteAddress
 	if err := encoder.Encode(manifest); err != nil {
 		return err
 	}
-	return this.client.Upload(contracts.UploadRequest{
+	return this.client.Upload(ctx, contracts.UploadRequest{
 		RemoteAddress: remoteAddress,
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),
@@ -214,8 +214,7 @@ func (this *UploadApp) uploadManifest(manifest contracts.Manifest, remoteAddress
 }
 
 func (this *UploadApp) buildRemoteStorageClient() {
-	client := shell.NewHTTPClient()
-	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusOK})
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }
 

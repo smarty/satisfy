@@ -1,6 +1,9 @@
 package contracts
 
-import "net/url"
+import (
+	"context"
+	"net/url"
+)
 
 type InstallationRequest struct {
 	RemoteAddress url.URL
@@ -13,8 +16,8 @@ type IntegrityCheck interface {
 }
 
 type PackageInstaller interface {
-	DownloadManifest(remoteAddress url.URL) (manifest Manifest, err error)
-	ManifestExists(remoteAddress url.URL) (exists bool, err error)
-	InstallManifest(request InstallationRequest) (manifest Manifest, err error)
-	InstallPackage(manifest Manifest, request InstallationRequest) error
+	DownloadManifest(ctx context.Context, remoteAddress url.URL) (manifest Manifest, err error)
+	ManifestExists(ctx context.Context, remoteAddress url.URL) (exists bool, err error)
+	InstallManifest(ctx context.Context, request InstallationRequest) (manifest Manifest, err error)
+	InstallPackage(ctx context.Context, manifest Manifest, request InstallationRequest) error
 }

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,12 +40,12 @@ func NewDependencyResolver(
 	}
 }
 
-func (this *DependencyResolver) Resolve() error {
+func (this *DependencyResolver) Resolve(ctx context.Context) error {
 	log.Printf("Installing dependency: %s", this.dependency.Title())
 
 	manifestPath := ComposeManifestPath(this.dependency.LocalDirectory, this.dependency.PackageName)
 	if !this.localManifestExists(manifestPath) {
-		return this.installPackage()
+		return this.installPackage(ctx)
 	}
 
 	localManifest, err := this.loadLocalManifest(manifestPath)
@@ -52,7 +53,7 @@ func (this *DependencyResolver) Resolve() error {
 		return err
 	}
 
-	installed, err := this.isInstalledCorrectly(localManifest)
+	installed, err := this.isInstalledCorrectly(ctx, localManifest)
 	if err != nil {
 		return err
 	}
@@ -63,7 +64,7 @@ func (this *DependencyResolver) Resolve() error {
 	if err = this.uninstallPackage(localManifest); err != nil {
 		return fmt.Errorf("failed to uninstall previous package contents for %s: %w", this.dependency.Title(), err)
 	}
-	return this.installPackage()
+	return this.installPackage(ctx)
 }
 
 func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest contracts.Manifest, err error) {
@@ -87,7 +88,7 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Manifest) (bool, error) {
+func (this *DependencyResolver) isInstalledCorrectly(ctx context.Context, localManifest contracts.Manifest) (bool, error) {
 	if localManifest.Name != this.dependency.PackageName {
 		if strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
 			// no-op
@@ -97,12 +98,12 @@ func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Man
 			return false, nil
 		}
 	}
-	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(localManifest) {
+	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(ctx, localManifest) {
 		log.Printf("incorrect version installed (%s), proceeding to installation of specified package: %s",
 			localManifest.Version, this.dependency.Title())
 		return false, nil
 	} else if this.dependency.PackageVersion != "latest" && localManifest.Version != this.dependency.PackageVersion {
-		matchesTag, err := this.localManifestMatchesRequestedTag(localManifest)
+		matchesTag, err := this.localManifestMatchesRequestedTag(ctx, localManifest)
 		if err != nil {
 			return false, err
 		}
@@ -127,8 +128,8 @@ func (this *DependencyResolver) isInstalledCorrectly(localManifest contracts.Man
 // not match the locally installed version. A remote manifest at the literal
 // version path takes precedence over a tag of the same name; only when no such
 // version exists is the requested string resolved against the root manifest tags.
-func (this *DependencyResolver) localManifestMatchesRequestedTag(localManifest contracts.Manifest) (bool, error) {
-	exists, err := this.packageInstaller.ManifestExists(this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename))
+func (this *DependencyResolver) localManifestMatchesRequestedTag(ctx context.Context, localManifest contracts.Manifest) (bool, error) {
+	exists, err := this.packageInstaller.ManifestExists(ctx, this.dependency.ComposeRemoteAddress(contracts.RemoteManifestFilename))
 	if err != nil {
 		return false, fmt.Errorf("failed to check for manifest of %s: %w", this.dependency.Title(), err)
 	}
@@ -136,7 +137,7 @@ func (this *DependencyResolver) localManifestMatchesRequestedTag(localManifest c
 		return false, nil
 	}
 
-	version, err := this.resolveTag()
+	version, err := this.resolveTag(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -146,9 +147,9 @@ func (this *DependencyResolver) localManifestMatchesRequestedTag(localManifest c
 
 // resolveTag translates the requested version into a concrete version by way of
 // the tag listing in the root manifest.
-func (this *DependencyResolver) resolveTag() (string, error) {
+func (this *DependencyResolver) resolveTag(ctx context.Context) (string, error) {
 	requested := this.dependency.PackageVersion
-	rootManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeLatestManifestRemoteAddress())
+	rootManifest, err := this.packageInstaller.DownloadManifest(ctx, this.dependency.ComposeLatestManifestRemoteAddress())
 	if err != nil {
 		return "", fmt.Errorf("failed to download root manifest while resolving %q for package %q: %w",
 			requested, this.dependency.PackageName, err)
@@ -161,9 +162,9 @@ func (this *DependencyResolver) resolveTag() (string, error) {
 	return version, nil
 }
 
-func (this *DependencyResolver) installPackage() error {
+func (this *DependencyResolver) installPackage(ctx context.Context) error {
 	log.Printf("Downloading manifest for %s", this.dependency.Title())
-	manifest, err := this.packageInstaller.InstallManifest(contracts.InstallationRequest{
+	manifest, err := this.packageInstaller.InstallManifest(ctx, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 		LocalPath:     this.dependency.LocalDirectory,
 		PackageName:   this.dependency.PackageName,
@@ -172,12 +173,12 @@ func (this *DependencyResolver) installPackage() error {
 		// No manifest exists at the literal version path; the requested
 		// version may be a tag defined in the root manifest.
 		var version string
-		version, err = this.resolveTag()
+		version, err = this.resolveTag(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to install manifest for %s: %w", this.dependency.Title(), err)
 		}
 		this.dependency.PackageVersion = version
-		manifest, err = this.packageInstaller.InstallManifest(contracts.InstallationRequest{
+		manifest, err = this.packageInstaller.InstallManifest(ctx, contracts.InstallationRequest{
 			RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
 			LocalPath:     this.dependency.LocalDirectory,
 			PackageName:   this.dependency.PackageName,
@@ -198,7 +199,7 @@ func (this *DependencyResolver) installPackage() error {
 	//    exists, we can change the archive filename in the contracts and all previously uploaded manifests using the
 	//    older name are still recognized and understood.
 
-	err = this.packageInstaller.InstallPackage(manifest, contracts.InstallationRequest{
+	err = this.packageInstaller.InstallPackage(ctx, manifest, contracts.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
 		LocalPath:     this.dependency.LocalDirectory,
 	})
@@ -218,8 +219,8 @@ func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) (e
 	return err
 }
 
-func (this *DependencyResolver) localManifestIsLatest(manifest contracts.Manifest) bool {
-	remoteManifest, err := this.packageInstaller.DownloadManifest(this.dependency.ComposeRemoteManifestAddress())
+func (this *DependencyResolver) localManifestIsLatest(ctx context.Context, manifest contracts.Manifest) bool {
+	remoteManifest, err := this.packageInstaller.DownloadManifest(ctx, this.dependency.ComposeRemoteManifestAddress())
 	if err != nil {
 		log.Println("Failed to download the latest manifest file:", err)
 		return false

@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -24,16 +25,16 @@ func NewTagsApp(config contracts.TagsConfig) *TagsApp {
 	return &TagsApp{config: config}
 }
 
-func (this *TagsApp) Run() error {
+func (this *TagsApp) Run(ctx context.Context) error {
 	this.buildRemoteStorageClient()
 	modification := this.config.Modification
 
-	rootManifest, err := this.downloadRootManifest()
+	rootManifest, err := this.downloadRootManifest(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = this.verifyVersionsExist(modification.Add)
+	err = this.verifyVersionsExist(ctx, modification.Add)
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func (this *TagsApp) Run() error {
 	this.logModifications(rootManifest, modification)
 	rootManifest.Tags = core.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
 
-	err = this.uploadRootManifest(rootManifest)
+	err = this.uploadRootManifest(ctx, rootManifest)
 	if err != nil {
 		return err
 	}
@@ -55,9 +56,9 @@ func (this *TagsApp) buildRemoteStorageClient() {
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 }
 
-func (this *TagsApp) downloadRootManifest() (manifest contracts.Manifest, err error) {
+func (this *TagsApp) downloadRootManifest(ctx context.Context) (manifest contracts.Manifest, err error) {
 	address := this.config.Modification.ComposeRootManifestAddress()
-	body, err := this.client.Download(address)
+	body, err := this.client.Download(ctx, address)
 	if contracts.IsNotFound(err) {
 		return contracts.Manifest{}, fmt.Errorf(
 			"no root manifest found for package %q at [%s] (has the package been uploaded?)",
@@ -77,14 +78,14 @@ func (this *TagsApp) downloadRootManifest() (manifest contracts.Manifest, err er
 // verifyVersionsExist guards against dangling tags by confirming each version
 // to be tagged has a manifest on remote storage. No modifications are written
 // unless every version checks out.
-func (this *TagsApp) verifyVersionsExist(add []contracts.Tag) error {
+func (this *TagsApp) verifyVersionsExist(ctx context.Context, add []contracts.Tag) error {
 	verified := make(map[string]struct{})
 	for _, tag := range add {
 		if _, done := verified[tag.Version]; done {
 			continue
 		}
 		address := this.config.Modification.ComposeVersionedManifestAddress(tag.Version)
-		_, err := this.client.Size(address)
+		_, err := this.client.Size(ctx, address)
 		if contracts.IsNotFound(err) {
 			return fmt.Errorf("cannot tag version %q as %q: no manifest found at [%s]",
 				tag.Version, tag.Name, address.String())
@@ -114,7 +115,7 @@ func (this *TagsApp) logModifications(rootManifest contracts.Manifest, modificat
 	}
 }
 
-func (this *TagsApp) uploadRootManifest(manifest contracts.Manifest) error {
+func (this *TagsApp) uploadRootManifest(ctx context.Context, manifest contracts.Manifest) error {
 	buffer := new(bytes.Buffer)
 	hasher := md5.New()
 	encoder := json.NewEncoder(io.MultiWriter(buffer, hasher))
@@ -122,7 +123,7 @@ func (this *TagsApp) uploadRootManifest(manifest contracts.Manifest) error {
 	if err := encoder.Encode(manifest); err != nil {
 		return err
 	}
-	return this.client.Upload(contracts.UploadRequest{
+	return this.client.Upload(ctx, contracts.UploadRequest{
 		RemoteAddress: this.config.Modification.ComposeRootManifestAddress(),
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),

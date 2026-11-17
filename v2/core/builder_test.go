@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"testing"
 
@@ -34,7 +36,7 @@ func (this *DirectoryPackageBuilderFixture) Setup() {
 	this.fileSystem.Root = "/in"
 }
 func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 
 	this.So(err, should.BeNil)
 	this.So(this.builder.Contents(), should.Resemble, []contracts.ArchiveItem{
@@ -44,20 +46,42 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
+func (this *DirectoryPackageBuilderFixture) TestCancelledBuildStops() {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := this.builder.Build(ctx)
+
+	this.So(errors.Is(err, context.Canceled), should.BeTrue)
+	this.So(this.builder.Contents(), should.BeEmpty)
+}
+
+func (this *DirectoryPackageBuilderFixture) TestCopyStopsWhenCancelled() {
+	ctx, cancel := context.WithCancel(context.Background())
+	reader := contextReader{ctx: ctx, reader: bytes.NewReader([]byte("content"))}
+	buffer := make([]byte, 2)
+
+	_, err := reader.Read(buffer)
+	this.So(err, should.BeNil)
+	cancel()
+	_, err = reader.Read(buffer)
+	this.So(err, should.Equal, context.Canceled)
+}
+
 func (this *DirectoryPackageBuilderFixture) TestListingErrorIsReturned() {
 	listingErr := errors.New("listing failed")
 	this.fileSystem.errListing = listingErr
 
-	this.So(this.builder.Build(), should.Equal, listingErr)
+	this.So(this.builder.Build(context.Background()), should.Equal, listingErr)
 }
 func (this *DirectoryPackageBuilderFixture) TestOpenErrorIsReturned() {
 	openErr := errors.New("open failed")
 	this.fileSystem.errOpen["/in/file1.txt"] = openErr
 
-	this.So(this.builder.Build(), should.Equal, openErr)
+	this.So(this.builder.Build(context.Background()), should.Equal, openErr)
 }
 func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 
 	this.So(err, should.BeNil)
 	this.So(this.archive.items, should.Resemble, []*ArchiveItem{
@@ -71,30 +95,30 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 func (this *DirectoryPackageBuilderFixture) TestSimulatedArchiveWriteError() {
 	this.archive.writeError = writeErr
 
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 
 	this.So(err, should.Equal, writeErr)
 }
 func (this *DirectoryPackageBuilderFixture) TestSimulatedArchiveCloseError() {
 	this.archive.closedError = closeErr
 
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 
 	this.So(err, should.Equal, closeErr)
 }
 func (this *DirectoryPackageBuilderFixture) TestAbsoluteSymlinkOutOfBoundsNotAllowed() {
 	this.fileSystem.CreateSymlink("/out/of-bounds.txt", "/in/link.txt")
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 	this.So(err, should.NotBeNil)
 }
 func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAllowed() {
 	this.fileSystem.CreateSymlink("../../out/of-bounds.txt", "/in/link.txt")
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 	this.So(err, should.NotBeNil)
 }
 func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
 	this.fileSystem.CreateSymlink("../file0.txt", "/in/inner/link.txt")
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 	if !this.So(err, should.BeNil) {
 		return
 	}
@@ -112,7 +136,7 @@ func (this *DirectoryPackageBuilderFixture) TestFileOnlyEnsureNoPath() {
 	this.hasher = NewFakeHasher()
 	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 	if !this.So(err, should.BeNil) {
 		return
 	}
@@ -127,7 +151,7 @@ func (this *DirectoryPackageBuilderFixture) TestMultipleFilesEnsurePath() {
 	this.fileSystem.WriteDirectory("/out")
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("/out/in/file1.txt", []byte("a"))
-	err := this.builder.Build()
+	err := this.builder.Build(context.Background())
 	if !this.So(err, should.BeNil) {
 		return
 	}

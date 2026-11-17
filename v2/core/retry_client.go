@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -20,9 +21,9 @@ func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, sleep func(dura
 	return &RetryClient{inner: inner, maxRetry: maxRetry, sleep: sleep}
 }
 
-func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
+func (this *RetryClient) Upload(ctx context.Context, request contracts.UploadRequest) (err error) {
 	for x := 0; x <= this.maxRetry; x++ {
-		err = this.inner.Upload(request)
+		err = this.inner.Upload(ctx, request)
 		if err == nil {
 			return nil
 		}
@@ -37,9 +38,9 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 	return err
 }
 
-func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err error) {
+func (this *RetryClient) Download(ctx context.Context, request url.URL) (body io.ReadCloser, err error) {
 	for x := 0; x <= this.maxRetry; x++ {
-		body, err = this.inner.Download(request)
+		body, err = this.inner.Download(ctx, request)
 		if err == nil {
 			return body, nil
 		}
@@ -54,9 +55,9 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 	return nil, err
 }
 
-func (this *RetryClient) Seek(request url.URL, start, end int64) (body io.ReadCloser, err error) {
+func (this *RetryClient) Seek(ctx context.Context, request url.URL, start, end int64) (body io.ReadCloser, err error) {
 	for x := 0; x <= this.maxRetry; x++ {
-		body, err = this.inner.Seek(request, start, end)
+		body, err = this.inner.Seek(ctx, request, start, end)
 		if err == nil {
 			return body, nil
 		}
@@ -71,9 +72,9 @@ func (this *RetryClient) Seek(request url.URL, start, end int64) (body io.ReadCl
 	return nil, err
 }
 
-func (this *RetryClient) Size(request url.URL) (size int64, err error) {
+func (this *RetryClient) Size(ctx context.Context, request url.URL) (size int64, err error) {
 	for x := 0; x <= this.maxRetry; x++ {
-		size, err = this.inner.Size(request)
+		size, err = this.inner.Size(ctx, request)
 		if err == nil {
 			return size, nil
 		}

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -44,7 +45,7 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 	this.downloader.prepareManifestDownload(originalManifest)
 
 	request := this.installationRequest(originalManifest.Name)
-	manifest, err := this.installer.InstallManifest(request)
+	manifest, err := this.installer.InstallManifest(context.Background(), request)
 
 	this.So(this.downloader.request, should.Resemble, request.RemoteAddress)
 	this.So(manifest, should.Resemble, originalManifest)
@@ -64,14 +65,14 @@ func (this *PackageInstallerFixture) loadLocalManifest(fileName string) contract
 func (this *PackageInstallerFixture) TestInstallManifestDownloadError() {
 	downloadError := errors.New("something or other")
 	this.downloader.Error = downloadError
-	manifest, err := this.installer.InstallManifest(this.installationRequest(""))
+	manifest, err := this.installer.InstallManifest(context.Background(), this.installationRequest(""))
 	this.So(err, should.Equal, downloadError)
 	this.So(manifest, should.BeZeroValue)
 }
 
 func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.downloader.prepareMalformedDownload()
-	manifest, err := this.installer.InstallManifest(this.installationRequest(""))
+	manifest, err := this.installer.InstallManifest(context.Background(), this.installationRequest(""))
 	this.So(err, should.NotBeNil)
 	this.So(manifest, should.BeZeroValue)
 }
@@ -79,7 +80,7 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 func (this *PackageInstallerFixture) TestDownloadManifestReadError() {
 	readError := errors.New("connection reset")
 	this.downloader.Body = io.NopCloser(iotest.ErrReader(readError))
-	manifest, err := this.installer.DownloadManifest(this.installationRequest("").RemoteAddress)
+	manifest, err := this.installer.DownloadManifest(context.Background(), this.installationRequest("").RemoteAddress)
 	this.So(err, should.Equal, readError)
 	this.So(manifest, should.BeZeroValue)
 }
@@ -87,7 +88,7 @@ func (this *PackageInstallerFixture) TestDownloadManifestReadError() {
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzipCompression() {
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -99,7 +100,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingGzi
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZstdCompression() {
 	checksum := this.downloader.prepareArchiveDownload(zstdAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, zstdAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -110,7 +111,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZst
 func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZipCompression() {
 	checksum := this.downloader.prepareZipArchiveDownload()
 
-	err := this.installer.InstallPackage(this.buildZipManifest(checksum), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildZipManifest(checksum), this.installationRequest(""))
 
 	this.So(err, should.BeNil)
 	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
@@ -120,7 +121,7 @@ func (this *PackageInstallerFixture) TestInstallPackageToLocalFileSystemUsingZip
 func (this *PackageInstallerFixture) TestInstallPackageZipChecksumMismatch() {
 	this.downloader.prepareZipArchiveDownload()
 
-	err := this.installer.InstallPackage(this.buildZipManifest([]byte("mismatch")), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildZipManifest([]byte("mismatch")), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -129,7 +130,7 @@ func (this *PackageInstallerFixture) TestInstallPackageZipChecksumMismatch() {
 func (this *PackageInstallerFixture) TestInstallPackageMalformedZipArchive() {
 	this.downloader.prepareMalformedDownload()
 
-	err := this.installer.InstallPackage(this.buildZipManifest(nil), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildZipManifest(nil), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -139,7 +140,7 @@ func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
 
 	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, "invalid"), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, "invalid"), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 }
@@ -147,7 +148,7 @@ func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
 func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 	this.downloader.prepareMalformedDownload()
 
-	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -156,7 +157,7 @@ func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 	this.downloader.Error = errors.New("i am an error")
 
-	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -167,7 +168,7 @@ func (this *PackageInstallerFixture) TestInstallPackageCreateErrorRevertsExtract
 	createErr := errors.New("disk full")
 	this.filesystem.errCreate["local/path/Goodbye/World"] = createErr
 
-	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(errors.Is(err, createErr), should.BeTrue)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -176,7 +177,7 @@ func (this *PackageInstallerFixture) TestInstallPackageCreateErrorRevertsExtract
 func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	this.downloader.prepareArchiveDownload(gzipAlgorithm)
 
-	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
 	this.So(this.filesystem.listing(), should.BeEmpty)
@@ -227,12 +228,12 @@ type FakeDownloader struct {
 	request url.URL
 }
 
-func (this *FakeDownloader) Download(request url.URL) (io.ReadCloser, error) {
+func (this *FakeDownloader) Download(_ context.Context, request url.URL) (io.ReadCloser, error) {
 	this.request = request
 	return this.Body, this.Error
 }
 
-func (this *FakeDownloader) Seek(request url.URL, start, end int64) (io.ReadCloser, error) {
+func (this *FakeDownloader) Seek(_ context.Context, request url.URL, start, end int64) (io.ReadCloser, error) {
 	this.request = request
 	buff := bytes.NewBuffer([]byte{})
 	_, err := io.Copy(buff, this.Body)
@@ -244,7 +245,7 @@ func (this *FakeDownloader) Seek(request url.URL, start, end int64) (io.ReadClos
 	return io.NopCloser(reader), this.Error
 }
 
-func (this *FakeDownloader) Size(request url.URL) (int64, error) {
+func (this *FakeDownloader) Size(_ context.Context, request url.URL) (int64, error) {
 	this.request = request
 	buff := bytes.NewBuffer([]byte{})
 	return io.Copy(buff, this.Body)

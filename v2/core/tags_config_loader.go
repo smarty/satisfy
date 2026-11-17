@@ -37,7 +37,7 @@ func NewTagsConfigLoader(storage contracts.FileReader, env contracts.Environment
 	}
 }
 
-func (this *TagsConfigLoader) LoadConfig(args []string) (config contracts.TagsConfig, err error) {
+func (this *TagsConfigLoader) LoadConfig(ctx context.Context, args []string) (config contracts.TagsConfig, err error) {
 	config, err = this.parseCLI(args)
 	if err != nil {
 		return contracts.TagsConfig{}, err
@@ -49,7 +49,7 @@ func (this *TagsConfigLoader) LoadConfig(args []string) (config contracts.TagsCo
 		return contracts.TagsConfig{}, err
 	}
 
-	config.GoogleCredentials, err = this.reader.Read(context.Background(), "")
+	config.GoogleCredentials, err = this.reader.Read(ctx, "")
 	if err != nil {
 		log.Printf("[Error] Google authentication failed: [%s]", err)
 		return contracts.TagsConfig{}, err

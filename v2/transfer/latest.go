@@ -93,7 +93,7 @@ func NewLatestApp(config LatestConfig) *LatestApp {
 	return &LatestApp{config: config}
 }
 
-func (this *LatestApp) Run() error {
+func (this *LatestApp) Run(ctx context.Context) error {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
 	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 
@@ -102,7 +102,7 @@ func (this *LatestApp) Run() error {
 		RemoteAddress: this.config.RemoteAddress,
 	}
 
-	body, err := client.Download(dependency.ComposeLatestManifestRemoteAddress())
+	body, err := client.Download(ctx, dependency.ComposeLatestManifestRemoteAddress())
 	if err != nil {
 		return fmt.Errorf("could not download latest manifest for %q: %w", this.config.PackageName, err)
 	}

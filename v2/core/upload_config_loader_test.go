@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -41,7 +42,7 @@ func (this *UploadConfigLoaderFixture) Setup() {
 func (this *UploadConfigLoaderFixture) TestInvalidCLI() {
 	args := []string{"-max-retry", "Hello, world!"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config, should.BeZeroValue)
@@ -55,7 +56,7 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromSpecifiedFile() {
 		"-overwrite",
 	}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.BeNil)
 	this.So(config.MaxRetry, should.Equal, 10)
@@ -69,7 +70,7 @@ func (this *UploadConfigLoaderFixture) TestInValidJSONFromSpecifiedFile() {
 	this.storage.WriteFile("config.json", []byte("Invalid JSON"))
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.PackageConfig, should.BeZeroValue)
@@ -88,7 +89,7 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
 	this.stdin.Write(raw)
 	args := []string{"-json", "_STDIN_"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.BeNil)
 	this.So(config.PackageConfig, should.Resemble, packageConfig)
@@ -97,7 +98,7 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
 func (this *UploadConfigLoaderFixture) TestSpecifiedJSONFileNotFound() {
 	args := []string{"-json", "not-found.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.PackageConfig, should.BeZeroValue)
@@ -110,7 +111,7 @@ func (this *UploadConfigLoaderFixture) TestGoogleCredentialsEnvironmentVariableM
 	_ = this.prepareValidJSONConfigFile()
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.GoogleCredentials, should.BeZeroValue)
@@ -121,7 +122,7 @@ func (this *UploadConfigLoaderFixture) TestGoogleCredentialsEnvironmentVariableB
 	_ = this.prepareValidJSONConfigFile()
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.GoogleCredentials, should.BeZeroValue)
@@ -132,7 +133,7 @@ func (this *UploadConfigLoaderFixture) TestGoogleCredentialsFileIsMissing() {
 	_ = this.prepareValidJSONConfigFile()
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.GoogleCredentials, should.BeZeroValue)
@@ -143,7 +144,7 @@ func (this *UploadConfigLoaderFixture) TestGoogleCredentialsFileIsMalformed() {
 	_ = this.prepareValidJSONConfigFile()
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.NotBeNil)
 	this.So(config.GoogleCredentials, should.BeZeroValue)
@@ -156,14 +157,14 @@ func (this *UploadConfigLoaderFixture) TestValidateJSONNegativeMaxRetries() {
 		"-json", "config.json",
 	}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, maxRetryErr)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateJSONPathIsNotBlank() {
 	_ = this.prepareValidJSONConfigFile()
-	_, err := this.loader.LoadConfig("upload", []string{"-json", ""})
+	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", ""})
 
 	this.So(err, should.Resemble, blankJSONPathErr)
 }
@@ -172,7 +173,7 @@ func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsNotBlan
 	this.pkgConfig.CompressionAlgorithm = ""
 	raw, _ := json.Marshal(this.pkgConfig.configure())
 	this.storage.WriteFile("config.json", raw)
-	_, err := this.loader.LoadConfig("upload", []string{"-json", "config.json"})
+	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", "config.json"})
 
 	this.So(err, should.Resemble, blankCompressionAlgorithmErr)
 }
@@ -183,7 +184,7 @@ func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, blankSourceDirectoryErr)
 }
@@ -194,7 +195,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, blankPackageNameErr)
 }
@@ -205,7 +206,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, blankPackageVersionErr)
 }
@@ -216,7 +217,7 @@ func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil()
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, nilRemoteAddressPrefixErr)
 }
@@ -227,7 +228,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, blankTagNameErr)
 }
@@ -238,7 +239,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	_, err := this.loader.LoadConfig("upload", args)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.Resemble, reservedTagNameErr)
 }
@@ -249,7 +250,7 @@ func (this *UploadConfigLoaderFixture) TestValidTagsAccepted() {
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
 
-	config, err := this.loader.LoadConfig("upload", args)
+	config, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
 	this.So(err, should.BeNil)
 	this.So(config.PackageConfig.Tags, should.Resemble, []string{"stable", "experimental"})

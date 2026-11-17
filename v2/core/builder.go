@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"hash"
 	"io"
@@ -13,7 +14,7 @@ import (
 )
 
 type PackageBuilder interface {
-	Build() error
+	Build(ctx context.Context) error
 	Contents() []contracts.ArchiveItem
 }
 
@@ -41,20 +42,25 @@ func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archi
 	}
 }
 
-func (this *DirectoryPackageBuilder) Build() error {
+// Build archives the listing. It stops with ctx's error once ctx is done,
+// checking between files and while copying each file.
+func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	listing, err := this.storage.Listing()
 	if err != nil {
 		return err
 	}
 	this.listing = listing
 	if fileInfo, ok := this.fileOnly(); ok {
-		err = this.add(fileInfo, true)
+		err = this.add(ctx, fileInfo, true)
 		if err != nil {
 			return err
 		}
 	} else {
 		for _, file := range listing {
-			err = this.add(file, false)
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+			err = this.add(ctx, file, false)
 			if err != nil {
 				return err
 			}
@@ -63,7 +69,7 @@ func (this *DirectoryPackageBuilder) Build() error {
 	return this.archive.Close()
 }
 
-func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool) error {
+func (this *DirectoryPackageBuilder) add(ctx context.Context, file contracts.FileInfo, fileOnly bool) error {
 	log.Printf("Adding \"%s\" to archive.", file.Path())
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
@@ -73,7 +79,7 @@ func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool)
 	if err != nil {
 		return err
 	}
-	err = this.archiveContents(file, header.LinkName)
+	err = this.archiveContents(ctx, file, header.LinkName)
 	if err != nil {
 		return err
 	}
@@ -81,7 +87,7 @@ func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool)
 	return err
 }
 
-func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, symlinkSourcePath string) error {
+func (this *DirectoryPackageBuilder) archiveContents(ctx context.Context, file contracts.FileInfo, symlinkSourcePath string) error {
 	if symlinkSourcePath != "" {
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
@@ -111,8 +117,22 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 	hasher := NewAsyncHashWriter(this.hasher)
 	defer closeResource(hasher)
 	writer := io.MultiWriter(hasher, this.archive, progressWriter)
-	_, err = io.Copy(writer, reader)
+	_, err = io.Copy(writer, contextReader{ctx: ctx, reader: reader})
 	return err
+}
+
+// contextReader fails with ctx's error once ctx is done, so that copying a
+// large file stops promptly when the operation is cancelled.
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (this contextReader) Read(buffer []byte) (int, error) {
+	if err := this.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return this.reader.Read(buffer)
 }
 
 func (this *DirectoryPackageBuilder) buildHeader(file contracts.FileInfo, fileOnly bool) (header contracts.ArchiveHeader, err error) {

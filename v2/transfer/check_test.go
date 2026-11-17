@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -34,23 +35,23 @@ func (this *CheckAppFixture) Setup() {
 
 func (this *CheckAppFixture) TestMissingPackageIsNotAnError() {
 	this.client.err = contracts.NewStatusCodeError(http.StatusNotFound, []int{http.StatusOK}, url.URL{})
-	this.So(this.app.Run(), should.BeNil)
+	this.So(this.app.Run(context.Background()), should.BeNil)
 	this.So(this.client.address.Path, should.Equal, "/name/1.2.3/manifest.json")
 }
 
 func (this *CheckAppFixture) TestExistingPackageReturnsErrPackageExists() {
-	this.So(errors.Is(this.app.Run(), contracts.ErrPackageExists), should.BeTrue)
+	this.So(errors.Is(this.app.Run(context.Background()), contracts.ErrPackageExists), should.BeTrue)
 }
 
 func (this *CheckAppFixture) TestOtherFailuresAreReturned() {
 	failure := errors.New("boom")
 	this.client.err = failure
-	this.So(errors.Is(this.app.Run(), failure), should.BeTrue)
+	this.So(errors.Is(this.app.Run(context.Background()), failure), should.BeTrue)
 }
 
 func (this *CheckAppFixture) TestOverwriteSkipsTheCheck() {
 	this.app.config.Overwrite = true
-	this.So(this.app.Run(), should.BeNil)
+	this.So(this.app.Run(context.Background()), should.BeNil)
 	this.So(this.client.calls, should.Equal, 0)
 }
 
@@ -60,12 +61,12 @@ type fakeSizer struct {
 	calls   int
 }
 
-func (this *fakeSizer) Size(address url.URL) (int64, error) {
+func (this *fakeSizer) Size(_ context.Context, address url.URL) (int64, error) {
 	this.calls++
 	this.address = address
 	return 0, this.err
 }
-func (this *fakeSizer) Download(url.URL) (io.ReadCloser, error) { panic("not used") }
-func (this *fakeSizer) Seek(url.URL, int64, int64) (io.ReadCloser, error) {
+func (this *fakeSizer) Download(context.Context, url.URL) (io.ReadCloser, error) { panic("not used") }
+func (this *fakeSizer) Seek(context.Context, url.URL, int64, int64) (io.ReadCloser, error) {
 	panic("not used")
 }

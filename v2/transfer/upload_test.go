@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"io"
 	"net/url"
@@ -112,7 +113,7 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 			CompressionAlgorithm: algorithm,
 		},
 	}
-	err = installer.InstallPackage(manifest, contracts.InstallationRequest{
+	err = installer.InstallPackage(context.Background(), manifest, contracts.InstallationRequest{
 		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
 		LocalPath:     this.localPath,
 	})
@@ -155,15 +156,15 @@ type fakeArchiveDownloader struct {
 	body []byte
 }
 
-func (this *fakeArchiveDownloader) Download(url.URL) (io.ReadCloser, error) {
+func (this *fakeArchiveDownloader) Download(context.Context, url.URL) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(this.body)), nil
 }
 
-func (this *fakeArchiveDownloader) Seek(_ url.URL, start, end int64) (io.ReadCloser, error) {
+func (this *fakeArchiveDownloader) Seek(_ context.Context, _ url.URL, start, end int64) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(this.body[start:end])), nil
 }
 
-func (this *fakeArchiveDownloader) Size(url.URL) (int64, error) {
+func (this *fakeArchiveDownloader) Size(context.Context, url.URL) (int64, error) {
 	return int64(len(this.body)), nil
 }
 

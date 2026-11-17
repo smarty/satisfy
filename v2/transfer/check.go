@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,14 +24,14 @@ func NewCheckApp(config contracts.UploadConfig) *CheckApp {
 
 // Run returns contracts.ErrPackageExists when the package version described by
 // the configuration is already present on remote storage (unless overwriting).
-func (this *CheckApp) Run() error {
+func (this *CheckApp) Run(ctx context.Context) error {
 	if this.config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
 		return nil
 	}
 
 	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
-	_, err := this.client.Size(address)
+	_, err := this.client.Size(ctx, address)
 	if contracts.IsNotFound(err) {
 		return nil
 	}

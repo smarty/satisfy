@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ func (this *DependencyResolverFixture) Setup() {
 
 func (this *DependencyResolverFixture) Resolve() error {
 	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency)
-	return this.resolver.Resolve()
+	return this.resolver.Resolve(context.Background())
 }
 
 func (this *DependencyResolverFixture) TestFreshInstallation() {
@@ -418,7 +419,7 @@ type FakePackageInstaller struct {
 	errsByAddress          map[string]error
 }
 
-func (this *FakePackageInstaller) DownloadManifest(address url.URL) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) DownloadManifest(_ context.Context, address url.URL) (manifest contracts.Manifest, err error) {
 	if err, found := this.errsByAddress[address.String()]; found {
 		return contracts.Manifest{}, err
 	}
@@ -428,7 +429,7 @@ func (this *FakePackageInstaller) DownloadManifest(address url.URL) (manifest co
 	return this.remoteLatest, this.downloadError
 }
 
-func (this *FakePackageInstaller) ManifestExists(address url.URL) (bool, error) {
+func (this *FakePackageInstaller) ManifestExists(_ context.Context, address url.URL) (bool, error) {
 	if err, found := this.errsByAddress[address.String()]; found {
 		if contracts.IsNotFound(err) {
 			return false, nil
@@ -438,7 +439,7 @@ func (this *FakePackageInstaller) ManifestExists(address url.URL) (bool, error) 
 	return true, nil
 }
 
-func (this *FakePackageInstaller) InstallManifest(request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
+func (this *FakePackageInstaller) InstallManifest(_ context.Context, request contracts.InstallationRequest) (manifest contracts.Manifest, err error) {
 	this.installManifestCounter++
 	this.manifestRequest = request
 	if err, found := this.errsByAddress[request.RemoteAddress.String()]; found {
@@ -450,7 +451,7 @@ func (this *FakePackageInstaller) InstallManifest(request contracts.Installation
 	return this.remote, this.installManifestErr
 }
 
-func (this *FakePackageInstaller) InstallPackage(manifest contracts.Manifest, request contracts.InstallationRequest) error {
+func (this *FakePackageInstaller) InstallPackage(_ context.Context, manifest contracts.Manifest, request contracts.InstallationRequest) error {
 	this.installPackageCounter++
 	this.installed = manifest
 	this.packageRequest = request
