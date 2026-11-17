@@ -8,27 +8,26 @@ import (
 	"io"
 
 	"github.com/smarty/gcs"
-
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // tagsCommandConfig is the configuration for the tags modify command.
 type tagsCommandConfig struct {
 	MaxRetry          int
 	GoogleCredentials gcs.Credentials
-	Modification      contracts.TagModificationConfig
+	Modification      model.TagModificationConfig
 	JSONPath          string
 }
 
 type TagsConfigLoader struct {
 	reader  gcs.CredentialsReader
-	storage contracts.FileReader
+	storage model.FileReader
 	stdin   io.Reader
 	stderr  io.Writer
 }
 
-func NewTagsConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader, stderr io.Writer) *TagsConfigLoader {
+func NewTagsConfigLoader(storage model.FileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *TagsConfigLoader {
 	vaultAddress, _ := env.LookupEnv("VAULT_ADDR")
 	vaultToken, _ := env.LookupEnv("VAULT_TOKEN")
 
@@ -94,10 +93,10 @@ exit code 1: general failure (see stderr for details)`)
 	return config, err
 }
 
-func (this *TagsConfigLoader) parseConfigFile(path string) (config contracts.TagModificationConfig, err error) {
+func (this *TagsConfigLoader) parseConfigFile(path string) (config model.TagModificationConfig, err error) {
 	data, err := readRawJSON(this.storage, this.stdin, path)
 	if err != nil {
-		return contracts.TagModificationConfig{}, err
+		return model.TagModificationConfig{}, err
 	}
 	return config, json.Unmarshal(data, &config)
 }

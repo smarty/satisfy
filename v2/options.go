@@ -7,10 +7,8 @@ import (
 	"time"
 
 	"github.com/smarty/gcs"
-
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2/internal/storage"
 )
 
 // Option configures a Client.
@@ -18,22 +16,22 @@ type Option func(*clientConfig)
 
 type clientConfig struct {
 	httpClient     *http.Client
-	credentials    shell.CredentialsSource
+	credentials    storage.CredentialsSource
 	maxRetry       int
 	retryDelay     time.Duration
 	concurrency    int
 	verifyContents bool
 	logger         *slog.Logger
-	progress       contracts.ProgressFunc
-	storage        contracts.RemoteStorage // for tests: replaces the GCS client
+	progress       model.ProgressFunc
+	storage        model.RemoteStorage // for tests: replaces the GCS client
 }
 
 func defaultClientConfig() clientConfig {
 	return clientConfig{
-		httpClient:  shell.NewHTTPClient(),
-		credentials: shell.NewRefreshingCredentials(gcs.NewCredentialsReader(), "", shell.DefaultCredentialsMaxAge),
+		httpClient:  storage.NewHTTPClient(),
+		credentials: storage.NewRefreshingCredentials(gcs.NewCredentialsReader(), "", storage.DefaultCredentialsMaxAge),
 		maxRetry:    5,
-		retryDelay:  core.DefaultRetryDelay,
+		retryDelay:  storage.DefaultRetryDelay,
 		concurrency: runtime.NumCPU(),
 	}
 }
@@ -50,7 +48,7 @@ func WithHTTPClient(client *http.Client) Option {
 // WithCredentials uses fixed credentials for every request. Bearer tokens
 // expire, so prefer WithCredentialsReader for long-running work.
 func WithCredentials(credentials gcs.Credentials) Option {
-	return func(this *clientConfig) { this.credentials = shell.StaticCredentials(credentials) }
+	return func(this *clientConfig) { this.credentials = storage.StaticCredentials(credentials) }
 }
 
 // WithCredentialsReader reads credentials from reader on first use and again
@@ -58,7 +56,7 @@ func WithCredentials(credentials gcs.Credentials) Option {
 // credentials are discovered from the environment by gcs.NewCredentialsReader.
 func WithCredentialsReader(reader gcs.CredentialsReader) Option {
 	return func(this *clientConfig) {
-		this.credentials = shell.NewRefreshingCredentials(reader, "", shell.DefaultCredentialsMaxAge)
+		this.credentials = storage.NewRefreshingCredentials(reader, "", storage.DefaultCredentialsMaxAge)
 	}
 }
 
@@ -96,6 +94,6 @@ func WithProgress(progress func(Progress)) Option {
 	return func(this *clientConfig) { this.progress = progress }
 }
 
-func withStorage(storage contracts.RemoteStorage) Option {
+func withStorage(storage model.RemoteStorage) Option {
 	return func(this *clientConfig) { this.storage = storage }
 }

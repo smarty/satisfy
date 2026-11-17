@@ -13,9 +13,10 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/archive"
+	"github.com/smarty/satisfy/v2/internal/fsys"
+	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2/internal/packaging"
 )
 
 func TestUploadCompressionFixture(t *testing.T) {
@@ -71,16 +72,16 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 	buffer := bytes.NewBuffer(nil)
 	compressor, err := newCompressor(algorithm, level, io.MultiWriter(hasher, buffer))
 	this.So(err, should.BeNil)
-	archive := shell.NewSwitchArchiveWriter(compressor)
+	archive := archive.NewSwitchArchiveWriter(compressor)
 
-	archive.WriteHeader(contracts.ArchiveHeader{
+	archive.WriteHeader(model.ArchiveHeader{
 		Name:    "Hello/World",
 		Size:    int64(len("Hello World")),
 		ModTime: archiveModTime,
 	})
 	_, err = archive.Write([]byte("Hello World"))
 	this.So(err, should.BeNil)
-	archive.WriteHeader(contracts.ArchiveHeader{
+	archive.WriteHeader(model.ArchiveHeader{
 		Name:       "bin/tool",
 		Size:       int64(len(payload)),
 		ModTime:    archiveModTime,
@@ -89,7 +90,7 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 	_, err = archive.Write(payload)
 	this.So(err, should.BeNil)
 	if algorithm != "zip" {
-		archive.WriteHeader(contracts.ArchiveHeader{
+		archive.WriteHeader(model.ArchiveHeader{
 			Name:     "Link",
 			LinkName: "Hello/World",
 			ModTime:  archiveModTime,
@@ -98,23 +99,23 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 	this.So(archive.Close(), should.BeNil)
 	this.So(compressor.Close(), should.BeNil)
 
-	installer := core.NewPackageInstaller(
+	installer := packaging.NewPackageInstaller(
 		&fakeArchiveDownloader{body: buffer.Bytes()},
-		shell.NewDiskFileSystem(""),
+		fsys.NewDiskFileSystem(""),
 		nil,
 		nil,
 	)
-	manifest := contracts.Manifest{
-		Archive: contracts.Archive{
+	manifest := model.Manifest{
+		Archive: model.Archive{
 			MD5Checksum: hasher.Sum(nil),
-			Contents: []contracts.ArchiveItem{
+			Contents: []model.ArchiveItem{
 				{Path: "Hello/World"},
 				{Path: "bin/tool"},
 			},
 			CompressionAlgorithm: algorithm,
 		},
 	}
-	err = installer.InstallPackage(context.Background(), manifest, contracts.InstallationRequest{
+	err = installer.InstallPackage(context.Background(), manifest, model.InstallationRequest{
 		RemoteAddress: url.URL{Host: "bucket", Path: "resource"},
 		LocalPath:     this.localPath,
 	})

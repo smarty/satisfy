@@ -13,7 +13,7 @@ import (
 	"github.com/smarty/gcs"
 	"github.com/smarty/gunit"
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestUploadConfigLoaderFixture(t *testing.T) {
@@ -79,13 +79,13 @@ func (this *UploadConfigLoaderFixture) TestInValidJSONFromSpecifiedFile() {
 }
 
 func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
-	packageConfig := contracts.PackageConfig{
+	packageConfig := model.PackageConfig{
 		CompressionAlgorithm: "zstd",
 		CompressionLevel:     42,
 		SourceDirectory:      "source",
 		PackageName:          "package",
 		PackageVersion:       "version",
-		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		RemoteAddressPrefix:  &model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
 	}
 	raw, _ := json.Marshal(packageConfig)
 	this.stdin.Write(raw)
@@ -267,7 +267,7 @@ func (this *UploadConfigLoaderFixture) TestValidTagsAccepted() {
 	this.So(config.PackageConfig.Tags, should.Resemble, []string{"stable", "experimental"})
 }
 
-func (this *UploadConfigLoaderFixture) prepareValidJSONConfigFile() contracts.PackageConfig {
+func (this *UploadConfigLoaderFixture) prepareValidJSONConfigFile() model.PackageConfig {
 	packageConfig := this.pkgConfig.configure()
 	raw, _ := json.Marshal(packageConfig)
 	this.storage.WriteFile("config.json", raw)
@@ -281,7 +281,7 @@ type FakePackageConfig struct {
 	SourceDirectory      string
 	PackageName          string
 	PackageVersion       string
-	RemoteAddressPrefix  *contracts.URL
+	RemoteAddressPrefix  *model.URL
 	Tags                 []string
 }
 
@@ -291,12 +291,12 @@ func NewFakePackageConfig() *FakePackageConfig {
 		SourceDirectory:      "source",
 		PackageName:          "package",
 		PackageVersion:       "version",
-		RemoteAddressPrefix:  &contracts.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		RemoteAddressPrefix:  &model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
 	}
 }
 
-func (this *FakePackageConfig) configure() contracts.PackageConfig {
-	return contracts.PackageConfig{
+func (this *FakePackageConfig) configure() model.PackageConfig {
+	return model.PackageConfig{
 		CompressionAlgorithm: this.CompressionAlgorithm,
 		CompressionLevel:     42,
 		SourceDirectory:      this.SourceDirectory,

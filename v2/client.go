@@ -11,19 +11,18 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2/internal/storage"
 )
 
 // Client installs, uploads and inspects packages in Google Cloud Storage. It
 // is safe for concurrent use.
 type Client struct {
-	storage        contracts.RemoteStorage
+	storage        model.RemoteStorage
 	concurrency    int
 	verifyContents bool
 	logger         *slog.Logger
-	progress       contracts.ProgressFunc
+	progress       model.ProgressFunc
 }
 
 // New returns a Client. It performs no I/O.
@@ -32,14 +31,14 @@ func New(options ...Option) *Client {
 	for _, option := range options {
 		option(&config)
 	}
-	logger := contracts.LoggerOrDiscard(config.logger)
-	storage := config.storage
-	if storage == nil {
-		storage = shell.NewGoogleCloudStorageClient(config.httpClient, config.credentials,
+	logger := model.LoggerOrDiscard(config.logger)
+	remote := config.storage
+	if remote == nil {
+		remote = storage.NewGoogleCloudStorageClient(config.httpClient, config.credentials,
 			[]int{http.StatusOK, http.StatusPartialContent})
 	}
 	return &Client{
-		storage:        core.NewRetryClient(storage, config.maxRetry, config.retryDelay, logger),
+		storage:        storage.NewRetryClient(remote, config.maxRetry, config.retryDelay, logger),
 		concurrency:    config.concurrency,
 		verifyContents: config.verifyContents,
 		logger:         logger,
@@ -67,7 +66,7 @@ func (this *Client) uploadManifest(ctx context.Context, manifest Manifest, addre
 	if err := encoder.Encode(manifest); err != nil {
 		return err
 	}
-	return this.storage.Upload(ctx, contracts.UploadRequest{
+	return this.storage.Upload(ctx, model.UploadRequest{
 		RemoteAddress: address,
 		Body:          bytes.NewReader(buffer.Bytes()),
 		Size:          int64(buffer.Len()),

@@ -10,8 +10,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 const stdinPath = "_STDIN_"
@@ -22,7 +21,7 @@ type downloadCommandConfig struct {
 	MaxRetry          int
 	Concurrency       int
 	QuickVerification bool
-	Dependencies      contracts.DependencyListing
+	Dependencies      model.DependencyListing
 	JSONPath          string
 	ShowProgress      bool
 }
@@ -87,20 +86,20 @@ func parseDownloadConfig(args []string, stdin io.Reader, stderr io.Writer) (conf
 	return config, nil
 }
 
-func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr io.Writer) (contracts.DependencyListing, error) {
+func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr io.Writer) (model.DependencyListing, error) {
 	dependencies, err := readDependencyListing(path, stdin)
 	if errors.Is(err, fs.ErrNotExist) {
 		emitExampleDependenciesFile(stderr)
 	}
 	if err != nil {
-		return contracts.DependencyListing{}, err
+		return model.DependencyListing{}, err
 	}
 
 	if err = dependencies.Validate(); err != nil {
-		return contracts.DependencyListing{}, err
+		return model.DependencyListing{}, err
 	}
 
-	dependencies.Listing = core.Filter(dependencies.Listing, filter)
+	dependencies.Listing = Filter(dependencies.Listing, filter)
 
 	if len(dependencies.Listing) == 0 {
 		_, _ = fmt.Fprintln(stderr, "No dependencies provided. You can go about your business. Move along.")
@@ -109,7 +108,7 @@ func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr
 	return dependencies, nil
 }
 
-func readDependencyListing(path string, stdin io.Reader) (listing contracts.DependencyListing, err error) {
+func readDependencyListing(path string, stdin io.Reader) (listing model.DependencyListing, err error) {
 	if path == stdinPath {
 		return decodeDependencyListing(stdin)
 	}
@@ -121,17 +120,17 @@ func readDependencyListing(path string, stdin io.Reader) (listing contracts.Depe
 	return decodeDependencyListing(file)
 }
 
-func decodeDependencyListing(reader io.Reader) (listing contracts.DependencyListing, err error) {
+func decodeDependencyListing(reader io.Reader) (listing model.DependencyListing, err error) {
 	err = json.NewDecoder(reader).Decode(&listing)
 	return listing, err
 }
 
 func emitExampleDependenciesFile(output io.Writer) {
-	var listing contracts.DependencyListing
-	listing.Listing = append(listing.Listing, contracts.Dependency{
+	var listing model.DependencyListing
+	listing.Listing = append(listing.Listing, model.Dependency{
 		PackageName:    "example_package_name",
 		PackageVersion: "0.0.1",
-		RemoteAddress:  contracts.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		RemoteAddress:  model.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
 	raw, _ := json.MarshalIndent(listing, "", "  ") // the example always marshals

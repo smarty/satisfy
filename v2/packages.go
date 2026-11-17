@@ -6,8 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // Latest returns the most recently uploaded version of the package stored
@@ -39,7 +38,7 @@ func (this *Client) rootManifest(ctx context.Context, remoteAddress URL, package
 	dependency := Dependency{PackageName: packageName, RemoteAddress: remoteAddress}
 	address := dependency.ComposeLatestManifestRemoteAddress()
 	manifest, err := this.downloadManifest(ctx, address)
-	if contracts.IsNotFound(err) {
+	if model.IsNotFound(err) {
 		return Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
 			packageName, address.String(), err)
 	}
@@ -57,7 +56,7 @@ func (this *Client) ModifyTags(ctx context.Context, modification TagModification
 	}
 	address := modification.ComposeRootManifestAddress()
 	rootManifest, err := this.downloadManifest(ctx, address)
-	if contracts.IsNotFound(err) {
+	if model.IsNotFound(err) {
 		return fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
 			modification.PackageName, address.String(), err)
 	}
@@ -70,7 +69,7 @@ func (this *Client) ModifyTags(ctx context.Context, modification TagModification
 	}
 
 	this.logModifications(rootManifest, modification)
-	rootManifest.Tags = core.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
+	rootManifest.Tags = model.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
 	if err = this.uploadManifest(ctx, rootManifest, address); err != nil {
 		return err
 	}
@@ -125,7 +124,7 @@ func (this *Client) verifyVersionsExist(ctx context.Context, modification TagMod
 		}
 		address := modification.ComposeVersionedManifestAddress(tag.Version)
 		_, err := this.storage.Size(ctx, address)
-		if contracts.IsNotFound(err) {
+		if model.IsNotFound(err) {
 			return fmt.Errorf("cannot tag version %q as %q: no manifest found at [%s]: %w",
 				tag.Version, tag.Name, address.String(), err)
 		}

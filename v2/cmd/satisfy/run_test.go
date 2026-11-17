@@ -10,7 +10,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestRunFixture(t *testing.T) {
@@ -95,7 +95,7 @@ func (this *ExitCodeFixture) TestSuccess() {
 }
 
 func (this *ExitCodeFixture) TestPackageExistsIsExitCodeTwo() {
-	err := fmt.Errorf("wrapped: %w", contracts.ErrPackageExists)
+	err := fmt.Errorf("wrapped: %w", model.ErrPackageExists)
 	this.So(exitCode(this.env, err), should.Equal, exitPackageExists)
 }
 
@@ -113,15 +113,15 @@ type RenderProgressFixture struct {
 }
 
 func (this *RenderProgressFixture) TestInProgressRedrawsTheLine() {
-	rendered := renderProgress(contracts.Progress{
-		Phase: contracts.ProgressExtracting, Name: "file.txt", Written: 1024, Total: 2048,
+	rendered := renderProgress(model.Progress{
+		Phase: model.ProgressExtracting, Name: "file.txt", Written: 1024, Total: 2048,
 	})
 	this.So(rendered, should.Equal, "\033[2K\rExtracting file.txt: 1 KB of 2 KB.")
 }
 
 func (this *RenderProgressFixture) TestDoneEndsTheLine() {
-	rendered := renderProgress(contracts.Progress{
-		Phase: contracts.ProgressArchiving, Name: "file.txt", Written: 1024, Total: 1024, Done: true,
+	rendered := renderProgress(model.Progress{
+		Phase: model.ProgressArchiving, Name: "file.txt", Written: 1024, Total: 1024, Done: true,
 	})
 	this.So(strings.HasSuffix(rendered, "\n"), should.BeTrue)
 	this.So(rendered, should.ContainSubstring, "Done archiving file.txt (1 KB)")

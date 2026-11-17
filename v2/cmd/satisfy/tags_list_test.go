@@ -6,7 +6,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestTagsListFixture(t *testing.T) {
@@ -48,7 +48,7 @@ func (this *TagsListFixture) TestPackageOfOnlySlashesIsRejected() {
 }
 
 func (this *TagsListFixture) TestFormatTagsTextIsSortedAndTabSeparated() {
-	tags := []contracts.Tag{
+	tags := []model.Tag{
 		{Name: "stable", Version: "2026.01.A"},
 		{Name: "experimental", Version: "2026.01.B"},
 	}
@@ -67,7 +67,7 @@ func (this *TagsListFixture) TestFormatTagsTextEmptyProducesNoOutput() {
 }
 
 func (this *TagsListFixture) TestFormatTagsJSONIsSorted() {
-	tags := []contracts.Tag{
+	tags := []model.Tag{
 		{Name: "stable", Version: "2026.01.A"},
 		{Name: "experimental", Version: "2026.01.B"},
 	}
@@ -96,12 +96,12 @@ func (this *TagsListFixture) TestFormatTagsJSONEmptyIsEmptyArray() {
 }
 
 func (this *TagsListFixture) TestFormatTagsDoesNotMutateInput() {
-	tags := []contracts.Tag{
+	tags := []model.Tag{
 		{Name: "stable", Version: "2026.01.A"},
 		{Name: "experimental", Version: "2026.01.B"},
 	}
 
 	_, _ = formatTags(tags, false)
 
-	this.So(tags[0], should.Resemble, contracts.Tag{Name: "stable", Version: "2026.01.A"})
+	this.So(tags[0], should.Resemble, model.Tag{Name: "stable", Version: "2026.01.A"})
 }

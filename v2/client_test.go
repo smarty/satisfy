@@ -14,7 +14,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestClientFixture(t *testing.T) {
@@ -226,7 +226,7 @@ func newFakeStorage() *fakeStorage {
 	return &fakeStorage{objects: make(map[string][]byte)}
 }
 
-func (this *fakeStorage) Upload(_ context.Context, request contracts.UploadRequest) error {
+func (this *fakeStorage) Upload(_ context.Context, request model.UploadRequest) error {
 	raw, err := io.ReadAll(request.Body)
 	if err != nil {
 		return err
@@ -242,7 +242,7 @@ func (this *fakeStorage) object(address url.URL) ([]byte, error) {
 	defer this.lock.Unlock()
 	raw, found := this.objects[address.String()]
 	if !found {
-		return nil, contracts.NewStatusCodeError(http.StatusNotFound, []int{http.StatusOK}, address)
+		return nil, model.NewStatusCodeError(http.StatusNotFound, []int{http.StatusOK}, address)
 	}
 	return raw, nil
 }

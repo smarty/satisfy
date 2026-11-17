@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // remotePackageFlags are the flags shared by commands that look up a single
@@ -44,20 +44,20 @@ func (this *remotePackageFlags) register(flags *flag.FlagSet) {
 
 // resolve validates the flags and returns the package name and the remote
 // address under which packages live.
-func (this *remotePackageFlags) resolve() (packageName string, remoteAddress contracts.URL, err error) {
+func (this *remotePackageFlags) resolve() (packageName string, remoteAddress model.URL, err error) {
 	if this.bucket == "" {
-		return "", contracts.URL{}, errors.New("-bucket is required")
+		return "", model.URL{}, errors.New("-bucket is required")
 	}
 	if strings.Contains(this.bucket, "/") {
-		return "", contracts.URL{}, errors.New("-bucket should be a bare bucket name (no scheme, no slashes)")
+		return "", model.URL{}, errors.New("-bucket should be a bare bucket name (no scheme, no slashes)")
 	}
 
 	packageName = strings.Trim(this.packageName, "/")
 	if packageName == "" {
-		return "", contracts.URL{}, errors.New("-package is required")
+		return "", model.URL{}, errors.New("-package is required")
 	}
 
-	remoteAddress = contracts.URL{Scheme: "gcs", Host: this.bucket}
+	remoteAddress = model.URL{Scheme: "gcs", Host: this.bucket}
 	if prefix := strings.Trim(this.prefix, "/"); prefix != "" {
 		remoteAddress.Path = "/" + prefix
 	}
@@ -67,7 +67,7 @@ func (this *remotePackageFlags) resolve() (packageName string, remoteAddress con
 // remotePackageConfig identifies one package's root manifest.
 type remotePackageConfig struct {
 	PackageName   string
-	RemoteAddress contracts.URL
+	RemoteAddress model.URL
 	MaxRetry      int
 }
 

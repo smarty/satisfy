@@ -9,9 +9,8 @@ import (
 	"io"
 
 	"github.com/smarty/gcs"
-
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // uploadCommandConfig is the configuration for the upload and check
@@ -21,19 +20,19 @@ type uploadCommandConfig struct {
 	CredentialReader  gcs.CredentialsReader
 	GoogleCredentials gcs.Credentials
 	Overwrite         bool
-	PackageConfig     contracts.PackageConfig
+	PackageConfig     model.PackageConfig
 	JSONPath          string
 	ShowProgress      bool
 }
 
 type UploadConfigLoader struct {
 	reader  gcs.CredentialsReader
-	storage contracts.FileReader
+	storage model.FileReader
 	stdin   io.Reader
 	stderr  io.Writer
 }
 
-func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environment, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
+func NewUploadConfigLoader(storage model.FileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
 	vaultAddress, _ := env.LookupEnv("VAULT_ADDR")
 	vaultToken, _ := env.LookupEnv("VAULT_TOKEN")
 
@@ -113,10 +112,10 @@ exit code 2: package has already been uploaded`)
 	return config, err
 }
 
-func (this *UploadConfigLoader) parseConfigFile(path string) (config contracts.PackageConfig, err error) {
+func (this *UploadConfigLoader) parseConfigFile(path string) (config model.PackageConfig, err error) {
 	data, err := this.readRawJSON(path)
 	if err != nil {
-		return contracts.PackageConfig{}, err
+		return model.PackageConfig{}, err
 	}
 	return config, json.Unmarshal(data, &config)
 }
@@ -125,7 +124,7 @@ func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error
 	return readRawJSON(this.storage, this.stdin, path)
 }
 
-func readRawJSON(storage contracts.FileReader, stdin io.Reader, path string) (data []byte, err error) {
+func readRawJSON(storage model.FileReader, stdin io.Reader, path string) (data []byte, err error) {
 	if path == "" {
 		return nil, errBlankJSONPath
 	}

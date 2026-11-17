@@ -7,7 +7,7 @@ import (
 	"github.com/smarty/gcs"
 
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/fsys"
 )
 
 func (this environment) client(options ...satisfy.Option) *satisfy.Client {
@@ -54,7 +54,7 @@ func checkCommand(ctx context.Context, env environment, args []string) error {
 }
 
 func newUploadConfigLoader(env environment) *UploadConfigLoader {
-	return NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), env.stdin, env.stderr)
+	return NewUploadConfigLoader(fsys.NewDiskFileSystem(""), newOSEnvironment(), env.stdin, env.stderr)
 }
 
 func downloadCommand(ctx context.Context, env environment, args []string) error {
@@ -120,7 +120,7 @@ func tagsListCommand(ctx context.Context, env environment, args []string) error 
 }
 
 func tagsModifyCommand(ctx context.Context, env environment, args []string) error {
-	loader := NewTagsConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), env.stdin, env.stderr)
+	loader := NewTagsConfigLoader(fsys.NewDiskFileSystem(""), newOSEnvironment(), env.stdin, env.stderr)
 	config, err := loader.LoadConfig(ctx, args)
 	if err != nil {
 		return err

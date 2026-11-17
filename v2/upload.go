@@ -12,10 +12,10 @@ import (
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
-
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/archive"
+	"github.com/smarty/satisfy/v2/internal/fsys"
+	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2/internal/packaging"
 )
 
 // UploadRequest describes a package version to upload.
@@ -32,8 +32,8 @@ func (this *Client) Exists(ctx context.Context, pkg PackageConfig) (bool, error)
 	if pkg.RemoteAddressPrefix == nil {
 		return false, fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
 	}
-	_, err := this.storage.Size(ctx, pkg.ComposeRemoteAddress(contracts.RemoteManifestFilename))
-	if contracts.IsNotFound(err) {
+	_, err := this.storage.Size(ctx, pkg.ComposeRemoteAddress(model.RemoteManifestFilename))
+	if model.IsNotFound(err) {
 		return false, nil
 	}
 	if err != nil {
@@ -62,20 +62,20 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		}
 	}
 
-	archive, err := this.buildArchive(ctx, pkg)
+	built, err := this.buildArchive(ctx, pkg)
 	if err != nil {
 		return Manifest{}, err
 	}
-	defer func() { _ = os.Remove(archive.path) }()
+	defer func() { _ = os.Remove(built.path) }()
 
 	manifest := Manifest{
 		Name:    pkg.PackageName,
 		Version: pkg.PackageVersion,
 		Archive: Archive{
-			Filename:             contracts.RemoteArchiveFilename,
-			Size:                 uint64(archive.size),
-			MD5Checksum:          archive.checksum,
-			Contents:             archive.contents,
+			Filename:             model.RemoteArchiveFilename,
+			Size:                 uint64(built.size),
+			MD5Checksum:          built.checksum,
+			Contents:             built.contents,
 			CompressionAlgorithm: pkg.CompressionAlgorithm,
 		},
 	}
@@ -85,12 +85,12 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 
 	this.logger.Info("uploading the archive", "package", pkg.PackageName, "version", pkg.PackageVersion)
-	if err = this.uploadArchive(ctx, pkg, manifest, archive.path); err != nil {
+	if err = this.uploadArchive(ctx, pkg, manifest, built.path); err != nil {
 		return Manifest{}, err
 	}
 
 	this.logger.Info("uploading the manifest", "package", pkg.PackageName, "version", pkg.PackageVersion)
-	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(contracts.RemoteManifestFilename)); err != nil {
+	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename)); err != nil {
 		return Manifest{}, err
 	}
 	rootManifest, err := this.buildRootManifest(ctx, pkg, manifest)
@@ -145,16 +145,16 @@ type builtArchive struct {
 	contents []ArchiveItem
 }
 
-func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (archive builtArchive, err error) {
+func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (built builtArchive, err error) {
 	file, err := os.CreateTemp("", "satisfy-archive-*")
 	if err != nil {
 		return builtArchive{}, err
 	}
-	archive.path = file.Name()
+	built.path = file.Name()
 	defer func() {
 		err = errors.Join(err, file.Close())
 		if err != nil {
-			_ = os.Remove(archive.path)
+			_ = os.Remove(built.path)
 		}
 	}()
 
@@ -165,9 +165,9 @@ func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (archiv
 		return builtArchive{}, err
 	}
 
-	builder := core.NewDirectoryPackageBuilder(
-		shell.NewDiskFileSystem(sourcePath(pkg)),
-		shell.NewSwitchArchiveWriter(compressor),
+	builder := packaging.NewDirectoryPackageBuilder(
+		fsys.NewDiskFileSystem(sourcePath(pkg)),
+		archive.NewSwitchArchiveWriter(compressor),
 		md5.New(),
 		this.logger,
 		this.progress,
@@ -179,10 +179,10 @@ func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (archiv
 	if err = compressor.Close(); err != nil {
 		return builtArchive{}, err
 	}
-	archive.size = counter.count
-	archive.checksum = hasher.Sum(nil)
-	archive.contents = builder.Contents()
-	return archive, nil
+	built.size = counter.count
+	built.checksum = hasher.Sum(nil)
+	built.contents = builder.Contents()
+	return built, nil
 }
 
 func (this *Client) uploadArchive(ctx context.Context, pkg PackageConfig, manifest Manifest, path string) error {
@@ -191,8 +191,8 @@ func (this *Client) uploadArchive(ctx context.Context, pkg PackageConfig, manife
 		return err
 	}
 	defer func() { _ = file.Close() }()
-	return this.storage.Upload(ctx, contracts.UploadRequest{
-		RemoteAddress: pkg.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
+	return this.storage.Upload(ctx, model.UploadRequest{
+		RemoteAddress: pkg.ComposeRemoteAddress(model.RemoteArchiveFilename),
 		Body:          file,
 		Size:          int64(manifest.Archive.Size),
 		ContentType:   contentType[manifest.Archive.CompressionAlgorithm],
@@ -205,11 +205,11 @@ func (this *Client) uploadArchive(ctx context.Context, pkg PackageConfig, manife
 // being uploaded. The versioned manifest never includes tags.
 func (this *Client) buildRootManifest(ctx context.Context, pkg PackageConfig, manifest Manifest) (Manifest, error) {
 	existing, err := this.downloadManifest(ctx, pkg.ComposeLatestManifestRemoteAddress())
-	if err != nil && !contracts.IsNotFound(err) { // not found: first upload of this package
+	if err != nil && !model.IsNotFound(err) { // not found: first upload of this package
 		return Manifest{}, fmt.Errorf("could not read existing root manifest (needed to preserve tags): %w", err)
 	}
 	rootManifest := manifest
-	rootManifest.Tags = core.MergeTags(existing.Tags, pkg.Tags, pkg.PackageVersion)
+	rootManifest.Tags = model.MergeTags(existing.Tags, pkg.Tags, pkg.PackageVersion)
 	for _, name := range pkg.Tags {
 		this.logger.Info("tagging version", "version", pkg.PackageVersion, "tag", name)
 	}
@@ -226,13 +226,13 @@ func newCompressor(algorithm string, level int, writer io.Writer) (io.WriteClose
 
 var compression = map[string]func(_ io.Writer, level int) (io.WriteCloser, error){
 	"zstd": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return shell.NewParallelZstdWriter(writer, zstd.EncoderLevelFromZstd(level), shell.DefaultParallelZstdChunkSize)
+		return archive.NewParallelZstdWriter(writer, zstd.EncoderLevelFromZstd(level), archive.DefaultParallelZstdChunkSize)
 	},
 	"gzip": func(writer io.Writer, level int) (io.WriteCloser, error) {
 		return gzip.NewWriterLevel(writer, level)
 	},
 	"zip": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return shell.NewZipArchiveWriter(writer, level), nil
+		return archive.NewZipArchiveWriter(writer, level), nil
 	},
 }
 

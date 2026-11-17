@@ -8,9 +8,9 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/shell"
+	"github.com/smarty/satisfy/v2/internal/fsys"
+	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2/internal/packaging"
 )
 
 // Install makes each dependency's local directory hold the requested package
@@ -23,14 +23,14 @@ func (this *Client) Install(ctx context.Context, dependencies ...Dependency) err
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
-	disk := shell.NewDiskFileSystem("")
-	installer := core.NewPackageInstaller(this.storage, disk, this.logger, this.progress)
-	integrity := core.NewCompoundIntegrityCheck(
-		core.NewFileListingIntegrityChecker(disk),
-		core.NewFileContentIntegrityCheck(md5.New, disk, this.verifyContents),
+	disk := fsys.NewDiskFileSystem("")
+	installer := packaging.NewPackageInstaller(this.storage, disk, this.logger, this.progress)
+	integrity := packaging.NewCompoundIntegrityCheck(
+		packaging.NewFileListingIntegrityChecker(disk),
+		packaging.NewFileContentIntegrityCheck(md5.New, disk, this.verifyContents),
 	)
-	errs := runConcurrently(ctx, this.concurrency, listing.Listing, func(dependency contracts.Dependency) error {
-		return core.NewDependencyResolver(disk, integrity, installer, dependency, this.logger).Resolve(ctx)
+	errs := runConcurrently(ctx, this.concurrency, listing.Listing, func(dependency model.Dependency) error {
+		return packaging.NewDependencyResolver(disk, integrity, installer, dependency, this.logger).Resolve(ctx)
 	})
 	return errors.Join(errs...)
 }
