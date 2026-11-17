@@ -4,62 +4,46 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-`satisfy` is a Go-based package dependency manager that uploads, downloads, and verifies versioned package archives to/from Google Cloud Storage (GCS). It manages manifests (`manifest.json`) and compressed archives (gzip, zstd, zip) stored remotely, with local integrity checking to skip unnecessary re-downloads.
+`satisfy` is a Go package manager that uploads, downloads, and verifies versioned package archives to/from Google Cloud Storage (GCS). It manages manifests (`manifest.json`) and compressed archives (gzip, zstd, zip) stored remotely, with local integrity checking to skip unnecessary re-downloads. It is both a CLI and an importable library.
+
+## Repository Layout: v0 and v2
+
+- The repository root is the **deprecated v0 module** (`github.com/smarty/satisfy`).
+- **All development happens in `v2/`**, a separate module: `github.com/smarty/satisfy/v2` (note: `smarty`, not `smartystreets`).
 
 ## Build & Test Commands
 
+The Makefile runs Go in `v2/` (`go -C v2 ...`).
+
 ```bash
-# Run tests (formats code first via go fmt, then runs tests)
-make test
+make test        # go mod tidy + go fmt, then tests
+make coverage    # race detector + atomic coverage
+make compile     # build ./workspace/satisfy (uses OS/CPU env vars)
+make build       # coverage + compile
+make image       # Docker image
 
-# Run tests directly
-go test -timeout=1s -short -cover ./...
-
-# Run a single test
-go test -timeout=1s -short -run TestName ./core/
-
-# Race detector + atomic coverage
-make coverage
-
-# Format and tidy
-make fmt
-
-# Compile binary
-make compile          # uses OS/CPU env vars
-make build            # coverage + compile
-
-# Build Docker image
-make image
+# directly
+go -C v2 test -short ./...
+go -C v2 test -short -run TestName ./internal/packaging/
 ```
 
-## Architecture
+## Architecture (v2)
 
-The module path is `github.com/smarty/satisfy` (note: **not** `smartystreets`).
+- **`satisfy` (module root, `v2/*.go`)** — the public API. `satisfy.New(options...)` returns a `*Client` with `Install`, `Upload`, `Exists`, `Latest`, `Tags`, `ModifyTags`. Options: `WithCredentials`, `WithCredentialsReader`, `WithHTTPClient`, `WithMaxRetry`, `WithRetryDelay`, `WithConcurrency`, `WithContentVerification`, `WithLogger`, `WithProgress`. Errors: `ErrPackageExists`, `ErrNotFound`, `ErrInvalidConfig`, `*StatusError`. `ValidatePackageConfig` and `ValidateTagModification` check input before any I/O (the CLI uses them too). Domain types are aliases of `internal/model` types.
+- **`internal/model`** — domain types (`Manifest`, `Dependency`, `PackageConfig`, `TagModificationConfig`, `URL`, `Progress`), errors (`ErrNotFound`, `ErrPackageExists`, `ErrRetryable`, `StatusCodeError`), small interfaces (`RemoteStorage`, file system interfaces, `ArchiveWriter`, `PackageInstaller`, `IntegrityCheck`), and tag merge helpers.
+- **`internal/storage`** — GCS client, `CredentialsSource` (`StaticCredentials`, `RefreshingCredentials`), HTTP client, and `RetryClient` (context-aware waits, rewinds upload bodies before each attempt).
+- **`internal/packaging`** — `DirectoryPackageBuilder`, `PackageInstaller` (extract + checksum + rollback), `DependencyResolver` (versions, `latest`, tags), integrity checks.
+- **`internal/archive`** — tar/zip writers, zip reader, parallel zstd writer, progress counter.
+- **`internal/fsys`** — `DiskFileSystem`.
+- **`cmd/satisfy`** — the CLI. `main` calls `run(ctx, args, stdin, stdout, stderr) int`. Owns flag parsing, JSON config loading (upload/tags loaders), credential discovery (incl. Vault), the slog text logger on stderr, the progress renderer, and exit codes (0 ok / `-h`, 1 failure, 2 package exists).
 
-### Package Layers
+## Library Rules
 
-- **`contracts/`** — Shared types and interfaces. All domain structs live here: `Manifest`, `Archive`, `Dependency`, `DependencyListing`, `UploadConfig`, `PackageConfig`. Also defines interfaces for filesystem operations (`FileCreator`, `FileReader`, `Deleter`, etc.), remote storage (`Uploader`, `Downloader`), and integrity checking (`IntegrityCheck`, `PackageInstaller`).
+Library code (everything outside `cmd/` and tests) must never call `os.Exit`, `log.Fatal*`, `log.Panic*` or `panic`, import `log` or `flag`, use `os.Stdout`/`os.Stderr`/`os.Stdin`/`os.Args`, `fmt.Print*` or `slog.Default`. Return errors; take a `context.Context` first; log only through an injected `*slog.Logger` (nil means silent, via `model.LoggerOrDiscard`); report progress through `model.ProgressFunc`.
 
-- **`core/`** — Business logic with no external I/O. Key types:
-  - `PackageInstaller` — downloads manifests and extracts archives (tar over gzip/zstd, or zip) into local directories, with checksum verification and filesystem rollback on failure.
-  - `DependencyResolver` — decides whether a dependency needs installation by checking local manifests and running integrity checks, then delegates to `PackageInstaller`.
-  - `PackageBuilder` — builds archive + manifest content from a source directory.
-  - `RetryClient` — wraps a `RemoteStorage` with configurable retry logic.
-  - Integrity checkers: `FileListingIntegrityChecker`, `FileContentIntegrityCheck`, `CompoundIntegrityCheck`.
+## Testing Conventions
 
-- **`shell/`** — Infrastructure adapters (no business logic): `DiskFileSystem`, `Environment`, `GoogleCloudStorageClient`, `HTTPClient`, `TarArchiveWriter`, `ZipArchiveWriter`, `ZipArchiveReader`.
-
-- **`transfer/`** — Application-level orchestrators wiring core + shell together:
-  - `UploadApp` — builds archive, computes manifest, uploads both to GCS.
-  - `DownloadApp` — resolves dependencies concurrently (goroutine per dependency).
-  - `CheckApp` — pre-upload check for existing remote manifests.
-  - `ParseDownloadConfig` — CLI flag parsing and dependency listing loading.
-
-- **`cmd/satisfy/`** — CLI entry point. Subcommands: `upload`, `check`, `version`; default (no subcommand) is `download`.
-
-### Testing Conventions
-
-Tests use the [`gunit`](https://pkg.go.dev/github.com/smarty/gunit) framework with fixture-based test structs and [`assertions`](https://pkg.go.dev/github.com/smarty/assertions) for `should`-style assertions. Pattern:
+All tests use [`gunit`](https://pkg.go.dev/github.com/smarty/gunit) fixtures with [`assertions`](https://pkg.go.dev/github.com/smarty/assertions) — including CLI tests. Pattern:
 
 ```go
 func TestSomethingFixture(t *testing.T) {
@@ -68,7 +52,6 @@ func TestSomethingFixture(t *testing.T) {
 
 type SomethingFixture struct {
     *gunit.Fixture
-    // fields
 }
 
 func (this *SomethingFixture) Setup() { /* ... */ }
@@ -77,8 +60,10 @@ func (this *SomethingFixture) TestSomeBehavior() {
 }
 ```
 
-### Style Notes
+`client_test.go` exercises the `Client` end to end against an in-memory `fakeStorage` (injected with the unexported `withStorage` option).
+
+## Style Notes
 
 - Receiver variable is always `this`.
-- Interfaces are defined granularly in `contracts/` (single-method where possible) and composed via embedding at usage sites.
-- `core/` types define their own filesystem interface (e.g., `PackageInstallerFileSystem`, `DependencyResolverFileSystem`) by embedding only the `contracts` interfaces they need.
+- Interfaces are small and composed via embedding at usage sites (e.g. `PackageInstallerFileSystem`).
+- Constructors do no I/O.
