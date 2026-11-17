@@ -72,11 +72,7 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	this.file = tmp
 
-	progress := NewArchiveProgressCounter(this.size, func(written, total int64, done bool) {
-		this.progress.Report(model.Progress{
-			Phase: model.ProgressDownloading, Name: "zip archive", Written: written, Total: total, Done: done,
-		})
-	})
+	progress := NewProgressCounter(this.progress, model.ProgressDownloading, "zip archive", this.size)
 
 	multiWriter := io.MultiWriter(tmp, progress)
 	this.size, err = io.Copy(multiWriter, reader)

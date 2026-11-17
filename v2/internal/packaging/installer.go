@@ -163,11 +163,7 @@ func (this *PackageInstaller) extractArchive(reader ArchiveReader, root model.Ro
 			if err != nil {
 				return names, err
 			}
-			progressReader := archive.NewArchiveProgressCounter(header.Size, func(written, total int64, done bool) {
-				this.progress.Report(model.Progress{
-					Phase: model.ProgressExtracting, Name: pathItem, Written: written, Total: total, Done: done,
-				})
-			})
+			progressReader := archive.NewProgressCounter(this.progress, model.ProgressExtracting, pathItem, header.Size)
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
 			err = errors.Join(err, writer.Close())

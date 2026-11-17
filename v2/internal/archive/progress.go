@@ -4,7 +4,10 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"sync/atomic"
 	"time"
+
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 var (
@@ -41,43 +44,71 @@ func humanFileSize(size float64) string {
 }
 
 type archiveProgressCounter struct {
-	written    int64
+	written    atomic.Int64
 	total      int64
 	onProgress func(written, total int64, done bool)
 	printTimer *time.Ticker
 	done       chan struct{}
+	stopped    chan struct{}
 }
 
 func (this *archiveProgressCounter) Write(p []byte) (n int, e error) {
 	n = len(p)
-	this.written += int64(n)
+	this.written.Add(int64(n))
 	return
 }
 
 func (this *archiveProgressCounter) Read(p []byte) (n int, err error) {
 	n = len(p)
-	this.written += int64(n)
+	this.written.Add(int64(n))
 	return
 }
 
+// Close stops the periodic reports, then reports once more with done set, so
+// that the final report is always the last.
 func (this *archiveProgressCounter) Close() error {
-	this.reportProgress(true)
 	this.printTimer.Stop()
 	close(this.done)
+	<-this.stopped
+	this.reportProgress(true)
 	return nil
 }
 
 func (this *archiveProgressCounter) reportProgress(done bool) {
-	this.onProgress(this.written, this.total, done)
+	this.onProgress(this.written.Load(), this.total, done)
 }
+
+// NewProgressCounter counts the bytes written to it and reports them through
+// progress, for the item name in the given phase, every two seconds and once
+// more (with Done) when closed. With a nil progress it does nothing, without
+// starting a goroutine.
+func NewProgressCounter(progress model.ProgressFunc, phase model.ProgressPhase, name string, size int64) io.WriteCloser {
+	if progress == nil {
+		return discardCounter{}
+	}
+	return NewArchiveProgressCounter(size, func(written, total int64, done bool) {
+		progress(model.Progress{Phase: phase, Name: name, Written: written, Total: total, Done: done})
+	})
+}
+
+type discardCounter struct{}
+
+func (discardCounter) Write(p []byte) (int, error) { return len(p), nil }
+func (discardCounter) Close() error                { return nil }
 
 // NewArchiveProgressCounter counts the bytes written to it and calls
 // onProgress every two seconds, and once more (with done) when closed.
 func NewArchiveProgressCounter(size int64, onProgress func(written, total int64, done bool)) io.WriteCloser {
+	return newArchiveProgressCounter(size, 2*time.Second, onProgress)
+}
+
+func newArchiveProgressCounter(size int64, interval time.Duration, onProgress func(written, total int64, done bool)) *archiveProgressCounter {
 	this := &archiveProgressCounter{total: size, onProgress: onProgress}
-	this.printTimer = time.NewTicker(2 * time.Second)
+	this.printTimer = time.NewTicker(interval)
 	this.done = make(chan struct{})
+	this.stopped = make(chan struct{})
 	go func() {
+		defer close(this.stopped)
 		for {
 			select {
 			case <-this.printTimer.C:

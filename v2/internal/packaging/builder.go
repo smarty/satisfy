@@ -121,11 +121,7 @@ func (this *DirectoryPackageBuilder) archiveContents(ctx context.Context, file m
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := archive.NewArchiveProgressCounter(file.Size(), func(written, total int64, done bool) {
-		this.progress.Report(model.Progress{
-			Phase: model.ProgressArchiving, Name: file.Path(), Written: written, Total: total, Done: done,
-		})
-	})
+	progressWriter := archive.NewProgressCounter(this.progress, model.ProgressArchiving, file.Path(), file.Size())
 	defer closeResource(progressWriter)
 	reader, err := this.storage.Open(file.Path())
 	if err != nil {
