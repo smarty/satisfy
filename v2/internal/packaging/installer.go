@@ -118,6 +118,11 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	if err != nil {
 		return errors.Join(err, this.revertFileSystem(paths))
 	}
+	// The archive reader stops at its end-of-archive marker, which can leave
+	// the end of the compressed stream unread; the checksum covers all of it.
+	if _, err = io.Copy(io.Discard, checksumReader); err != nil {
+		return errors.Join(err, this.revertFileSystem(paths))
+	}
 	actualChecksum := checksumReader.Sum(nil)
 	if !bytes.Equal(actualChecksum, manifest.Archive.MD5Checksum) {
 		err = fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)

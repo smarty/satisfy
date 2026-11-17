@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math/rand"
 	"net/url"
 	"strings"
 	"testing"
@@ -187,6 +188,31 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
+// The tar reader stops at its end-of-archive marker, which can leave the end of
+// the compressed stream (e.g. the gzip trailer) unread; the checksum must still
+// cover every byte of the downloaded archive. These content sizes left the gzip
+// trailer unread before the installer drained the stream.
+func (this *PackageInstallerFixture) TestInstallPackageChecksumCoversEntireCompressedStream() {
+	for _, algorithm := range []string{gzipAlgorithm, zstdAlgorithm} {
+		for _, size := range []int{162183, 293101, 358560} {
+			content := make([]byte, size)
+			_, _ = rand.New(rand.NewSource(int64(size))).Read(content)
+			for i := 0; i < len(content); i += 3 {
+				content[i] = 'a' // partly compressible, so it is not stored uncompressed
+			}
+			checksum := this.downloader.prepareSingleFileArchiveDownload(algorithm, content)
+			installer := NewPackageInstaller(this.downloader, newInMemoryFileSystem(), nil, nil)
+
+			err := installer.InstallPackage(context.Background(), this.buildManifest(checksum, algorithm), this.installationRequest(""))
+
+			if !this.So(err, should.BeNil) {
+				this.Printf("algorithm: %s, size: %d", algorithm, size)
+				return
+			}
+		}
+	}
+}
+
 func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{
@@ -283,6 +309,19 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 
 	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 
+	return hasher.Sum(nil)
+}
+
+func (this *FakeDownloader) prepareSingleFileArchiveDownload(compressionAlgorithm string, content []byte) []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	compressor := compression[compressionAlgorithm](io.MultiWriter(hasher, writer), 4)
+	archiveWriter := tar.NewWriter(compressor)
+	_ = archiveWriter.WriteHeader(&tar.Header{Name: "file", Size: int64(len(content)), Mode: 0644})
+	_, _ = archiveWriter.Write(content)
+	_ = archiveWriter.Close()
+	_ = compressor.Close()
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 	return hasher.Sum(nil)
 }
 
