@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"log/slog"
 	"net/url"
 	"path"
 
@@ -11,10 +12,10 @@ type UploadConfig struct {
 	MaxRetry          int
 	CredentialReader  gcs.CredentialsReader
 	GoogleCredentials gcs.Credentials
-	JSONPath          string
 	Overwrite         bool
-	ShowProgress      bool
 	PackageConfig     PackageConfig
+	Logger            *slog.Logger
+	Progress          ProgressFunc
 }
 
 type PackageConfig struct {

@@ -13,8 +13,8 @@ func TestArchiveProgressCounter(t *testing.T) {
 
 type ArchiveProgressCounter struct {
 	*gunit.Fixture
-	written string
-	total   string
+	written int64
+	total   int64
 }
 
 func (this *ArchiveProgressCounter) Setup() {
@@ -31,15 +31,15 @@ func (this *ArchiveProgressCounter) TestRound() {
 }
 
 func (this *ArchiveProgressCounter) LongTestProgress() {
-	a := NewArchiveProgressCounter(250_000_000.00, func(written, total string, done bool) {
+	a := NewArchiveProgressCounter(250_000_000, func(written, total int64, done bool) {
 		this.written = written
 		this.total = total
 	})
 	a.Write([]byte{'t', 'e', 's', 't'})
 	time.Sleep(3 * time.Second)
-	this.So(this.written, should.Equal, "4 B")
+	this.So(this.written, should.Equal, 4)
 	a.Write([]byte{'t', 'e', 's', 't'})
 	a.Close()
-	this.So(this.written, should.Equal, "8 B")
-	this.So(this.total, should.Equal, "238.42 MB")
+	this.So(this.written, should.Equal, 8)
+	this.So(HumanFileSize(this.total), should.Equal, "238.42 MB")
 }

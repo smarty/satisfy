@@ -1,4 +1,4 @@
-package core
+package main
 
 import (
 	"context"
@@ -7,12 +7,19 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/smarty/gcs"
 
 	"github.com/smarty/satisfy/v2/contracts"
 )
+
+// uploadCommandConfig is the configuration for the upload and check
+// commands: the library configuration plus the options only the CLI uses.
+type uploadCommandConfig struct {
+	contracts.UploadConfig
+	JSONPath     string
+	ShowProgress bool
+}
 
 type UploadConfigLoader struct {
 	reader  gcs.CredentialsReader
@@ -38,27 +45,25 @@ func NewUploadConfigLoader(storage contracts.FileReader, env contracts.Environme
 	}
 }
 
-func (this *UploadConfigLoader) LoadConfig(ctx context.Context, name string, args []string) (config contracts.UploadConfig, err error) {
+func (this *UploadConfigLoader) LoadConfig(ctx context.Context, name string, args []string) (config uploadCommandConfig, err error) {
 	config, err = this.parseCLI(name, args)
 	if err != nil {
-		return contracts.UploadConfig{}, err
+		return uploadCommandConfig{}, err
 	}
 
 	config.PackageConfig, err = this.parseConfigFile(config.JSONPath)
 	if err != nil {
-		log.Printf("[Error] Error parsing configuration file: [%s]", err)
-		return contracts.UploadConfig{}, err
+		return uploadCommandConfig{}, fmt.Errorf("could not parse configuration file: %w", err)
 	}
 
 	config.GoogleCredentials, err = this.reader.Read(ctx, "")
 	if err != nil {
-		log.Printf("[Error] Google authentication failed: [%s]", err)
-		return contracts.UploadConfig{}, err
+		return uploadCommandConfig{}, fmt.Errorf("google authentication failed: %w", err)
 	}
 
 	err = this.validateConfigJsonValues(config)
 	if err != nil {
-		return contracts.UploadConfig{}, err
+		return uploadCommandConfig{}, err
 	}
 
 	// allow refreshing the token later which accommodates long compression times which cause the bearer token to expire
@@ -67,7 +72,7 @@ func (this *UploadConfigLoader) LoadConfig(ctx context.Context, name string, arg
 	return config, nil
 }
 
-func (this *UploadConfigLoader) parseCLI(name string, args []string) (config contracts.UploadConfig, err error) {
+func (this *UploadConfigLoader) parseCLI(name string, args []string) (config uploadCommandConfig, err error) {
 	flags := flag.NewFlagSet("satisfy "+name, flag.ContinueOnError)
 	flags.SetOutput(this.stderr)
 	flags.StringVar(&config.JSONPath,
@@ -117,7 +122,7 @@ func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error
 
 func readRawJSON(storage contracts.FileReader, stdin io.Reader, path string) (data []byte, err error) {
 	if path == "" {
-		return nil, blankJSONPathErr
+		return nil, errBlankJSONPath
 	}
 	if path == "_STDIN_" {
 		return io.ReadAll(stdin)
@@ -126,24 +131,24 @@ func readRawJSON(storage contracts.FileReader, stdin io.Reader, path string) (da
 	}
 }
 
-func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.UploadConfig) error {
+func (this *UploadConfigLoader) validateConfigJsonValues(config uploadCommandConfig) error {
 	if config.MaxRetry < 0 {
-		return maxRetryErr
+		return errMaxRetry
 	}
 	if config.PackageConfig.CompressionAlgorithm == "" {
-		return blankCompressionAlgorithmErr
+		return errBlankCompressionAlgorithm
 	}
 	if config.PackageConfig.SourceDirectory == "" && config.PackageConfig.SourceFile == "" && config.PackageConfig.SourcePath == "" {
-		return blankSourceDirectoryErr
+		return errBlankSourceDirectory
 	}
 	if config.PackageConfig.PackageName == "" {
-		return blankPackageNameErr
+		return errBlankPackageName
 	}
 	if config.PackageConfig.PackageVersion == "" {
-		return blankPackageVersionErr
+		return errBlankPackageVersion
 	}
 	if config.PackageConfig.RemoteAddressPrefix == nil {
-		return nilRemoteAddressPrefixErr
+		return errNilRemoteAddressPrefix
 	}
 	for _, tag := range config.PackageConfig.Tags {
 		if err := validateTagName(tag); err != nil {
@@ -155,26 +160,26 @@ func (this *UploadConfigLoader) validateConfigJsonValues(config contracts.Upload
 
 func validateTagName(name string) error {
 	if name == "" {
-		return blankTagNameErr
+		return errBlankTagName
 	}
 	if name == "latest" {
-		return reservedTagNameErr
+		return errReservedTagName
 	}
 	return nil
 }
 
 var (
-	maxRetryErr                  = errors.New("max-retry must be positive")
-	blankJSONPathErr             = errors.New("json flag must be populated")
-	blankCompressionAlgorithmErr = errors.New("compression algorithm should not be blank")
-	blankSourceDirectoryErr      = errors.New("'source path', 'source directory' or 'source file' must be provided")
-	blankPackageNameErr          = errors.New("package name should not be blank")
-	blankPackageVersionErr       = errors.New("package version should not be blank")
-	nilRemoteAddressPrefixErr    = errors.New("remote address prefix should not be nil")
-	blankTagNameErr              = errors.New("tag name should not be blank")
-	reservedTagNameErr           = errors.New("'latest' is a reserved tag name")
-	blankTagVersionErr           = errors.New("tag version should not be blank")
-	duplicateTagNameErr          = errors.New("tag name listed more than once")
-	conflictingTagNameErr        = errors.New("tag name appears in both add and delete lists")
-	noTagModificationsErr        = errors.New("at least one tag addition or deletion is required")
+	errMaxRetry                  = errors.New("max-retry must be positive")
+	errBlankJSONPath             = errors.New("json flag must be populated")
+	errBlankCompressionAlgorithm = errors.New("compression algorithm should not be blank")
+	errBlankSourceDirectory      = errors.New("'source path', 'source directory' or 'source file' must be provided")
+	errBlankPackageName          = errors.New("package name should not be blank")
+	errBlankPackageVersion       = errors.New("package version should not be blank")
+	errNilRemoteAddressPrefix    = errors.New("remote address prefix should not be nil")
+	errBlankTagName              = errors.New("tag name should not be blank")
+	errReservedTagName           = errors.New("'latest' is a reserved tag name")
+	errBlankTagVersion           = errors.New("tag version should not be blank")
+	errDuplicateTagName          = errors.New("tag name listed more than once")
+	errConflictingTagName        = errors.New("tag name appears in both add and delete lists")
+	errNoTagModifications        = errors.New("at least one tag addition or deletion is required")
 )

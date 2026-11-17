@@ -27,7 +27,7 @@ func (this *DirectoryPackageBuilderFixture) Setup() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, nil)
 	this.fileSystem.WriteFile("/in/file0.txt", []byte("a"))
 	_ = this.fileSystem.Chmod("/in/file0.txt", 0755)
 	this.fileSystem.WriteFile("/in/file1.txt", []byte("bb"))
@@ -79,6 +79,20 @@ func (this *DirectoryPackageBuilderFixture) TestOpenErrorIsReturned() {
 	this.fileSystem.errOpen["/in/file1.txt"] = openErr
 
 	this.So(this.builder.Build(context.Background()), should.Equal, openErr)
+}
+func (this *DirectoryPackageBuilderFixture) TestProgressIsReportedForEachArchivedFile() {
+	var finished []string
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, func(progress contracts.Progress) {
+		if progress.Done {
+			this.So(progress.Phase, should.Equal, contracts.ProgressArchiving)
+			this.So(progress.Written, should.Equal, progress.Total)
+			finished = append(finished, progress.Name)
+		}
+	})
+
+	this.So(this.builder.Build(context.Background()), should.BeNil)
+
+	this.So(finished, should.Resemble, []string{"/in/file0.txt", "/in/file1.txt", "/in/sub/file0.txt"})
 }
 func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 	err := this.builder.Build(context.Background())
@@ -134,7 +148,7 @@ func (this *DirectoryPackageBuilderFixture) TestFileOnlyEnsureNoPath() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, nil)
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
 	err := this.builder.Build(context.Background())
 	if !this.So(err, should.BeNil) {
@@ -147,7 +161,7 @@ func (this *DirectoryPackageBuilderFixture) TestMultipleFilesEnsurePath() {
 	this.fileSystem = newInMemoryFileSystem()
 	this.archive = NewFakeArchiveWriter()
 	this.hasher = NewFakeHasher()
-	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, true)
+	this.builder = NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, nil)
 	this.fileSystem.WriteDirectory("/out")
 	this.fileSystem.WriteFile("/out/in/file0.txt", []byte("a"))
 	this.fileSystem.WriteFile("/out/in/file1.txt", []byte("a"))

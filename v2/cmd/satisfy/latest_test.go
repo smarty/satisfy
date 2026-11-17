@@ -1,6 +1,7 @@
-package transfer
+package main
 
 import (
+	"io"
 	"testing"
 
 	"github.com/smarty/assertions/should"
@@ -16,31 +17,31 @@ type ParseLatestConfigFixture struct {
 }
 
 func (this *ParseLatestConfigFixture) TestMissingBucketIsRejected() {
-	_, err := ParseLatestConfig([]string{"-package", "p"})
+	_, err := parseLatestConfig([]string{"-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-bucket is required")
 }
 
 func (this *ParseLatestConfigFixture) TestBucketWithSlashIsRejected() {
-	_, err := ParseLatestConfig([]string{"-bucket", "my-bucket/extra", "-package", "p"})
+	_, err := parseLatestConfig([]string{"-bucket", "my-bucket/extra", "-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "bare bucket name")
 }
 
 func (this *ParseLatestConfigFixture) TestBucketWithSchemeIsRejected() {
-	_, err := ParseLatestConfig([]string{"-bucket", "gs://my-bucket", "-package", "p"})
+	_, err := parseLatestConfig([]string{"-bucket", "gs://my-bucket", "-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "bare bucket name")
 }
 
 func (this *ParseLatestConfigFixture) TestMissingPackageIsRejected() {
-	_, err := ParseLatestConfig([]string{"-bucket", "my-bucket"})
+	_, err := parseLatestConfig([]string{"-bucket", "my-bucket"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-package is required")
 }
 
 func (this *ParseLatestConfigFixture) TestPackageOfOnlySlashesIsRejected() {
-	_, err := ParseLatestConfig([]string{"-bucket", "my-bucket", "-package", "///"})
+	_, err := parseLatestConfig([]string{"-bucket", "my-bucket", "-package", "///"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-package is required")
 }

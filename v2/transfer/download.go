@@ -3,27 +3,42 @@ package transfer
 import (
 	"context"
 	"crypto/md5"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 
+	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
 	"github.com/smarty/satisfy/v2/shell"
 )
+
+type DownloadConfig struct {
+	MaxRetry          int
+	Concurrency       int
+	QuickVerification bool
+	GoogleCredentials gcs.Credentials
+	Dependencies      contracts.DependencyListing
+	Logger            *slog.Logger
+	Progress          contracts.ProgressFunc
+}
 
 type DownloadApp struct {
 	listing     contracts.DependencyListing
 	installer   *core.PackageInstaller
 	integrity   contracts.IntegrityCheck
 	concurrency int
+	logger      *slog.Logger
 }
 
 func NewDownloadApp(config DownloadConfig) *DownloadApp {
+	logger := contracts.LoggerOrDiscard(config.Logger)
 	disk := shell.NewDiskFileSystem("")
 	client := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), shell.StaticCredentials(config.GoogleCredentials), []int{http.StatusPartialContent, http.StatusOK})
-	installer := core.NewPackageInstaller(core.NewRetryClient(client, config.MaxRetry, core.DefaultRetryDelay), disk, config.ShowProgress)
+	retry := core.NewRetryClient(client, config.MaxRetry, core.DefaultRetryDelay, logger)
+	installer := core.NewPackageInstaller(retry, disk, logger, config.Progress)
 	integrity := core.NewCompoundIntegrityCheck(
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
@@ -33,24 +48,24 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 		installer:   installer,
 		integrity:   integrity,
 		concurrency: max(config.Concurrency, 1),
+		logger:      logger,
 	}
 }
 
+// Run installs every dependency in the listing, returning an error that joins
+// the failures of each dependency that could not be installed.
 func (this *DownloadApp) Run(ctx context.Context) error {
 	errs := runConcurrently(ctx, this.concurrency, this.listing.Listing, func(dependency contracts.Dependency) error {
 		return this.install(ctx, dependency)
 	})
-	for _, err := range errs {
-		log.Println("[WARN]", err)
-	}
 	if len(errs) > 0 {
-		return fmt.Errorf("[WARN] %d packages failed to install.", len(errs))
+		return fmt.Errorf("%d of %d packages failed to install: %w", len(errs), len(this.listing.Listing), errors.Join(errs...))
 	}
 	return nil
 }
 
 func (this *DownloadApp) install(ctx context.Context, dependency contracts.Dependency) error {
-	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
+	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency, this.logger)
 	return resolver.Resolve(ctx)
 }
 

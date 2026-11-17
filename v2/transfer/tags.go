@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/smarty/satisfy/v2/contracts"
@@ -18,10 +18,11 @@ import (
 type TagsApp struct {
 	config contracts.TagsConfig
 	client contracts.RemoteStorage
+	logger *slog.Logger
 }
 
 func NewTagsApp(config contracts.TagsConfig) *TagsApp {
-	return &TagsApp{config: config}
+	return &TagsApp{config: config, logger: contracts.LoggerOrDiscard(config.Logger)}
 }
 
 func (this *TagsApp) Run(ctx context.Context) error {
@@ -46,13 +47,13 @@ func (this *TagsApp) Run(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("Tags updated for package %q", modification.PackageName)
+	this.logger.Info("tags updated", "package", modification.PackageName)
 	return nil
 }
 
 func (this *TagsApp) buildRemoteStorageClient() {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), shell.StaticCredentials(this.config.GoogleCredentials), []int{http.StatusOK})
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay, this.logger)
 }
 
 func (this *TagsApp) downloadRootManifest(ctx context.Context) (manifest contracts.Manifest, err error) {
@@ -100,16 +101,16 @@ func (this *TagsApp) verifyVersionsExist(ctx context.Context, add []contracts.Ta
 func (this *TagsApp) logModifications(rootManifest contracts.Manifest, modification contracts.TagModificationConfig) {
 	for _, tag := range modification.Add {
 		if existing, found := rootManifest.TagVersion(tag.Name); found {
-			log.Printf("Updating tag %q: %q -> %q", tag.Name, existing, tag.Version)
+			this.logger.Info("updating tag", "tag", tag.Name, "from", existing, "to", tag.Version)
 		} else {
-			log.Printf("Adding tag %q -> %q", tag.Name, tag.Version)
+			this.logger.Info("adding tag", "tag", tag.Name, "version", tag.Version)
 		}
 	}
 	for _, tag := range modification.Delete {
 		if _, found := rootManifest.TagVersion(tag.Name); found {
-			log.Printf("Deleting tag %q", tag.Name)
+			this.logger.Info("deleting tag", "tag", tag.Name)
 		} else {
-			log.Printf("Tag %q does not exist; nothing to delete", tag.Name)
+			this.logger.Info("tag does not exist; nothing to delete", "tag", tag.Name)
 		}
 	}
 }

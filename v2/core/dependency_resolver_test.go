@@ -41,7 +41,7 @@ func (this *DependencyResolverFixture) Setup() {
 }
 
 func (this *DependencyResolverFixture) Resolve() error {
-	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency)
+	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency, nil)
 	return this.resolver.Resolve(context.Background())
 }
 

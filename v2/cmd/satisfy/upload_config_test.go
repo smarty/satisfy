@@ -1,9 +1,10 @@
-package core
+package main
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -159,14 +160,14 @@ func (this *UploadConfigLoaderFixture) TestValidateJSONNegativeMaxRetries() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, maxRetryErr)
+	this.So(err, should.Resemble, errMaxRetry)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateJSONPathIsNotBlank() {
 	_ = this.prepareValidJSONConfigFile()
 	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", ""})
 
-	this.So(err, should.Resemble, blankJSONPathErr)
+	this.So(errors.Is(err, errBlankJSONPath), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsNotBlank() {
@@ -175,7 +176,7 @@ func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsNotBlan
 	this.storage.WriteFile("config.json", raw)
 	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", "config.json"})
 
-	this.So(err, should.Resemble, blankCompressionAlgorithmErr)
+	this.So(err, should.Resemble, errBlankCompressionAlgorithm)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
@@ -186,7 +187,7 @@ func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, blankSourceDirectoryErr)
+	this.So(err, should.Resemble, errBlankSourceDirectory)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
@@ -197,7 +198,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, blankPackageNameErr)
+	this.So(err, should.Resemble, errBlankPackageName)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
@@ -208,7 +209,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, blankPackageVersionErr)
+	this.So(err, should.Resemble, errBlankPackageVersion)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil() {
@@ -219,7 +220,7 @@ func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil()
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, nilRemoteAddressPrefixErr)
+	this.So(err, should.Resemble, errNilRemoteAddressPrefix)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
@@ -230,7 +231,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, blankTagNameErr)
+	this.So(err, should.Resemble, errBlankTagName)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
@@ -241,7 +242,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, reservedTagNameErr)
+	this.So(err, should.Resemble, errReservedTagName)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidTagsAccepted() {

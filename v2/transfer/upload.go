@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +22,7 @@ import (
 )
 
 type UploadApp struct {
+	logger        *slog.Logger
 	config        contracts.UploadConfig
 	packageConfig contracts.PackageConfig
 	file          *os.File
@@ -34,7 +35,7 @@ type UploadApp struct {
 // NewUploadApp prepares an upload. It performs no I/O; callers that want to
 // avoid overwriting an existing package should run a CheckApp first.
 func NewUploadApp(config contracts.UploadConfig) *UploadApp {
-	return &UploadApp{config: config, packageConfig: config.PackageConfig}
+	return &UploadApp{config: config, packageConfig: config.PackageConfig, logger: contracts.LoggerOrDiscard(config.Logger)}
 }
 
 func (this *UploadApp) Run(ctx context.Context) (err error) {
@@ -49,14 +50,14 @@ func (this *UploadApp) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	log.Println("Manifest:", this.dumpManifest())
+	this.logger.Debug("built manifest", "manifest", this.dumpManifest())
 
-	log.Println("Uploading the archive...")
+	this.logger.Info("uploading the archive", "package", this.packageConfig.PackageName, "version", this.packageConfig.PackageVersion)
 	if err = this.uploadArchive(ctx); err != nil {
 		return err
 	}
 
-	log.Println("Uploading the manifest...")
+	this.logger.Info("uploading the manifest", "package", this.packageConfig.PackageName, "version", this.packageConfig.PackageVersion)
 	if err = this.uploadManifest(ctx, this.manifest, this.packageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)); err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func (this *UploadApp) buildRootManifest(ctx context.Context) (contracts.Manifes
 	rootManifest := this.manifest
 	rootManifest.Tags = core.MergeTags(existing, this.packageConfig.Tags, this.packageConfig.PackageVersion)
 	for _, name := range this.packageConfig.Tags {
-		log.Printf("Tagging version %q as %q", this.packageConfig.PackageVersion, name)
+		this.logger.Info("tagging version", "version", this.packageConfig.PackageVersion, "tag", name)
 	}
 	return rootManifest, nil
 }
@@ -140,7 +141,8 @@ func (this *UploadApp) buildArchiveAndManifestContents(ctx context.Context) (err
 		shell.NewDiskFileSystem(sourcePath),
 		shell.NewSwitchArchiveWriter(compressor),
 		md5.New(),
-		this.config.ShowProgress,
+		this.logger,
+		this.config.Progress,
 	)
 
 	if err = this.builder.Build(ctx); err != nil {
@@ -200,7 +202,7 @@ func (this *UploadApp) buildRemoteStorageClient() {
 		credentials = shell.NewRefreshingCredentials(this.config.CredentialReader, "", shell.DefaultCredentialsMaxAge)
 	}
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), credentials, []int{http.StatusOK})
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay, this.logger)
 }
 
 func (this *UploadApp) completeManifest() error {
@@ -231,5 +233,5 @@ func (this *UploadApp) deleteLocalArchiveFile() error {
 
 func (this *UploadApp) dumpManifest() string {
 	raw, _ := json.MarshalIndent(this.manifest, "", "  ") // a Manifest always marshals
-	return "\n" + string(raw)
+	return string(raw)
 }

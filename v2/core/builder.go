@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -25,20 +25,28 @@ type DirectoryPackageBuilderFileSystem interface {
 }
 
 type DirectoryPackageBuilder struct {
-	storage      DirectoryPackageBuilderFileSystem
-	archive      contracts.ArchiveWriter
-	hasher       hash.Hash
-	contents     []contracts.ArchiveItem
-	listing      []contracts.FileInfo
-	showProgress bool
+	storage  DirectoryPackageBuilderFileSystem
+	archive  contracts.ArchiveWriter
+	hasher   hash.Hash
+	contents []contracts.ArchiveItem
+	listing  []contracts.FileInfo
+	logger   *slog.Logger
+	progress contracts.ProgressFunc
 }
 
-func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archive contracts.ArchiveWriter, hasher hash.Hash, showProgress bool) PackageBuilder {
+func NewDirectoryPackageBuilder(
+	storage DirectoryPackageBuilderFileSystem,
+	archive contracts.ArchiveWriter,
+	hasher hash.Hash,
+	logger *slog.Logger,
+	progress contracts.ProgressFunc,
+) PackageBuilder {
 	return &DirectoryPackageBuilder{
-		storage:      storage,
-		archive:      archive,
-		hasher:       hasher,
-		showProgress: showProgress,
+		storage:  storage,
+		archive:  archive,
+		hasher:   hasher,
+		logger:   contracts.LoggerOrDiscard(logger),
+		progress: progress,
 	}
 }
 
@@ -70,7 +78,7 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 }
 
 func (this *DirectoryPackageBuilder) add(ctx context.Context, file contracts.FileInfo, fileOnly bool) error {
-	log.Printf("Adding \"%s\" to archive.", file.Path())
+	this.logger.Info("adding file to archive", "path", file.Path())
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
 		return err
@@ -92,18 +100,11 @@ func (this *DirectoryPackageBuilder) archiveContents(ctx context.Context, file c
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := archive_progress.NewArchiveProgressCounter(file.Size(), func(archived, total string, done bool) {
-		if this.showProgress {
-			if done {
-				fmt.Printf("\nArchived %s of %s.\n", archived, total)
-			} else {
-				fmt.Printf("\033[2K\rArchived %s of %s.", archived, total)
-			}
-		}
+	progressWriter := archive_progress.NewArchiveProgressCounter(file.Size(), func(written, total int64, done bool) {
+		this.progress.Report(contracts.Progress{
+			Phase: contracts.ProgressArchiving, Name: file.Path(), Written: written, Total: total, Done: done,
+		})
 	})
-	defer func() {
-		fmt.Printf("\n")
-	}()
 	defer closeResource(progressWriter)
 	reader, err := this.storage.Open(file.Path())
 	if err != nil {

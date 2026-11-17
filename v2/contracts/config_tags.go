@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"log/slog"
 	"net/url"
 	"path"
 
@@ -10,8 +11,8 @@ import (
 type TagsConfig struct {
 	MaxRetry          int
 	GoogleCredentials gcs.Credentials
-	JSONPath          string
 	Modification      TagModificationConfig
+	Logger            *slog.Logger
 }
 
 type TagModificationConfig struct {

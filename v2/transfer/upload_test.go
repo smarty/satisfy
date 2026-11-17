@@ -101,7 +101,8 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 	installer := core.NewPackageInstaller(
 		&fakeArchiveDownloader{body: buffer.Bytes()},
 		shell.NewDiskFileSystem(""),
-		false,
+		nil,
+		nil,
 	)
 	manifest := contracts.Manifest{
 		Archive: contracts.Archive{

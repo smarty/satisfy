@@ -1,4 +1,4 @@
-package core
+package main
 
 import (
 	"bytes"
@@ -53,7 +53,7 @@ func (this *TagsConfigLoaderFixture) prepareConfigFile() {
 	this.storage.WriteFile("tags.json", raw)
 }
 
-func (this *TagsConfigLoaderFixture) loadConfig() (contracts.TagsConfig, error) {
+func (this *TagsConfigLoaderFixture) loadConfig() (tagsCommandConfig, error) {
 	this.prepareConfigFile()
 	return this.loader.LoadConfig(context.Background(), []string{"-json", "tags.json"})
 }
@@ -101,7 +101,7 @@ func (this *TagsConfigLoaderFixture) TestNegativeMaxRetry() {
 
 	_, err := this.loader.LoadConfig(context.Background(), []string{"-max-retry", "-10", "-json", "tags.json"})
 
-	this.So(err, should.Resemble, maxRetryErr)
+	this.So(err, should.Resemble, errMaxRetry)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankPackageName() {
@@ -109,7 +109,7 @@ func (this *TagsConfigLoaderFixture) TestBlankPackageName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, blankPackageNameErr)
+	this.So(err, should.Resemble, errBlankPackageName)
 }
 
 func (this *TagsConfigLoaderFixture) TestNilRemoteAddress() {
@@ -117,7 +117,7 @@ func (this *TagsConfigLoaderFixture) TestNilRemoteAddress() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, nilRemoteAddressPrefixErr)
+	this.So(err, should.Resemble, errNilRemoteAddressPrefix)
 }
 
 func (this *TagsConfigLoaderFixture) TestNoModifications() {
@@ -126,7 +126,7 @@ func (this *TagsConfigLoaderFixture) TestNoModifications() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, noTagModificationsErr)
+	this.So(err, should.Resemble, errNoTagModifications)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
@@ -134,7 +134,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, blankTagNameErr)
+	this.So(err, should.Resemble, errBlankTagName)
 }
 
 func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
@@ -142,7 +142,7 @@ func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, reservedTagNameErr)
+	this.So(err, should.Resemble, errReservedTagName)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
@@ -150,7 +150,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, blankTagVersionErr)
+	this.So(err, should.Resemble, errBlankTagVersion)
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
@@ -158,7 +158,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, duplicateTagNameErr)
+	this.So(err, should.Resemble, errDuplicateTagName)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
@@ -166,7 +166,7 @@ func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, blankTagNameErr)
+	this.So(err, should.Resemble, errBlankTagName)
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
@@ -174,7 +174,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, duplicateTagNameErr)
+	this.So(err, should.Resemble, errDuplicateTagName)
 }
 
 func (this *TagsConfigLoaderFixture) TestTagNameInBothAddAndDelete() {
@@ -182,5 +182,5 @@ func (this *TagsConfigLoaderFixture) TestTagNameInBothAddAndDelete() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, conflictingTagNameErr)
+	this.So(err, should.Resemble, errConflictingTagName)
 }

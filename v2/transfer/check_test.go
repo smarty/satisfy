@@ -30,7 +30,7 @@ func (this *CheckAppFixture) Setup() {
 		PackageVersion:      "1.2.3",
 		RemoteAddressPrefix: &contracts.URL{Scheme: "gcs", Host: "bucket"},
 	}}
-	this.app = &CheckApp{config: config, client: this.client}
+	this.app = &CheckApp{config: config, client: this.client, logger: contracts.LoggerOrDiscard(nil)}
 }
 
 func (this *CheckAppFixture) TestMissingPackageIsNotAnError() {

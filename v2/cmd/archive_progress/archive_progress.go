@@ -25,6 +25,11 @@ func round(val float64, roundOn float64, places int) (newVal float64) {
 	return
 }
 
+// HumanFileSize renders a byte count using binary (1024) units, e.g. "1.5 MB".
+func HumanFileSize(size int64) string {
+	return humanFileSize(float64(size))
+}
+
 func humanFileSize(size float64) string {
 	if size < 1 {
 		return "0 B"
@@ -37,8 +42,8 @@ func humanFileSize(size float64) string {
 
 type archiveProgressCounter struct {
 	written    int64
-	total      string
-	onProgress func(written string, total string, done bool)
+	total      int64
+	onProgress func(written, total int64, done bool)
 	printTimer *time.Ticker
 	done       chan struct{}
 }
@@ -63,11 +68,13 @@ func (this *archiveProgressCounter) Close() error {
 }
 
 func (this *archiveProgressCounter) reportProgress(done bool) {
-	this.onProgress(humanFileSize(float64(this.written)), this.total, done)
+	this.onProgress(this.written, this.total, done)
 }
 
-func NewArchiveProgressCounter(size int64, onProgress func(written, total string, done bool)) io.WriteCloser {
-	this := &archiveProgressCounter{total: humanFileSize(float64(size)), onProgress: onProgress}
+// NewArchiveProgressCounter counts the bytes written to it and calls
+// onProgress every two seconds, and once more (with done) when closed.
+func NewArchiveProgressCounter(size int64, onProgress func(written, total int64, done bool)) io.WriteCloser {
+	this := &archiveProgressCounter{total: size, onProgress: onProgress}
 	this.printTimer = time.NewTicker(2 * time.Second)
 	this.done = make(chan struct{})
 	go func() {

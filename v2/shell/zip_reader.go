@@ -10,6 +10,7 @@ import (
 
 	"github.com/klauspost/compress/zip"
 	"github.com/smarty/satisfy/v2/cmd/archive_progress"
+	"github.com/smarty/satisfy/v2/contracts"
 )
 
 type ZipArchiveReader struct {
@@ -20,7 +21,7 @@ type ZipArchiveReader struct {
 	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
 	file                 *os.File
-	showProgress         bool
+	progress             contracts.ProgressFunc
 }
 
 func (this *ZipArchiveReader) Next() (*tar.Header, error) {
@@ -72,14 +73,10 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	this.file = tmp
 
-	progress := archive_progress.NewArchiveProgressCounter(this.size, func(archived, total string, done bool) {
-		if this.showProgress {
-			if done {
-				fmt.Printf("\nDone downloading archive %s.\n", archived)
-			} else {
-				fmt.Printf("\033[2K\rDownloading archive... %s.", archived)
-			}
-		}
+	progress := archive_progress.NewArchiveProgressCounter(this.size, func(written, total int64, done bool) {
+		this.progress.Report(contracts.Progress{
+			Phase: contracts.ProgressDownloading, Name: "zip archive", Written: written, Total: total, Done: done,
+		})
 	})
 
 	multiWriter := io.MultiWriter(tmp, progress)
@@ -118,8 +115,8 @@ func (this *ZipArchiveReader) Close() error {
 	return nil
 }
 
-func NewZipArchiveReader(reader io.Reader, showProgress bool) (io.ReadCloser, error) {
-	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, showProgress: showProgress}
+func NewZipArchiveReader(reader io.Reader, progress contracts.ProgressFunc) (io.ReadCloser, error) {
+	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, progress: progress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
 		_ = zipArchiveReader.Close()

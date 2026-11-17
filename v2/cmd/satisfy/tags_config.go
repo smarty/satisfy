@@ -1,4 +1,4 @@
-package core
+package main
 
 import (
 	"context"
@@ -6,12 +6,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/smarty/gcs"
 
 	"github.com/smarty/satisfy/v2/contracts"
 )
+
+// tagsCommandConfig is the configuration for the tags modify command.
+type tagsCommandConfig struct {
+	contracts.TagsConfig
+	JSONPath string
+}
 
 type TagsConfigLoader struct {
 	reader  gcs.CredentialsReader
@@ -37,33 +42,31 @@ func NewTagsConfigLoader(storage contracts.FileReader, env contracts.Environment
 	}
 }
 
-func (this *TagsConfigLoader) LoadConfig(ctx context.Context, args []string) (config contracts.TagsConfig, err error) {
+func (this *TagsConfigLoader) LoadConfig(ctx context.Context, args []string) (config tagsCommandConfig, err error) {
 	config, err = this.parseCLI(args)
 	if err != nil {
-		return contracts.TagsConfig{}, err
+		return tagsCommandConfig{}, err
 	}
 
 	config.Modification, err = this.parseConfigFile(config.JSONPath)
 	if err != nil {
-		log.Printf("[Error] Error parsing configuration file: [%s]", err)
-		return contracts.TagsConfig{}, err
+		return tagsCommandConfig{}, fmt.Errorf("could not parse configuration file: %w", err)
 	}
 
 	config.GoogleCredentials, err = this.reader.Read(ctx, "")
 	if err != nil {
-		log.Printf("[Error] Google authentication failed: [%s]", err)
-		return contracts.TagsConfig{}, err
+		return tagsCommandConfig{}, fmt.Errorf("google authentication failed: %w", err)
 	}
 
 	err = this.validate(config)
 	if err != nil {
-		return contracts.TagsConfig{}, err
+		return tagsCommandConfig{}, err
 	}
 
 	return config, nil
 }
 
-func (this *TagsConfigLoader) parseCLI(args []string) (config contracts.TagsConfig, err error) {
+func (this *TagsConfigLoader) parseCLI(args []string) (config tagsCommandConfig, err error) {
 	flags := flag.NewFlagSet("satisfy tags", flag.ContinueOnError)
 	flags.SetOutput(this.stderr)
 	flags.StringVar(&config.JSONPath,
@@ -96,19 +99,19 @@ func (this *TagsConfigLoader) parseConfigFile(path string) (config contracts.Tag
 	return config, json.Unmarshal(data, &config)
 }
 
-func (this *TagsConfigLoader) validate(config contracts.TagsConfig) error {
+func (this *TagsConfigLoader) validate(config tagsCommandConfig) error {
 	if config.MaxRetry < 0 {
-		return maxRetryErr
+		return errMaxRetry
 	}
 	modification := config.Modification
 	if modification.PackageName == "" {
-		return blankPackageNameErr
+		return errBlankPackageName
 	}
 	if modification.RemoteAddress == nil {
-		return nilRemoteAddressPrefixErr
+		return errNilRemoteAddressPrefix
 	}
 	if len(modification.Add) == 0 && len(modification.Delete) == 0 {
-		return noTagModificationsErr
+		return errNoTagModifications
 	}
 
 	added := make(map[string]struct{})
@@ -117,10 +120,10 @@ func (this *TagsConfigLoader) validate(config contracts.TagsConfig) error {
 			return err
 		}
 		if tag.Version == "" {
-			return blankTagVersionErr
+			return errBlankTagVersion
 		}
 		if _, found := added[tag.Name]; found {
-			return duplicateTagNameErr
+			return errDuplicateTagName
 		}
 		added[tag.Name] = struct{}{}
 	}
@@ -128,13 +131,13 @@ func (this *TagsConfigLoader) validate(config contracts.TagsConfig) error {
 	deleted := make(map[string]struct{})
 	for _, tag := range modification.Delete {
 		if tag.Name == "" {
-			return blankTagNameErr
+			return errBlankTagName
 		}
 		if _, found := added[tag.Name]; found {
-			return conflictingTagNameErr
+			return errConflictingTagName
 		}
 		if _, found := deleted[tag.Name]; found {
-			return duplicateTagNameErr
+			return errDuplicateTagName
 		}
 		deleted[tag.Name] = struct{}{}
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/url"
 	"time"
 
@@ -21,11 +21,18 @@ type RetryClient struct {
 	inner    contracts.RemoteStorage
 	maxRetry int
 	delay    time.Duration
+	logger   *slog.Logger
 	wait     func(ctx context.Context, delay time.Duration) error
 }
 
-func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, delay time.Duration) *RetryClient {
-	return &RetryClient{inner: inner, maxRetry: maxRetry, delay: delay, wait: waitContext}
+func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, delay time.Duration, logger *slog.Logger) *RetryClient {
+	return &RetryClient{
+		inner:    inner,
+		maxRetry: maxRetry,
+		delay:    delay,
+		logger:   contracts.LoggerOrDiscard(logger),
+		wait:     waitContext,
+	}
 }
 
 func (this *RetryClient) Upload(ctx context.Context, request contracts.UploadRequest) error {
@@ -79,7 +86,7 @@ func (this *RetryClient) retry(ctx context.Context, operation string, attempt fu
 			return err
 		}
 		if x < this.maxRetry {
-			log.Printf("[WARN] %s failed; retry imminent: %v", operation, err)
+			this.logger.Warn("remote storage operation failed; retrying", "operation", operation, "attempt", x+1, "error", err)
 			if waitErr := this.wait(ctx, this.delay); waitErr != nil {
 				return waitErr
 			}

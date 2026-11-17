@@ -28,7 +28,7 @@ type RetryFixture struct {
 
 func (this *RetryFixture) Setup() {
 	this.fakeClient = &FakeClient{}
-	this.client = NewRetryClient(this.fakeClient, 4, DefaultRetryDelay)
+	this.client = NewRetryClient(this.fakeClient, 4, DefaultRetryDelay, nil)
 	this.client.wait = func(_ context.Context, duration time.Duration) error {
 		this.naps = append(this.naps, duration)
 		return nil

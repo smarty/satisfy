@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -31,6 +30,5 @@ func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, loc
 			return fmt.Errorf("file size mismatch for \"%s\"(expected: [%d], actual: [%d])", fullPath, item.Size, fileInfo.Size())
 		}
 	}
-	log.Printf("Listing integrity check passed: [%s @ %s]", manifest.Name, manifest.Version)
 	return nil
 }

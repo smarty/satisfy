@@ -1,6 +1,7 @@
-package transfer
+package main
 
 import (
+	"io"
 	"testing"
 
 	"github.com/smarty/assertions/should"
@@ -17,31 +18,31 @@ type TagsListFixture struct {
 }
 
 func (this *TagsListFixture) TestMissingBucketIsRejected() {
-	_, err := ParseTagsListConfig([]string{"-package", "p"})
+	_, err := parseTagsListConfig([]string{"-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-bucket is required")
 }
 
 func (this *TagsListFixture) TestBucketWithSlashIsRejected() {
-	_, err := ParseTagsListConfig([]string{"-bucket", "my-bucket/extra", "-package", "p"})
+	_, err := parseTagsListConfig([]string{"-bucket", "my-bucket/extra", "-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "bare bucket name")
 }
 
 func (this *TagsListFixture) TestBucketWithSchemeIsRejected() {
-	_, err := ParseTagsListConfig([]string{"-bucket", "gs://my-bucket", "-package", "p"})
+	_, err := parseTagsListConfig([]string{"-bucket", "gs://my-bucket", "-package", "p"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "bare bucket name")
 }
 
 func (this *TagsListFixture) TestMissingPackageIsRejected() {
-	_, err := ParseTagsListConfig([]string{"-bucket", "my-bucket"})
+	_, err := parseTagsListConfig([]string{"-bucket", "my-bucket"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-package is required")
 }
 
 func (this *TagsListFixture) TestPackageOfOnlySlashesIsRejected() {
-	_, err := ParseTagsListConfig([]string{"-bucket", "my-bucket", "-package", "///"})
+	_, err := parseTagsListConfig([]string{"-bucket", "my-bucket", "-package", "///"}, io.Discard)
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.ContainSubstring, "-package is required")
 }
@@ -52,14 +53,14 @@ func (this *TagsListFixture) TestFormatTagsTextIsSortedAndTabSeparated() {
 		{Name: "experimental", Version: "2026.01.B"},
 	}
 
-	output, err := FormatTags(tags, false)
+	output, err := formatTags(tags, false)
 
 	this.So(err, should.BeNil)
 	this.So(output, should.Equal, "experimental\t2026.01.B\nstable\t2026.01.A\n")
 }
 
 func (this *TagsListFixture) TestFormatTagsTextEmptyProducesNoOutput() {
-	output, err := FormatTags(nil, false)
+	output, err := formatTags(nil, false)
 
 	this.So(err, should.BeNil)
 	this.So(output, should.BeBlank)
@@ -71,7 +72,7 @@ func (this *TagsListFixture) TestFormatTagsJSONIsSorted() {
 		{Name: "experimental", Version: "2026.01.B"},
 	}
 
-	output, err := FormatTags(tags, true)
+	output, err := formatTags(tags, true)
 
 	this.So(err, should.BeNil)
 	this.So(output, should.Equal, `[
@@ -88,7 +89,7 @@ func (this *TagsListFixture) TestFormatTagsJSONIsSorted() {
 }
 
 func (this *TagsListFixture) TestFormatTagsJSONEmptyIsEmptyArray() {
-	output, err := FormatTags(nil, true)
+	output, err := formatTags(nil, true)
 
 	this.So(err, should.BeNil)
 	this.So(output, should.Equal, "[]\n")
@@ -100,7 +101,7 @@ func (this *TagsListFixture) TestFormatTagsDoesNotMutateInput() {
 		{Name: "experimental", Version: "2026.01.B"},
 	}
 
-	_, _ = FormatTags(tags, false)
+	_, _ = formatTags(tags, false)
 
 	this.So(tags[0], should.Resemble, contracts.Tag{Name: "stable", Version: "2026.01.A"})
 }

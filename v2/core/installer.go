@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -32,13 +32,24 @@ type PackageInstallerFileSystem interface {
 }
 
 type PackageInstaller struct {
-	downloader   contracts.Downloader
-	filesystem   PackageInstallerFileSystem
-	showProgress bool
+	downloader contracts.Downloader
+	filesystem PackageInstallerFileSystem
+	logger     *slog.Logger
+	progress   contracts.ProgressFunc
 }
 
-func NewPackageInstaller(downloader contracts.Downloader, filesystem PackageInstallerFileSystem, showProgress bool) *PackageInstaller {
-	return &PackageInstaller{downloader: downloader, filesystem: filesystem, showProgress: showProgress}
+func NewPackageInstaller(
+	downloader contracts.Downloader,
+	filesystem PackageInstallerFileSystem,
+	logger *slog.Logger,
+	progress contracts.ProgressFunc,
+) *PackageInstaller {
+	return &PackageInstaller{
+		downloader: downloader,
+		filesystem: filesystem,
+		logger:     contracts.LoggerOrDiscard(logger),
+		progress:   progress,
+	}
 }
 
 func (this *PackageInstaller) DownloadManifest(ctx context.Context, remoteAddress url.URL) (manifest contracts.Manifest, err error) {
@@ -102,7 +113,7 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest contr
 	if !found {
 		return errors.New("invalid compression algorithm")
 	}
-	decompressor, err := factory(checksumReader, this.showProgress)
+	decompressor, err := factory(checksumReader, this.progress)
 	if err != nil {
 		return err
 	}
@@ -138,8 +149,8 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 		}
 		pathItem := filepath.Join(request.LocalPath, header.Name)
 		paths = append(paths, pathItem)
-		log.Printf("Extracting archive item [%d/%d] \"%s\" [%s] to \"%s\".",
-			i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem)
+		this.logger.Info("extracting archive item",
+			"item", i+1, "of", itemCount, "name", header.Name, "size", byteCountToString(header.Size), "path", pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
 			if err = this.filesystem.CreateSymlink(header.Linkname, pathItem); err != nil {
@@ -150,14 +161,10 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			if err != nil {
 				return paths, err
 			}
-			progressReader := archive_progress.NewArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
-				if this.showProgress {
-					if done {
-						fmt.Printf("\nDone extracting %s.\n", archived)
-					} else {
-						fmt.Printf("\033[2K\rExtracted %s of %s.", archived, total)
-					}
-				}
+			progressReader := archive_progress.NewArchiveProgressCounter(header.Size, func(written, total int64, done bool) {
+				this.progress.Report(contracts.Progress{
+					Phase: contracts.ProgressExtracting, Name: pathItem, Written: written, Total: total, Done: done,
+				})
 			})
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
@@ -215,23 +222,23 @@ func ComposeManifestPath(localPath, packageName string) string {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var decompressors = map[string]func(source io.Reader, showProgress bool) (io.ReadCloser, error){
+var decompressors = map[string]func(source io.Reader, progress contracts.ProgressFunc) (io.ReadCloser, error){
 	"zstd": newZStdReader,
 	"zip":  newZipReader,
 	"gzip": newGZipReader,
 }
 
-func newZStdReader(source io.Reader, _ bool) (io.ReadCloser, error) {
+func newZStdReader(source io.Reader, _ contracts.ProgressFunc) (io.ReadCloser, error) {
 	if reader, err := zstd.NewReader(source); err != nil {
 		return nil, err
 	} else {
 		return reader.IOReadCloser(), nil
 	}
 }
-func newZipReader(source io.Reader, showProgress bool) (io.ReadCloser, error) {
-	return shell.NewZipArchiveReader(source, showProgress)
+func newZipReader(source io.Reader, progress contracts.ProgressFunc) (io.ReadCloser, error) {
+	return shell.NewZipArchiveReader(source, progress)
 }
-func newGZipReader(source io.Reader, _ bool) (io.ReadCloser, error) {
+func newGZipReader(source io.Reader, _ contracts.ProgressFunc) (io.ReadCloser, error) {
 	return gzip.NewReader(source)
 }
 

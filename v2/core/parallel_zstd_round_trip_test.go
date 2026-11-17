@@ -90,7 +90,7 @@ func (this *ParallelZstdRoundTripFixture) upload(level zstd.EncoderLevel, worker
 	compressor, err := shell.NewParallelZstdWriterWithConcurrency(io.MultiWriter(archiveHasher, compressed), level, roundTripChunkSize, workers)
 	this.So(err, should.BeNil)
 
-	builder := NewDirectoryPackageBuilder(this.source, shell.NewSwitchArchiveWriter(compressor), md5.New(), false)
+	builder := NewDirectoryPackageBuilder(this.source, shell.NewSwitchArchiveWriter(compressor), md5.New(), nil, nil)
 	this.So(builder.Build(context.Background()), should.BeNil)
 	this.So(compressor.Close(), should.BeNil)
 
@@ -109,7 +109,7 @@ func (this *ParallelZstdRoundTripFixture) upload(level zstd.EncoderLevel, worker
 
 func (this *ParallelZstdRoundTripFixture) install(archive []byte, manifest contracts.Manifest) error {
 	this.downloader.Body = io.NopCloser(bytes.NewReader(archive))
-	installer := NewPackageInstaller(this.downloader, this.destination, false)
+	installer := NewPackageInstaller(this.downloader, this.destination, nil, nil)
 	return installer.InstallPackage(context.Background(), manifest, contracts.InstallationRequest{LocalPath: "out"})
 }
 

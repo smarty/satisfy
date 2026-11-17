@@ -182,14 +182,14 @@ func buildBinaryPayload() []byte {
 }
 
 func (this *ZipArchiveFixture) openReader(source io.Reader) *ZipArchiveReader {
-	reader, err := NewZipArchiveReader(source, false)
+	reader, err := NewZipArchiveReader(source, nil)
 	this.So(err, should.BeNil)
 	return reader.(*ZipArchiveReader)
 }
 
 func (this *ZipArchiveFixture) TestDownloadFailureIsReturnedAsError() {
 	failure := errors.New("connection reset")
-	reader, err := NewZipArchiveReader(iotest.ErrReader(failure), false)
+	reader, err := NewZipArchiveReader(iotest.ErrReader(failure), nil)
 	this.So(reader, should.BeNil)
 	this.So(errors.Is(err, failure), should.BeTrue)
 }
