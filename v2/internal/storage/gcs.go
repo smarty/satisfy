@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -57,6 +58,9 @@ func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request model.
 	if err != nil {
 		return err
 	}
+	if request.IfGenerationMatch != nil {
+		gcsRequest.Header.Set("x-goog-if-generation-match", strconv.FormatInt(*request.IfGenerationMatch, 10))
+	}
 	response, err := this.do(gcsRequest)
 	if err != nil {
 		return err
@@ -101,8 +105,19 @@ func (this *GoogleCloudStorageClient) body(request *http.Request, address url.UR
 		_ = response.Body.Close()
 		return nil, model.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
 	}
+	if generation, err := strconv.ParseInt(response.Header.Get("x-goog-generation"), 10, 64); err == nil {
+		return generationBody{ReadCloser: response.Body, generation: generation}, nil
+	}
 	return response.Body, nil
 }
+
+// generationBody is a downloaded body that knows its object's generation.
+type generationBody struct {
+	io.ReadCloser
+	generation int64
+}
+
+func (this generationBody) Generation() int64 { return this.generation }
 
 // Size uses an HTTP HEAD to find out how many bytes are available in total.
 func (this *GoogleCloudStorageClient) Size(ctx context.Context, address url.URL) (int64, error) {

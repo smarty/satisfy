@@ -84,14 +84,13 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 
 	this.logger.Info("uploading the manifest", "package", pkg.PackageName, "version", pkg.PackageVersion)
-	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename)); err != nil {
+	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename), nil); err != nil {
 		return Manifest{}, err
 	}
-	rootManifest, err := this.buildRootManifest(ctx, pkg, manifest)
+	err = this.updateRootManifest(ctx, pkg.ComposeLatestManifestRemoteAddress(), func(existing model.Manifest, _ bool) (model.Manifest, error) {
+		return this.buildRootManifest(pkg, manifest, existing), nil
+	})
 	if err != nil {
-		return Manifest{}, err
-	}
-	if err = this.uploadManifest(ctx, rootManifest, pkg.ComposeLatestManifestRemoteAddress()); err != nil {
 		return Manifest{}, err
 	}
 	return publicManifest(manifest), nil
@@ -218,19 +217,16 @@ func (this *Client) uploadArchive(ctx context.Context, pkg model.PackageConfig, 
 }
 
 // buildRootManifest carries the tag listing forward from the existing root
-// manifest and points any tags named in the package config at the version
-// being uploaded. The versioned manifest never includes tags.
-func (this *Client) buildRootManifest(ctx context.Context, pkg model.PackageConfig, manifest model.Manifest) (model.Manifest, error) {
-	existing, err := this.downloadManifest(ctx, pkg.ComposeLatestManifestRemoteAddress())
-	if err != nil && !model.IsNotFound(err) { // not found: first upload of this package
-		return model.Manifest{}, fmt.Errorf("could not read existing root manifest (needed to preserve tags): %w", err)
-	}
+// manifest (empty on the first upload of a package) and points any tags named
+// in the package config at the version being uploaded. The versioned manifest
+// never includes tags.
+func (this *Client) buildRootManifest(pkg model.PackageConfig, manifest, existing model.Manifest) model.Manifest {
 	rootManifest := manifest
 	rootManifest.Tags = model.MergeTags(existing.Tags, pkg.Tags, pkg.PackageVersion)
 	for _, name := range pkg.Tags {
 		this.logger.Info("tagging version", "version", pkg.PackageVersion, "tag", name)
 	}
-	return rootManifest, nil
+	return rootManifest
 }
 
 func newCompressor(algorithm string, level int, writer io.Writer) (io.WriteCloser, error) {

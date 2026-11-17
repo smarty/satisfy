@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -269,6 +270,55 @@ func (this *ClientFixture) TestModifyTagsRejectsDuplicateAndConflictingTags() {
 	}
 }
 
+// Simulates another client changing the root manifest between this client's
+// read and write: the write must not discard the other client's change.
+func (this *ClientFixture) changeRootManifestConcurrentlyOnce(change func()) {
+	var once sync.Once
+	this.storage.beforeUpload = func(request model.UploadRequest) {
+		if path.Base(request.RemoteAddress.Path) == model.RemoteManifestFilename &&
+			path.Base(path.Dir(request.RemoteAddress.Path)) == "package" {
+			once.Do(change)
+		}
+	}
+}
+
+func (this *ClientFixture) TestConcurrentTagModificationIsNotLost() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+	other := New(withStorage(this.storage), WithMaxRetry(0))
+	this.changeRootManifestConcurrentlyOnce(func() {
+		this.storage.beforeUpload = nil
+		this.So(other.ModifyTags(this.ctx, TagModification{
+			PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "beta", Version: "2.0.0"}},
+		}), should.BeNil)
+	})
+
+	err := this.client.ModifyTags(this.ctx, TagModification{
+		PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "stable", Version: "2.0.0"}},
+	})
+
+	this.So(err, should.BeNil)
+	tags, _ := this.client.Tags(this.ctx, this.ref())
+	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "2.0.0"}})
+}
+
+func (this *ClientFixture) TestTagModificationDuringUploadIsNotLost() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	other := New(withStorage(this.storage), WithMaxRetry(0))
+	this.changeRootManifestConcurrentlyOnce(func() {
+		this.storage.beforeUpload = nil
+		this.So(other.ModifyTags(this.ctx, TagModification{
+			PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "stable", Version: "1.0.0"}},
+		}), should.BeNil)
+	})
+
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0", "beta")})
+
+	this.So(err, should.BeNil)
+	tags, _ := this.client.Tags(this.ctx, this.ref())
+	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "1.0.0"}})
+}
+
 func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
 
@@ -303,26 +353,48 @@ func (this *ClientFixture) TestInvalidDependencyIsRejected() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// fakeStorage keeps uploaded objects in memory, keyed by address.
+// fakeStorage keeps uploaded objects in memory, keyed by address, and gives
+// each write a new generation, as Google Cloud Storage does.
 type fakeStorage struct {
-	lock    sync.Mutex
-	objects map[string][]byte
+	lock        sync.Mutex
+	objects     map[string][]byte
+	generations map[string]int64
+	written     int64
+
+	// beforeUpload, when set, runs at the start of each upload.
+	beforeUpload func(request model.UploadRequest)
 }
 
 func newFakeStorage() *fakeStorage {
-	return &fakeStorage{objects: make(map[string][]byte)}
+	return &fakeStorage{objects: make(map[string][]byte), generations: make(map[string]int64)}
 }
 
 func (this *fakeStorage) Upload(_ context.Context, request model.UploadRequest) error {
+	if this.beforeUpload != nil {
+		this.beforeUpload(request)
+	}
 	raw, err := io.ReadAll(request.Body)
 	if err != nil {
 		return err
 	}
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	this.objects[request.RemoteAddress.String()] = raw
+	address := request.RemoteAddress.String()
+	if request.IfGenerationMatch != nil && *request.IfGenerationMatch != this.generations[address] {
+		return model.NewStatusCodeError(http.StatusPreconditionFailed, []int{http.StatusOK}, request.RemoteAddress)
+	}
+	this.written++
+	this.objects[address] = raw
+	this.generations[address] = this.written
 	return nil
 }
+
+type generationBody struct {
+	io.ReadCloser
+	generation int64
+}
+
+func (this generationBody) Generation() int64 { return this.generation }
 
 func (this *fakeStorage) object(address url.URL) ([]byte, error) {
 	this.lock.Lock()
@@ -339,7 +411,9 @@ func (this *fakeStorage) Download(_ context.Context, address url.URL) (io.ReadCl
 	if err != nil {
 		return nil, err
 	}
-	return io.NopCloser(bytes.NewReader(raw)), nil
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	return generationBody{ReadCloser: io.NopCloser(bytes.NewReader(raw)), generation: this.generations[address.String()]}, nil
 }
 
 func (this *fakeStorage) Seek(_ context.Context, address url.URL, start, end int64) (io.ReadCloser, error) {
