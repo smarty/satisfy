@@ -1,19 +1,9 @@
 package contracts
 
 import (
-	"log/slog"
 	"net/url"
 	"path"
-
-	"github.com/smarty/gcs"
 )
-
-type TagsConfig struct {
-	MaxRetry          int
-	GoogleCredentials gcs.Credentials
-	Modification      TagModificationConfig
-	Logger            *slog.Logger
-}
 
 type TagModificationConfig struct {
 	PackageName   string `json:"package_name"`

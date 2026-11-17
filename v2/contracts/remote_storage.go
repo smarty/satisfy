@@ -55,9 +55,12 @@ var ErrRetryable = errors.New("retry")
 // already present on remote storage.
 var ErrPackageExists = errors.New("package already exists on remote storage")
 
+// ErrNotFound matches (via errors.Is) any error caused by a remote object
+// that does not exist.
+var ErrNotFound = errors.New("not found")
+
 func IsNotFound(err error) bool {
-	statusError, ok := errors.AsType[*StatusCodeError](err)
-	return ok && statusError.StatusCode() == http.StatusNotFound
+	return errors.Is(err, ErrNotFound)
 }
 
 type StatusCodeError struct {
@@ -84,4 +87,9 @@ func (this *StatusCodeError) Error() string {
 
 func (this *StatusCodeError) StatusCode() int {
 	return this.actualStatusCode
+}
+
+// Is reports a 404 status as ErrNotFound.
+func (this *StatusCodeError) Is(target error) bool {
+	return target == ErrNotFound && this.actualStatusCode == http.StatusNotFound
 }

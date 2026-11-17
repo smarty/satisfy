@@ -1,22 +1,9 @@
 package contracts
 
 import (
-	"log/slog"
 	"net/url"
 	"path"
-
-	"github.com/smarty/gcs"
 )
-
-type UploadConfig struct {
-	MaxRetry          int
-	CredentialReader  gcs.CredentialsReader
-	GoogleCredentials gcs.Credentials
-	Overwrite         bool
-	PackageConfig     PackageConfig
-	Logger            *slog.Logger
-	Progress          ProgressFunc
-}
 
 type PackageConfig struct {
 	CompressionAlgorithm string   `json:"compression_algorithm"`

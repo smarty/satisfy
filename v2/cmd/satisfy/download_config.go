@@ -12,7 +12,6 @@ import (
 
 	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
-	"github.com/smarty/satisfy/v2/transfer"
 )
 
 const stdinPath = "_STDIN_"
@@ -20,9 +19,12 @@ const stdinPath = "_STDIN_"
 // downloadCommandConfig is the configuration for the default (download)
 // command: the library configuration plus the options only the CLI uses.
 type downloadCommandConfig struct {
-	transfer.DownloadConfig
-	JSONPath     string
-	ShowProgress bool
+	MaxRetry          int
+	Concurrency       int
+	QuickVerification bool
+	Dependencies      contracts.DependencyListing
+	JSONPath          string
+	ShowProgress      bool
 }
 
 func parseDownloadConfig(args []string, stdin io.Reader, stderr io.Writer) (config downloadCommandConfig, err error) {

@@ -9,13 +9,16 @@ import (
 
 	"github.com/smarty/gcs"
 
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/contracts"
 )
 
 // tagsCommandConfig is the configuration for the tags modify command.
 type tagsCommandConfig struct {
-	contracts.TagsConfig
-	JSONPath string
+	MaxRetry          int
+	GoogleCredentials gcs.Credentials
+	Modification      contracts.TagModificationConfig
+	JSONPath          string
 }
 
 type TagsConfigLoader struct {
@@ -103,43 +106,5 @@ func (this *TagsConfigLoader) validate(config tagsCommandConfig) error {
 	if config.MaxRetry < 0 {
 		return errMaxRetry
 	}
-	modification := config.Modification
-	if modification.PackageName == "" {
-		return errBlankPackageName
-	}
-	if modification.RemoteAddress == nil {
-		return errNilRemoteAddressPrefix
-	}
-	if len(modification.Add) == 0 && len(modification.Delete) == 0 {
-		return errNoTagModifications
-	}
-
-	added := make(map[string]struct{})
-	for _, tag := range modification.Add {
-		if err := validateTagName(tag.Name); err != nil {
-			return err
-		}
-		if tag.Version == "" {
-			return errBlankTagVersion
-		}
-		if _, found := added[tag.Name]; found {
-			return errDuplicateTagName
-		}
-		added[tag.Name] = struct{}{}
-	}
-
-	deleted := make(map[string]struct{})
-	for _, tag := range modification.Delete {
-		if tag.Name == "" {
-			return errBlankTagName
-		}
-		if _, found := added[tag.Name]; found {
-			return errConflictingTagName
-		}
-		if _, found := deleted[tag.Name]; found {
-			return errDuplicateTagName
-		}
-		deleted[tag.Name] = struct{}{}
-	}
-	return nil
+	return satisfy.ValidateTagModification(config.Modification)
 }

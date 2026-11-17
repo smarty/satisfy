@@ -1,0 +1,155 @@
+package satisfy
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2/core"
+)
+
+// Latest returns the most recently uploaded version of the package stored
+// under remoteAddress.
+func (this *Client) Latest(ctx context.Context, remoteAddress URL, packageName string) (string, error) {
+	manifest, err := this.rootManifest(ctx, remoteAddress, packageName)
+	if err != nil {
+		return "", err
+	}
+	return manifest.Version, nil
+}
+
+// Tags returns the package's tags, sorted by name.
+func (this *Client) Tags(ctx context.Context, remoteAddress URL, packageName string) ([]Tag, error) {
+	manifest, err := this.rootManifest(ctx, remoteAddress, packageName)
+	if err != nil {
+		return nil, err
+	}
+	tags := slices.Clone(manifest.Tags)
+	slices.SortFunc(tags, func(a, b Tag) int { return strings.Compare(a.Name, b.Name) })
+	return tags, nil
+}
+
+func (this *Client) rootManifest(ctx context.Context, remoteAddress URL, packageName string) (Manifest, error) {
+	packageName = strings.Trim(packageName, "/")
+	if packageName == "" {
+		return Manifest{}, fmt.Errorf("%w: package name is required", ErrInvalidConfig)
+	}
+	dependency := Dependency{PackageName: packageName, RemoteAddress: remoteAddress}
+	address := dependency.ComposeLatestManifestRemoteAddress()
+	manifest, err := this.downloadManifest(ctx, address)
+	if contracts.IsNotFound(err) {
+		return Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
+			packageName, address.String(), err)
+	}
+	if err != nil {
+		return Manifest{}, fmt.Errorf("could not read root manifest for package %q: %w", packageName, err)
+	}
+	return manifest, nil
+}
+
+// ModifyTags adds, moves and deletes tags of a package. Every version being
+// tagged must already exist; otherwise nothing is changed.
+func (this *Client) ModifyTags(ctx context.Context, modification TagModification) error {
+	if err := ValidateTagModification(modification); err != nil {
+		return err
+	}
+	address := modification.ComposeRootManifestAddress()
+	rootManifest, err := this.downloadManifest(ctx, address)
+	if contracts.IsNotFound(err) {
+		return fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
+			modification.PackageName, address.String(), err)
+	}
+	if err != nil {
+		return fmt.Errorf("could not read root manifest: %w", err)
+	}
+
+	if err = this.verifyVersionsExist(ctx, modification); err != nil {
+		return err
+	}
+
+	this.logModifications(rootManifest, modification)
+	rootManifest.Tags = core.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
+	if err = this.uploadManifest(ctx, rootManifest, address); err != nil {
+		return err
+	}
+	this.logger.Info("tags updated", "package", modification.PackageName)
+	return nil
+}
+
+// ValidateTagModification reports incomplete or inconsistent tag changes with
+// an error matching ErrInvalidConfig. ModifyTags calls it before any I/O.
+func ValidateTagModification(modification TagModification) error {
+	switch {
+	case modification.PackageName == "":
+		return fmt.Errorf("%w: package name is required", ErrInvalidConfig)
+	case modification.RemoteAddress == nil:
+		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
+	case len(modification.Add) == 0 && len(modification.Delete) == 0:
+		return fmt.Errorf("%w: at least one tag addition or deletion is required", ErrInvalidConfig)
+	}
+	added := make(map[string]struct{})
+	for _, tag := range modification.Add {
+		if tag.Name == "" || tag.Name == "latest" || tag.Version == "" {
+			return fmt.Errorf("%w: invalid tag %q -> %q", ErrInvalidConfig, tag.Name, tag.Version)
+		}
+		if _, found := added[tag.Name]; found {
+			return fmt.Errorf("%w: tag %q is added more than once", ErrInvalidConfig, tag.Name)
+		}
+		added[tag.Name] = struct{}{}
+	}
+	deleted := make(map[string]struct{})
+	for _, tag := range modification.Delete {
+		if tag.Name == "" {
+			return fmt.Errorf("%w: invalid tag name to delete: %q", ErrInvalidConfig, tag.Name)
+		}
+		if _, found := added[tag.Name]; found {
+			return fmt.Errorf("%w: tag %q is both added and deleted", ErrInvalidConfig, tag.Name)
+		}
+		if _, found := deleted[tag.Name]; found {
+			return fmt.Errorf("%w: tag %q is deleted more than once", ErrInvalidConfig, tag.Name)
+		}
+		deleted[tag.Name] = struct{}{}
+	}
+	return nil
+}
+
+// verifyVersionsExist guards against dangling tags by confirming each version
+// to be tagged has a manifest on remote storage.
+func (this *Client) verifyVersionsExist(ctx context.Context, modification TagModification) error {
+	verified := make(map[string]struct{})
+	for _, tag := range modification.Add {
+		if _, done := verified[tag.Version]; done {
+			continue
+		}
+		address := modification.ComposeVersionedManifestAddress(tag.Version)
+		_, err := this.storage.Size(ctx, address)
+		if contracts.IsNotFound(err) {
+			return fmt.Errorf("cannot tag version %q as %q: no manifest found at [%s]: %w",
+				tag.Version, tag.Name, address.String(), err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not verify version %q exists: %w", tag.Version, err)
+		}
+		verified[tag.Version] = struct{}{}
+	}
+	return nil
+}
+
+func (this *Client) logModifications(rootManifest Manifest, modification TagModification) {
+	for _, tag := range modification.Add {
+		if existing, found := rootManifest.TagVersion(tag.Name); found {
+			this.logger.Info("updating tag", "tag", tag.Name, "from", existing, "to", tag.Version)
+		} else {
+			this.logger.Info("adding tag", "tag", tag.Name, "version", tag.Version)
+		}
+	}
+	for _, tag := range modification.Delete {
+		if _, found := rootManifest.TagVersion(tag.Name); found {
+			this.logger.Info("deleting tag", "tag", tag.Name)
+		} else {
+			this.logger.Info("tag does not exist; nothing to delete", "tag", tag.Name)
+		}
+	}
+}

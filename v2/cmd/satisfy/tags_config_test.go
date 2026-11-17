@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/contracts"
 )
 
@@ -109,7 +111,7 @@ func (this *TagsConfigLoaderFixture) TestBlankPackageName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errBlankPackageName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestNilRemoteAddress() {
@@ -117,7 +119,7 @@ func (this *TagsConfigLoaderFixture) TestNilRemoteAddress() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errNilRemoteAddressPrefix)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestNoModifications() {
@@ -126,7 +128,7 @@ func (this *TagsConfigLoaderFixture) TestNoModifications() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errNoTagModifications)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
@@ -134,7 +136,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errBlankTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
@@ -142,7 +144,7 @@ func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errReservedTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
@@ -150,7 +152,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errBlankTagVersion)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
@@ -158,7 +160,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errDuplicateTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
@@ -166,7 +168,7 @@ func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errBlankTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
@@ -174,7 +176,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errDuplicateTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *TagsConfigLoaderFixture) TestTagNameInBothAddAndDelete() {
@@ -182,5 +184,5 @@ func (this *TagsConfigLoaderFixture) TestTagNameInBothAddAndDelete() {
 
 	_, err := this.loadConfig()
 
-	this.So(err, should.Resemble, errConflictingTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }

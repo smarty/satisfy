@@ -10,15 +10,20 @@ import (
 
 	"github.com/smarty/gcs"
 
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/contracts"
 )
 
 // uploadCommandConfig is the configuration for the upload and check
 // commands: the library configuration plus the options only the CLI uses.
 type uploadCommandConfig struct {
-	contracts.UploadConfig
-	JSONPath     string
-	ShowProgress bool
+	MaxRetry          int
+	CredentialReader  gcs.CredentialsReader
+	GoogleCredentials gcs.Credentials
+	Overwrite         bool
+	PackageConfig     contracts.PackageConfig
+	JSONPath          string
+	ShowProgress      bool
 }
 
 type UploadConfigLoader struct {
@@ -135,51 +140,10 @@ func (this *UploadConfigLoader) validateConfigJsonValues(config uploadCommandCon
 	if config.MaxRetry < 0 {
 		return errMaxRetry
 	}
-	if config.PackageConfig.CompressionAlgorithm == "" {
-		return errBlankCompressionAlgorithm
-	}
-	if config.PackageConfig.SourceDirectory == "" && config.PackageConfig.SourceFile == "" && config.PackageConfig.SourcePath == "" {
-		return errBlankSourceDirectory
-	}
-	if config.PackageConfig.PackageName == "" {
-		return errBlankPackageName
-	}
-	if config.PackageConfig.PackageVersion == "" {
-		return errBlankPackageVersion
-	}
-	if config.PackageConfig.RemoteAddressPrefix == nil {
-		return errNilRemoteAddressPrefix
-	}
-	for _, tag := range config.PackageConfig.Tags {
-		if err := validateTagName(tag); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateTagName(name string) error {
-	if name == "" {
-		return errBlankTagName
-	}
-	if name == "latest" {
-		return errReservedTagName
-	}
-	return nil
+	return satisfy.ValidatePackageConfig(config.PackageConfig)
 }
 
 var (
-	errMaxRetry                  = errors.New("max-retry must be positive")
-	errBlankJSONPath             = errors.New("json flag must be populated")
-	errBlankCompressionAlgorithm = errors.New("compression algorithm should not be blank")
-	errBlankSourceDirectory      = errors.New("'source path', 'source directory' or 'source file' must be provided")
-	errBlankPackageName          = errors.New("package name should not be blank")
-	errBlankPackageVersion       = errors.New("package version should not be blank")
-	errNilRemoteAddressPrefix    = errors.New("remote address prefix should not be nil")
-	errBlankTagName              = errors.New("tag name should not be blank")
-	errReservedTagName           = errors.New("'latest' is a reserved tag name")
-	errBlankTagVersion           = errors.New("tag version should not be blank")
-	errDuplicateTagName          = errors.New("tag name listed more than once")
-	errConflictingTagName        = errors.New("tag name appears in both add and delete lists")
-	errNoTagModifications        = errors.New("at least one tag addition or deletion is required")
+	errMaxRetry      = errors.New("max-retry must be positive")
+	errBlankJSONPath = errors.New("json flag must be populated")
 )

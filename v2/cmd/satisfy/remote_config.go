@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/smarty/satisfy/v2/contracts"
-	"github.com/smarty/satisfy/v2/transfer"
 )
 
 // remotePackageFlags are the flags shared by commands that look up a single
@@ -65,7 +64,14 @@ func (this *remotePackageFlags) resolve() (packageName string, remoteAddress con
 	return packageName, remoteAddress, nil
 }
 
-func parseLatestConfig(args []string, stderr io.Writer) (config transfer.LatestConfig, err error) {
+// remotePackageConfig identifies one package's root manifest.
+type remotePackageConfig struct {
+	PackageName   string
+	RemoteAddress contracts.URL
+	MaxRetry      int
+}
+
+func parseLatestConfig(args []string, stderr io.Writer) (config remotePackageConfig, err error) {
 	flags := flag.NewFlagSet("satisfy latest", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var remote remotePackageFlags
@@ -76,11 +82,11 @@ func parseLatestConfig(args []string, stderr io.Writer) (config transfer.LatestC
 		flags.PrintDefaults()
 	}
 	if err = flags.Parse(args); err != nil {
-		return transfer.LatestConfig{}, err
+		return remotePackageConfig{}, err
 	}
 	config.PackageName, config.RemoteAddress, err = remote.resolve()
 	if err != nil {
-		return transfer.LatestConfig{}, err
+		return remotePackageConfig{}, err
 	}
 	config.MaxRetry = remote.maxRetry
 	return config, nil
@@ -88,7 +94,7 @@ func parseLatestConfig(args []string, stderr io.Writer) (config transfer.LatestC
 
 // tagsListCommandConfig is the configuration for the tags list command.
 type tagsListCommandConfig struct {
-	transfer.TagsListConfig
+	remotePackageConfig
 	JSONOutput bool
 }
 

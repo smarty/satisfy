@@ -12,6 +12,7 @@ import (
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gcs"
 	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/contracts"
 )
 
@@ -79,7 +80,7 @@ func (this *UploadConfigLoaderFixture) TestInValidJSONFromSpecifiedFile() {
 
 func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
 	packageConfig := contracts.PackageConfig{
-		CompressionAlgorithm: "algorithm",
+		CompressionAlgorithm: "zstd",
 		CompressionLevel:     42,
 		SourceDirectory:      "source",
 		PackageName:          "package",
@@ -170,13 +171,22 @@ func (this *UploadConfigLoaderFixture) TestValidateJSONPathIsNotBlank() {
 	this.So(errors.Is(err, errBlankJSONPath), should.BeTrue)
 }
 
+func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsSupported() {
+	this.pkgConfig.CompressionAlgorithm = "rar"
+	raw, _ := json.Marshal(this.pkgConfig.configure())
+	this.storage.WriteFile("config.json", raw)
+	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", "config.json"})
+
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
+}
+
 func (this *UploadConfigLoaderFixture) TestValidateCompressionAlgorithmIsNotBlank() {
 	this.pkgConfig.CompressionAlgorithm = ""
 	raw, _ := json.Marshal(this.pkgConfig.configure())
 	this.storage.WriteFile("config.json", raw)
 	_, err := this.loader.LoadConfig(context.Background(), "upload", []string{"-json", "config.json"})
 
-	this.So(err, should.Resemble, errBlankCompressionAlgorithm)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
@@ -187,7 +197,7 @@ func (this *UploadConfigLoaderFixture) TestValidateSourceDirectoryIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errBlankSourceDirectory)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
@@ -198,7 +208,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageNameIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errBlankPackageName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
@@ -209,7 +219,7 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errBlankPackageVersion)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil() {
@@ -220,7 +230,7 @@ func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil()
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errNilRemoteAddressPrefix)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
@@ -231,7 +241,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotBlank() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errBlankTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
@@ -242,7 +252,7 @@ func (this *UploadConfigLoaderFixture) TestValidateTagNameIsNotReserved() {
 
 	_, err := this.loader.LoadConfig(context.Background(), "upload", args)
 
-	this.So(err, should.Resemble, errReservedTagName)
+	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *UploadConfigLoaderFixture) TestValidTagsAccepted() {
@@ -277,7 +287,7 @@ type FakePackageConfig struct {
 
 func NewFakePackageConfig() *FakePackageConfig {
 	return &FakePackageConfig{
-		CompressionAlgorithm: "algorithm",
+		CompressionAlgorithm: "zstd",
 		SourceDirectory:      "source",
 		PackageName:          "package",
 		PackageVersion:       "version",

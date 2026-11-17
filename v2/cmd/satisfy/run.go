@@ -8,7 +8,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/smarty/satisfy/v2/contracts"
+	"github.com/smarty/satisfy/v2"
 )
 
 const (
@@ -27,7 +27,7 @@ type environment struct {
 
 // progress returns a progress renderer writing to stderr, or nil when
 // progress display is disabled.
-func (this environment) progress(enabled bool) contracts.ProgressFunc {
+func (this environment) progress(enabled bool) func(satisfy.Progress) {
 	if !enabled {
 		return nil
 	}
@@ -75,7 +75,7 @@ func exitCode(env environment, err error) int {
 		return exitSuccess
 	case errors.Is(err, flag.ErrHelp):
 		return exitSuccess
-	case errors.Is(err, contracts.ErrPackageExists):
+	case errors.Is(err, satisfy.ErrPackageExists):
 		env.logger.Info(err.Error())
 		return exitPackageExists
 	default:

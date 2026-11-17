@@ -6,21 +6,31 @@ import (
 
 	"github.com/smarty/gcs"
 
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/shell"
-	"github.com/smarty/satisfy/v2/transfer"
 )
+
+func (this environment) client(options ...satisfy.Option) *satisfy.Client {
+	return satisfy.New(append([]satisfy.Option{satisfy.WithLogger(this.logger)}, options...)...)
+}
 
 func uploadCommand(ctx context.Context, env environment, args []string) error {
 	config, err := newUploadConfigLoader(env).LoadConfig(ctx, "upload", args)
 	if err != nil {
 		return err
 	}
-	config.Logger = env.logger
-	config.Progress = env.progress(config.ShowProgress)
-	if err = transfer.NewCheckApp(config.UploadConfig).Run(ctx); err != nil {
-		return err
+	client := env.client(
+		// compressing a large package can outlive a bearer token, so read
+		// credentials again as they age
+		satisfy.WithCredentialsReader(config.CredentialReader),
+		satisfy.WithMaxRetry(config.MaxRetry),
+		satisfy.WithProgress(env.progress(config.ShowProgress)),
+	)
+	if config.Overwrite {
+		env.logger.Info("overwrite mode enabled; skipping remote manifest check")
 	}
-	return transfer.NewUploadApp(config.UploadConfig).Run(ctx)
+	_, err = client.Upload(ctx, satisfy.UploadRequest{Package: config.PackageConfig, Overwrite: config.Overwrite})
+	return err
 }
 
 func checkCommand(ctx context.Context, env environment, args []string) error {
@@ -28,8 +38,19 @@ func checkCommand(ctx context.Context, env environment, args []string) error {
 	if err != nil {
 		return err
 	}
-	config.Logger = env.logger
-	return transfer.NewCheckApp(config.UploadConfig).Run(ctx)
+	if config.Overwrite {
+		env.logger.Info("overwrite mode enabled; skipping remote manifest check")
+		return nil
+	}
+	client := env.client(satisfy.WithCredentials(config.GoogleCredentials), satisfy.WithMaxRetry(config.MaxRetry))
+	exists, err := client.Exists(ctx, config.PackageConfig)
+	if err != nil {
+		return fmt.Errorf("sanity check failed: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("%s @ %s: %w", config.PackageConfig.PackageName, config.PackageConfig.PackageVersion, satisfy.ErrPackageExists)
+	}
+	return nil
 }
 
 func newUploadConfigLoader(env environment) *UploadConfigLoader {
@@ -37,21 +58,25 @@ func newUploadConfigLoader(env environment) *UploadConfigLoader {
 }
 
 func downloadCommand(ctx context.Context, env environment, args []string) error {
-	parsed, err := parseDownloadConfig(args, env.stdin, env.stderr)
+	config, err := parseDownloadConfig(args, env.stdin, env.stderr)
 	if err != nil {
 		return err
 	}
-	config := parsed.DownloadConfig
 	if len(config.Dependencies.Listing) == 0 {
 		return nil
 	}
-	config.GoogleCredentials, err = readCredentials(ctx, parsed.Dependencies.Credentials)
+	credentials, err := readCredentials(ctx, config.Dependencies.Credentials)
 	if err != nil {
 		return err
 	}
-	config.Logger = env.logger
-	config.Progress = env.progress(parsed.ShowProgress)
-	return transfer.NewDownloadApp(config).Run(ctx)
+	client := env.client(
+		satisfy.WithCredentials(credentials),
+		satisfy.WithMaxRetry(config.MaxRetry),
+		satisfy.WithConcurrency(config.Concurrency),
+		satisfy.WithContentVerification(!config.QuickVerification),
+		satisfy.WithProgress(env.progress(config.ShowProgress)),
+	)
+	return client.Install(ctx, config.Dependencies.Listing...)
 }
 
 func latestCommand(ctx context.Context, env environment, args []string) error {
@@ -59,11 +84,12 @@ func latestCommand(ctx context.Context, env environment, args []string) error {
 	if err != nil {
 		return err
 	}
-	if config.GoogleCredentials, err = readCredentials(ctx, ""); err != nil {
+	credentials, err := readCredentials(ctx, "")
+	if err != nil {
 		return err
 	}
-	config.Logger = env.logger
-	version, err := transfer.NewLatestApp(config).Run(ctx)
+	client := env.client(satisfy.WithCredentials(credentials), satisfy.WithMaxRetry(config.MaxRetry))
+	version, err := client.Latest(ctx, config.RemoteAddress, config.PackageName)
 	if err != nil {
 		return err
 	}
@@ -72,20 +98,20 @@ func latestCommand(ctx context.Context, env environment, args []string) error {
 }
 
 func tagsListCommand(ctx context.Context, env environment, args []string) error {
-	parsed, err := parseTagsListConfig(args, env.stderr)
+	config, err := parseTagsListConfig(args, env.stderr)
 	if err != nil {
 		return err
 	}
-	config := parsed.TagsListConfig
-	if config.GoogleCredentials, err = readCredentials(ctx, ""); err != nil {
-		return err
-	}
-	config.Logger = env.logger
-	tags, err := transfer.NewTagsListApp(config).Run(ctx)
+	credentials, err := readCredentials(ctx, "")
 	if err != nil {
 		return err
 	}
-	formatted, err := formatTags(tags, parsed.JSONOutput)
+	client := env.client(satisfy.WithCredentials(credentials), satisfy.WithMaxRetry(config.MaxRetry))
+	tags, err := client.Tags(ctx, config.RemoteAddress, config.PackageName)
+	if err != nil {
+		return err
+	}
+	formatted, err := formatTags(tags, config.JSONOutput)
 	if err != nil {
 		return err
 	}
@@ -99,8 +125,8 @@ func tagsModifyCommand(ctx context.Context, env environment, args []string) erro
 	if err != nil {
 		return err
 	}
-	config.Logger = env.logger
-	return transfer.NewTagsApp(config.TagsConfig).Run(ctx)
+	client := env.client(satisfy.WithCredentials(config.GoogleCredentials), satisfy.WithMaxRetry(config.MaxRetry))
+	return client.ModifyTags(ctx, config.Modification)
 }
 
 // readCredentials discovers Google credentials from the environment, or uses

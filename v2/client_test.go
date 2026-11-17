@@ -1,0 +1,269 @@
+package satisfy
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+
+	"github.com/smarty/assertions/should"
+	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/v2/contracts"
+)
+
+func TestClientFixture(t *testing.T) {
+	gunit.Run(new(ClientFixture), t)
+}
+
+type ClientFixture struct {
+	*gunit.Fixture
+	ctx      context.Context
+	storage  *fakeStorage
+	client   *Client
+	source   string
+	target   string
+	remote   URL
+	progress []Progress
+	lock     sync.Mutex
+}
+
+func (this *ClientFixture) Setup() {
+	this.ctx = context.Background()
+	this.storage = newFakeStorage()
+	this.client = New(withStorage(this.storage), WithMaxRetry(0), WithProgress(func(progress Progress) {
+		this.lock.Lock()
+		defer this.lock.Unlock()
+		this.progress = append(this.progress, progress)
+	}))
+	this.source = this.tempDir()
+	this.target = this.tempDir()
+	this.remote = URL{Scheme: "gcs", Host: "bucket", Path: "/prefix"}
+	this.writeSource("hello.txt", "Hello, World!")
+	this.writeSource("nested/goodbye.txt", "Goodbye!")
+}
+
+func (this *ClientFixture) Teardown() {
+	_ = os.RemoveAll(this.source)
+	_ = os.RemoveAll(this.target)
+}
+
+func (this *ClientFixture) tempDir() string {
+	path, err := os.MkdirTemp("", "satisfy-client-test-*")
+	this.So(err, should.BeNil)
+	return path
+}
+
+func (this *ClientFixture) writeSource(name, content string) {
+	path := filepath.Join(this.source, name)
+	this.So(os.MkdirAll(filepath.Dir(path), 0755), should.BeNil)
+	this.So(os.WriteFile(path, []byte(content), 0644), should.BeNil)
+}
+
+func (this *ClientFixture) pkg(version string, tags ...string) PackageConfig {
+	prefix := this.remote
+	return PackageConfig{
+		CompressionAlgorithm: "zstd",
+		CompressionLevel:     1,
+		SourceDirectory:      this.source,
+		PackageName:          "team/package",
+		PackageVersion:       version,
+		RemoteAddressPrefix:  &prefix,
+		Tags:                 tags,
+	}
+}
+
+func (this *ClientFixture) dependency(version string) Dependency {
+	return Dependency{
+		PackageName:    "team/package",
+		PackageVersion: version,
+		RemoteAddress:  this.remote,
+		LocalDirectory: this.target,
+	}
+}
+
+func (this *ClientFixture) readTarget(name string) string {
+	raw, err := os.ReadFile(filepath.Join(this.target, name))
+	this.So(err, should.BeNil)
+	return string(raw)
+}
+
+func (this *ClientFixture) TestUploadThenInstall() {
+	manifest, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	this.So(err, should.BeNil)
+	this.So(manifest.Archive.Contents, should.HaveLength, 2)
+
+	this.So(this.client.Install(this.ctx, this.dependency("1.0.0")), should.BeNil)
+
+	this.So(this.readTarget("hello.txt"), should.Equal, "Hello, World!")
+	this.So(this.readTarget("nested/goodbye.txt"), should.Equal, "Goodbye!")
+	this.So(this.progress, should.NotBeEmpty)
+}
+
+func (this *ClientFixture) TestUploadExistingVersionFailsWithErrPackageExists() {
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	this.So(err, should.BeNil)
+
+	_, err = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	this.So(errors.Is(err, ErrPackageExists), should.BeTrue)
+
+	_, err = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0"), Overwrite: true})
+	this.So(err, should.BeNil)
+}
+
+func (this *ClientFixture) TestExists() {
+	exists, err := this.client.Exists(this.ctx, this.pkg("1.0.0"))
+	this.So(err, should.BeNil)
+	this.So(exists, should.BeFalse)
+
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	exists, err = this.client.Exists(this.ctx, this.pkg("1.0.0"))
+	this.So(err, should.BeNil)
+	this.So(exists, should.BeTrue)
+}
+
+func (this *ClientFixture) TestInvalidUploadIsRejectedBeforeAnyIO() {
+	pkg := this.pkg("1.0.0")
+	pkg.RemoteAddressPrefix = nil
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: pkg})
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	this.So(this.storage.objects, should.BeEmpty)
+}
+
+func (this *ClientFixture) TestLatestAndTags() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0", "beta")})
+
+	latest, err := this.client.Latest(this.ctx, this.remote, "team/package")
+	this.So(err, should.BeNil)
+	this.So(latest, should.Equal, "2.0.0")
+
+	tags, err := this.client.Tags(this.ctx, this.remote, "team/package")
+	this.So(err, should.BeNil)
+	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "1.0.0"}})
+}
+
+func (this *ClientFixture) TestInstallByTag() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+
+	this.So(this.client.Install(this.ctx, this.dependency("stable")), should.BeNil)
+	this.So(this.readTarget("hello.txt"), should.Equal, "Hello, World!")
+}
+
+func (this *ClientFixture) TestModifyTags() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+	prefix := this.remote
+
+	err := this.client.ModifyTags(this.ctx, TagModification{
+		PackageName:   "team/package",
+		RemoteAddress: &prefix,
+		Add:           []Tag{{Name: "stable", Version: "2.0.0"}},
+	})
+	this.So(err, should.BeNil)
+
+	tags, _ := this.client.Tags(this.ctx, this.remote, "team/package")
+	this.So(tags, should.Resemble, []Tag{{Name: "stable", Version: "2.0.0"}})
+}
+
+func (this *ClientFixture) TestModifyTagsRejectsDuplicateAndConflictingTags() {
+	prefix := this.remote
+	for _, modification := range []TagModification{
+		{Add: []Tag{{Name: "a", Version: "1"}, {Name: "a", Version: "2"}}},
+		{Delete: []Tag{{Name: "a"}, {Name: "a"}}},
+		{Add: []Tag{{Name: "a", Version: "1"}}, Delete: []Tag{{Name: "a"}}},
+	} {
+		modification.PackageName, modification.RemoteAddress = "team/package", &prefix
+		this.So(errors.Is(this.client.ModifyTags(this.ctx, modification), ErrInvalidConfig), should.BeTrue)
+	}
+}
+
+func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	prefix := this.remote
+
+	err := this.client.ModifyTags(this.ctx, TagModification{
+		PackageName:   "team/package",
+		RemoteAddress: &prefix,
+		Add:           []Tag{{Name: "stable", Version: "9.9.9"}},
+	})
+	this.So(errors.Is(err, ErrNotFound), should.BeTrue)
+}
+
+func (this *ClientFixture) TestUnknownPackageIsNotFound() {
+	_, err := this.client.Latest(this.ctx, this.remote, "no/such/package")
+	this.So(errors.Is(err, ErrNotFound), should.BeTrue)
+
+	err = this.client.Install(this.ctx, Dependency{
+		PackageName:    "no/such/package",
+		PackageVersion: "1.0.0",
+		RemoteAddress:  this.remote,
+		LocalDirectory: this.target,
+	})
+	this.So(errors.Is(err, ErrNotFound), should.BeTrue)
+}
+
+func (this *ClientFixture) TestInvalidDependencyIsRejected() {
+	err := this.client.Install(this.ctx, Dependency{PackageName: "p"})
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// fakeStorage keeps uploaded objects in memory, keyed by address.
+type fakeStorage struct {
+	lock    sync.Mutex
+	objects map[string][]byte
+}
+
+func newFakeStorage() *fakeStorage {
+	return &fakeStorage{objects: make(map[string][]byte)}
+}
+
+func (this *fakeStorage) Upload(_ context.Context, request contracts.UploadRequest) error {
+	raw, err := io.ReadAll(request.Body)
+	if err != nil {
+		return err
+	}
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.objects[request.RemoteAddress.String()] = raw
+	return nil
+}
+
+func (this *fakeStorage) object(address url.URL) ([]byte, error) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	raw, found := this.objects[address.String()]
+	if !found {
+		return nil, contracts.NewStatusCodeError(http.StatusNotFound, []int{http.StatusOK}, address)
+	}
+	return raw, nil
+}
+
+func (this *fakeStorage) Download(_ context.Context, address url.URL) (io.ReadCloser, error) {
+	raw, err := this.object(address)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(raw)), nil
+}
+
+func (this *fakeStorage) Seek(_ context.Context, address url.URL, start, end int64) (io.ReadCloser, error) {
+	raw, err := this.object(address)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(raw[start : end+1])), nil
+}
+
+func (this *fakeStorage) Size(_ context.Context, address url.URL) (int64, error) {
+	raw, err := this.object(address)
+	return int64(len(raw)), err
+}
