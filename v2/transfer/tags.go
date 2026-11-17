@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
@@ -53,7 +52,7 @@ func (this *TagsApp) Run(ctx context.Context) error {
 
 func (this *TagsApp) buildRemoteStorageClient() {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 }
 
 func (this *TagsApp) downloadRootManifest(ctx context.Context) (manifest contracts.Manifest, err error) {

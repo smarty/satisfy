@@ -21,6 +21,8 @@ type Uploader interface {
 	Upload(context.Context, UploadRequest) error
 }
 
+// UploadRequest describes an object to upload. Body is rewound to its start
+// before every attempt, so it may be sent more than once.
 type UploadRequest struct {
 	RemoteAddress url.URL
 	Body          io.ReadSeeker

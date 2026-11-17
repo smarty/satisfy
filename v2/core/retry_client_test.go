@@ -28,9 +28,11 @@ type RetryFixture struct {
 
 func (this *RetryFixture) Setup() {
 	this.fakeClient = &FakeClient{}
-	this.client = NewRetryClient(this.fakeClient, 4, func(duration time.Duration) {
+	this.client = NewRetryClient(this.fakeClient, 4, DefaultRetryDelay)
+	this.client.wait = func(_ context.Context, duration time.Duration) error {
 		this.naps = append(this.naps, duration)
-	})
+		return nil
+	}
 }
 
 func (this *RetryFixture) TestUploadCallsInner() {
@@ -55,6 +57,30 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 		time.Second * 3,
 		time.Second * 3,
 	})
+}
+
+func (this *RetryFixture) TestUploadBodyIsRewoundBeforeEveryAttempt() {
+	this.fakeClient.error = aRetryError
+
+	_ = this.client.Upload(context.Background(), contracts.UploadRequest{Body: strings.NewReader("payload")})
+
+	this.So(this.fakeClient.uploadBodies, should.Resemble, []string{"payload", "payload", "payload", "payload", "payload"})
+}
+
+func (this *RetryFixture) TestCancelledContextStopsRetries() {
+	this.fakeClient.error = aRetryError
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	this.client.wait = waitContext
+
+	_, err := this.client.Download(ctx, url.URL{})
+
+	this.So(err, should.Equal, context.Canceled)
+	this.So(this.fakeClient.downloadAttempts, should.Equal, 1)
+}
+
+func (this *RetryFixture) TestWaitContextWaitsForTheDelay() {
+	this.So(waitContext(context.Background(), time.Millisecond), should.BeNil)
 }
 
 func (this *RetryFixture) TestUploadNoRetryOnRegularErrors() {
@@ -114,6 +140,7 @@ var (
 type FakeClient struct {
 	uploadRequest  contracts.UploadRequest
 	uploadAttempts int
+	uploadBodies   []string
 
 	downloadRequest  url.URL
 	downloadContent  string
@@ -143,5 +170,9 @@ func (this *FakeClient) Size(_ context.Context, request url.URL) (int64, error) 
 func (this *FakeClient) Upload(_ context.Context, request contracts.UploadRequest) error {
 	this.uploadRequest = request
 	this.uploadAttempts++
+	if request.Body != nil {
+		raw, _ := io.ReadAll(request.Body)
+		this.uploadBodies = append(this.uploadBodies, string(raw))
+	}
 	return this.error
 }

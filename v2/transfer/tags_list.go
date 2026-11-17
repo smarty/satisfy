@@ -11,7 +11,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/smarty/gcs"
 
@@ -104,7 +103,7 @@ func NewTagsListApp(config TagsListConfig) *TagsListApp {
 
 func (this *TagsListApp) Run(ctx context.Context) error {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
-	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
+	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 
 	dependency := contracts.Dependency{
 		PackageName:   this.config.PackageName,

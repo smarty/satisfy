@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
@@ -19,7 +18,7 @@ type CheckApp struct {
 
 func NewCheckApp(config contracts.UploadConfig) *CheckApp {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusOK})
-	return &CheckApp{config: config, client: core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)}
+	return &CheckApp{config: config, client: core.NewRetryClient(gcsClient, config.MaxRetry, core.DefaultRetryDelay)}
 }
 
 // Run returns contracts.ErrPackageExists when the package version described by

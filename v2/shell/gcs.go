@@ -45,7 +45,7 @@ func (this *GoogleCloudStorageClient) do(request *http.Request) (*http.Response,
 
 func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request contracts.UploadRequest) error {
 	gcsRequest, err := this.newRequest(ctx, "PUT", request.RemoteAddress,
-		gcs.PutWithContent(request.Body),
+		gcs.PutWithContent(withoutClose{Reader: request.Body}),
 		gcs.PutWithContentLength(request.Size),
 		gcs.PutWithContentMD5(request.Checksum),
 		gcs.PutWithContentType(request.ContentType),
@@ -134,3 +134,8 @@ func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
 func (this *GoogleCloudStorageClient) isExpectedStatus(statusCode int) bool {
 	return slices.Contains(this.expectedStatus, statusCode)
 }
+
+// withoutClose hides any Close method on an upload body: net/http closes
+// request bodies after sending, which would prevent the body from being
+// rewound and sent again on retry.
+type withoutClose struct{ io.Reader }

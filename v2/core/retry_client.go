@@ -11,80 +11,90 @@ import (
 	"github.com/smarty/satisfy/v2/contracts"
 )
 
+// DefaultRetryDelay is the pause between attempts of a retryable operation.
+const DefaultRetryDelay = 3 * time.Second
+
+// RetryClient retries operations that fail with contracts.ErrRetryable, up to
+// maxRetry additional attempts, pausing between attempts. A cancelled context
+// stops the retries.
 type RetryClient struct {
 	inner    contracts.RemoteStorage
 	maxRetry int
-	sleep    func(duration time.Duration)
+	delay    time.Duration
+	wait     func(ctx context.Context, delay time.Duration) error
 }
 
-func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, sleep func(duration time.Duration)) *RetryClient {
-	return &RetryClient{inner: inner, maxRetry: maxRetry, sleep: sleep}
+func NewRetryClient(inner contracts.RemoteStorage, maxRetry int, delay time.Duration) *RetryClient {
+	return &RetryClient{inner: inner, maxRetry: maxRetry, delay: delay, wait: waitContext}
 }
 
-func (this *RetryClient) Upload(ctx context.Context, request contracts.UploadRequest) (err error) {
-	for x := 0; x <= this.maxRetry; x++ {
-		err = this.inner.Upload(ctx, request)
-		if err == nil {
-			return nil
+func (this *RetryClient) Upload(ctx context.Context, request contracts.UploadRequest) error {
+	return this.retry(ctx, "upload", func() error {
+		if request.Body != nil {
+			if _, err := request.Body.Seek(0, io.SeekStart); err != nil {
+				return err
+			}
 		}
-		if !errors.Is(err, contracts.ErrRetryable) {
+		return this.inner.Upload(ctx, request)
+	})
+}
+
+func (this *RetryClient) Download(ctx context.Context, address url.URL) (body io.ReadCloser, err error) {
+	err = this.retry(ctx, "download", func() (err error) {
+		body, err = this.inner.Download(ctx, address)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func (this *RetryClient) Seek(ctx context.Context, address url.URL, start, end int64) (body io.ReadCloser, err error) {
+	err = this.retry(ctx, "seek", func() (err error) {
+		body, err = this.inner.Seek(ctx, address, start, end)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func (this *RetryClient) Size(ctx context.Context, address url.URL) (size int64, err error) {
+	err = this.retry(ctx, "size", func() (err error) {
+		size, err = this.inner.Size(ctx, address)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+func (this *RetryClient) retry(ctx context.Context, operation string, attempt func() error) (err error) {
+	for x := 0; x <= this.maxRetry; x++ {
+		err = attempt()
+		if err == nil || !errors.Is(err, contracts.ErrRetryable) {
 			return err
 		}
 		if x < this.maxRetry {
-			log.Printf("[WARN] upload failed; retry imminent: %v", err)
-			this.sleep(time.Second * 3)
+			log.Printf("[WARN] %s failed; retry imminent: %v", operation, err)
+			if waitErr := this.wait(ctx, this.delay); waitErr != nil {
+				return waitErr
+			}
 		}
 	}
 	return err
 }
 
-func (this *RetryClient) Download(ctx context.Context, request url.URL) (body io.ReadCloser, err error) {
-	for x := 0; x <= this.maxRetry; x++ {
-		body, err = this.inner.Download(ctx, request)
-		if err == nil {
-			return body, nil
-		}
-		if !errors.Is(err, contracts.ErrRetryable) {
-			return nil, err
-		}
-		if x < this.maxRetry {
-			log.Println("[WARN] download failed, retry imminent.")
-			this.sleep(time.Second * 3)
-		}
+func waitContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
-	return nil, err
-}
-
-func (this *RetryClient) Seek(ctx context.Context, request url.URL, start, end int64) (body io.ReadCloser, err error) {
-	for x := 0; x <= this.maxRetry; x++ {
-		body, err = this.inner.Seek(ctx, request, start, end)
-		if err == nil {
-			return body, nil
-		}
-		if !errors.Is(err, contracts.ErrRetryable) {
-			return nil, err
-		}
-		if x < this.maxRetry {
-			log.Println("[WARN] seek failed, retry imminent.")
-			this.sleep(time.Second * 3)
-		}
-	}
-	return nil, err
-}
-
-func (this *RetryClient) Size(ctx context.Context, request url.URL) (size int64, err error) {
-	for x := 0; x <= this.maxRetry; x++ {
-		size, err = this.inner.Size(ctx, request)
-		if err == nil {
-			return size, nil
-		}
-		if !errors.Is(err, contracts.ErrRetryable) {
-			return 0, err
-		}
-		if x < this.maxRetry {
-			log.Println("[WARN] size failed, retry imminent.")
-			this.sleep(time.Second * 3)
-		}
-	}
-	return 0, err
 }

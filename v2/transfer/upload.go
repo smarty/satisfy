@@ -129,7 +129,7 @@ func (this *UploadApp) uploadArchive(ctx context.Context) error {
 	defer func() { _ = file.Close() }()
 	return this.client.Upload(ctx, contracts.UploadRequest{
 		RemoteAddress: this.packageConfig.ComposeRemoteAddress(contracts.RemoteArchiveFilename),
-		Body:          NewFileWrapper(file),
+		Body:          file,
 		Size:          int64(this.manifest.Archive.Size),
 		ContentType:   contentType[this.manifest.Archive.CompressionAlgorithm],
 		Checksum:      this.manifest.Archive.MD5Checksum,
@@ -215,7 +215,7 @@ func (this *UploadApp) uploadManifest(ctx context.Context, manifest contracts.Ma
 
 func (this *UploadApp) buildRemoteStorageClient() {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
-	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
+	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 }
 
 func (this *UploadApp) completeManifest() error {
