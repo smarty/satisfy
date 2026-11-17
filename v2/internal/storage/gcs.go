@@ -70,10 +70,7 @@ func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request model.
 	_, _ = io.Copy(io.Discard, response.Body)
 
 	if !this.isExpectedStatus(response.StatusCode) {
-		if this.isSafeRetryStatus(response.StatusCode) {
-			return fmt.Errorf("http error: %d (%w)", response.StatusCode, model.ErrRetryable)
-		}
-		return model.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
+		return this.statusError(response.StatusCode, request.RemoteAddress)
 	}
 	return nil
 }
@@ -103,7 +100,7 @@ func (this *GoogleCloudStorageClient) body(request *http.Request, address url.UR
 	if !this.isExpectedStatus(response.StatusCode) {
 		_, _ = io.Copy(io.Discard, response.Body)
 		_ = response.Body.Close()
-		return nil, model.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
+		return nil, this.statusError(response.StatusCode, address)
 	}
 	if generation, err := strconv.ParseInt(response.Header.Get("x-goog-generation"), 10, 64); err == nil {
 		return generationBody{ReadCloser: response.Body, generation: generation}, nil
@@ -131,15 +128,34 @@ func (this *GoogleCloudStorageClient) Size(ctx context.Context, address url.URL)
 	}
 	_ = response.Body.Close()
 	if !this.isExpectedStatus(response.StatusCode) {
-		return 0, model.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
+		return 0, this.statusError(response.StatusCode, address)
 	}
 	return response.ContentLength, nil
 }
 
+// statusError reports an unexpected status, marking it retryable when sending
+// the same request again may succeed. A 401 is retryable only when the
+// credentials can be read again (they may have expired).
+func (this *GoogleCloudStorageClient) statusError(statusCode int, address url.URL) error {
+	err := model.NewStatusCodeError(statusCode, this.expectedStatus, address)
+	if statusCode == http.StatusUnauthorized {
+		invalidator, ok := this.credentials.(interface{ Invalidate() })
+		if !ok {
+			return err
+		}
+		invalidator.Invalidate()
+		return fmt.Errorf("%w (%w)", err, model.ErrRetryable)
+	}
+	if this.isSafeRetryStatus(statusCode) {
+		return fmt.Errorf("%w (%w)", err, model.ErrRetryable)
+	}
+	return err
+}
+
 func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
 	switch statusCode {
-	case http.StatusUnauthorized,
-		http.StatusRequestTimeout,
+	case http.StatusRequestTimeout,
+		http.StatusTooManyRequests,
 		http.StatusInternalServerError,
 		http.StatusBadGateway,
 		http.StatusServiceUnavailable,

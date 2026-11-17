@@ -65,3 +65,11 @@ func (this *RefreshingCredentials) Credentials(ctx context.Context) (gcs.Credent
 	this.current, this.readAt, this.loaded = credentials, now, true
 	return credentials, nil
 }
+
+// Invalidate discards the current credentials, so that the next request reads
+// them again (for example, after the server rejected them as expired).
+func (this *RefreshingCredentials) Invalidate() {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	this.loaded = false
+}

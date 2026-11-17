@@ -75,6 +75,53 @@ func (this *GoogleCloudStorageClientFixture) TestDownloadReportsObjectGeneration
 	this.So(generational.Generation(), should.Equal, int64(1700000000000001))
 }
 
+func (this *GoogleCloudStorageClientFixture) TestServerErrorsAreRetryableForEveryOperation() {
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable} {
+		this.transport.status = status
+
+		_, downloadErr := this.client.Download(context.Background(), this.address)
+		_, seekErr := this.client.Seek(context.Background(), this.address, 0, 1)
+		_, sizeErr := this.client.Size(context.Background(), this.address)
+		uploadErr := this.upload(nil)
+
+		for _, err := range []error{downloadErr, seekErr, sizeErr, uploadErr} {
+			this.So(errors.Is(err, model.ErrRetryable), should.BeTrue)
+			statusErr, ok := errors.AsType[*model.StatusCodeError](err)
+			this.So(ok, should.BeTrue)
+			this.So(statusErr.StatusCode(), should.Equal, status)
+		}
+	}
+}
+
+func (this *GoogleCloudStorageClientFixture) TestNotFoundIsNotRetryable() {
+	this.transport.status = http.StatusNotFound
+	_, err := this.client.Download(context.Background(), this.address)
+	this.So(errors.Is(err, model.ErrNotFound), should.BeTrue)
+	this.So(errors.Is(err, model.ErrRetryable), should.BeFalse)
+}
+
+func (this *GoogleCloudStorageClientFixture) TestUnauthorizedWithFixedCredentialsIsNotRetryable() {
+	this.transport.status = http.StatusUnauthorized
+	_, err := this.client.Download(context.Background(), this.address)
+	this.So(errors.Is(err, model.ErrRetryable), should.BeFalse)
+}
+
+func (this *GoogleCloudStorageClientFixture) TestUnauthorizedRereadsRefreshableCredentials() {
+	reader := &fakeCredentialsReader{}
+	this.client = NewGoogleCloudStorageClient(&http.Client{Transport: this.transport},
+		NewRefreshingCredentials(reader, "", DefaultCredentialsMaxAge), []int{http.StatusOK})
+	this.transport.status = http.StatusUnauthorized
+
+	_, err := this.client.Download(context.Background(), this.address)
+	this.So(errors.Is(err, model.ErrRetryable), should.BeTrue)
+
+	this.transport.status = http.StatusOK
+	_, err = this.client.Download(context.Background(), this.address)
+	this.So(err, should.BeNil)
+	this.So(reader.values, should.HaveLength, 2) // read again after the 401
+	this.So(this.transport.request.Header.Get("Authorization"), should.Equal, "Bearer 2")
+}
+
 func (this *GoogleCloudStorageClientFixture) TestTransportErrorsAreRetryableAndInspectable() {
 	this.transport.err = &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}
 
