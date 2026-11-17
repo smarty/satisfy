@@ -50,7 +50,11 @@ func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url
 	return prefix
 }
 
-var RetryErr = errors.New("retry")
+var ErrRetryable = errors.New("retry")
+
+// ErrPackageExists indicates that the package version being uploaded is
+// already present on remote storage.
+var ErrPackageExists = errors.New("package already exists on remote storage")
 
 func IsNotFound(err error) bool {
 	statusError, ok := errors.AsType[*StatusCodeError](err)

@@ -26,7 +26,7 @@ func (this *RetryClient) Upload(request contracts.UploadRequest) (err error) {
 		if err == nil {
 			return nil
 		}
-		if !errors.Is(err, contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetryable) {
 			return err
 		}
 		if x < this.maxRetry {
@@ -43,7 +43,7 @@ func (this *RetryClient) Download(request url.URL) (body io.ReadCloser, err erro
 		if err == nil {
 			return body, nil
 		}
-		if !errors.Is(err, contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetryable) {
 			return nil, err
 		}
 		if x < this.maxRetry {
@@ -60,7 +60,7 @@ func (this *RetryClient) Seek(request url.URL, start, end int64) (body io.ReadCl
 		if err == nil {
 			return body, nil
 		}
-		if !errors.Is(err, contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetryable) {
 			return nil, err
 		}
 		if x < this.maxRetry {
@@ -77,7 +77,7 @@ func (this *RetryClient) Size(request url.URL) (size int64, err error) {
 		if err == nil {
 			return size, nil
 		}
-		if !errors.Is(err, contracts.RetryErr) {
+		if !errors.Is(err, contracts.ErrRetryable) {
 			return 0, err
 		}
 		if x < this.maxRetry {

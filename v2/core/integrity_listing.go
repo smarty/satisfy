@@ -24,6 +24,9 @@ func (this *FileListingIntegrityChecker) Verify(manifest contracts.Manifest, loc
 		if os.IsNotExist(err) {
 			return fmt.Errorf("filename not found for \"%s\"", fullPath)
 		}
+		if err != nil {
+			return err
+		}
 		if item.Size != fileInfo.Size() {
 			return fmt.Errorf("file size mismatch for \"%s\"(expected: [%d], actual: [%d])", fullPath, item.Size, fileInfo.Size())
 		}

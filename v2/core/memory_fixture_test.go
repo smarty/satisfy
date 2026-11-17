@@ -30,9 +30,9 @@ func (this *MemoryFixture) TestWriteFileReadFile() {
 func (this *MemoryFixture) TestSizeIsExhastingBuffer() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
 	buffer := &bytes.Buffer{}
-	reader := this.fileSystem.Open("/file.txt")
+	reader, _ := this.fileSystem.Open("/file.txt")
 	_, _ = io.Copy(buffer, reader)
-	this.So(this.fileSystem.Listing()[0].Size(), should.Equal, len([]byte("Hello World")))
+	this.So(this.fileSystem.listing()[0].Size(), should.Equal, len([]byte("Hello World")))
 }
 
 func (this *MemoryFixture) TestReadFileNonExistingFile() {
@@ -41,13 +41,13 @@ func (this *MemoryFixture) TestReadFileNonExistingFile() {
 
 func (this *MemoryFixture) TestOpenWrittenFile() {
 	this.fileSystem.WriteFile("/file.txt", []byte("Hello World"))
-	reader := this.fileSystem.Open("/file.txt")
+	reader, _ := this.fileSystem.Open("/file.txt")
 	raw, _ := io.ReadAll(reader)
 	this.So(raw, should.Resemble, []byte("Hello World"))
 }
 
 func (this *MemoryFixture) TestCreate() {
-	writer := this.fileSystem.Create("/file.txt")
+	writer, _ := this.fileSystem.Create("/file.txt")
 	_, _ = writer.Write([]byte("Hello World"))
 	_ = writer.Close()
 	this.So(this.fileSystem.readFile("/file.txt"), should.Resemble, []byte("Hello World"))
@@ -58,7 +58,7 @@ func (this *MemoryFixture) TestListing() {
 	this.fileSystem.WriteFile("file1.txt", []byte("1"))
 	this.fileSystem.WriteFile("sub/file0.txt", []byte("12"))
 
-	fileInfo := this.fileSystem.Listing()
+	fileInfo := this.fileSystem.listing()
 
 	this.So(fileInfo, should.HaveLength, 3)
 	this.So(fileInfo[0].Path(), should.Equal, "file0.txt")
@@ -74,7 +74,7 @@ func (this *MemoryFixture) TestDelete() {
 
 	this.fileSystem.Delete("/file.txt")
 
-	this.So(this.fileSystem.Listing(), should.BeEmpty)
+	this.So(this.fileSystem.listing(), should.BeEmpty)
 }
 
 func (this *MemoryFixture) TestCreateSymlink() {
@@ -82,6 +82,6 @@ func (this *MemoryFixture) TestCreateSymlink() {
 
 	this.fileSystem.CreateSymlink("/source.txt", "/target.txt")
 
-	this.So(this.fileSystem.Listing(), should.HaveLength, 2)
+	this.So(this.fileSystem.listing(), should.HaveLength, 2)
 	this.So(this.fileSystem.readFile("/target.txt"), should.Resemble, []byte("Hello World"))
 }

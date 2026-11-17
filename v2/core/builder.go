@@ -28,6 +28,7 @@ type DirectoryPackageBuilder struct {
 	archive      contracts.ArchiveWriter
 	hasher       hash.Hash
 	contents     []contracts.ArchiveItem
+	listing      []contracts.FileInfo
 	showProgress bool
 }
 
@@ -41,14 +42,19 @@ func NewDirectoryPackageBuilder(storage DirectoryPackageBuilderFileSystem, archi
 }
 
 func (this *DirectoryPackageBuilder) Build() error {
-	if fileInfo, ok := this.fileOnly(); ok == true {
-		err := this.add(fileInfo, true)
+	listing, err := this.storage.Listing()
+	if err != nil {
+		return err
+	}
+	this.listing = listing
+	if fileInfo, ok := this.fileOnly(); ok {
+		err = this.add(fileInfo, true)
 		if err != nil {
 			return err
 		}
 	} else {
-		for _, file := range this.storage.Listing() {
-			err := this.add(file, false)
+		for _, file := range listing {
+			err = this.add(file, false)
 			if err != nil {
 				return err
 			}
@@ -63,7 +69,10 @@ func (this *DirectoryPackageBuilder) add(file contracts.FileInfo, fileOnly bool)
 	if err != nil {
 		return err
 	}
-	this.archive.WriteHeader(header)
+	err = this.archive.WriteHeader(header)
+	if err != nil {
+		return err
+	}
 	err = this.archiveContents(file, header.LinkName)
 	if err != nil {
 		return err
@@ -90,17 +99,19 @@ func (this *DirectoryPackageBuilder) archiveContents(file contracts.FileInfo, sy
 		fmt.Printf("\n")
 	}()
 	defer closeResource(progressWriter)
-	reader := this.storage.Open(file.Path())
+	reader, err := this.storage.Open(file.Path())
+	if err != nil {
+		return err
+	}
 	defer closeResource(reader)
 	// Hashing runs on its own goroutine so it overlaps with archiving and
-	// compression. It starts only after Open (which may panic) succeeds, and the
+	// compression. It starts only after Open succeeds, and the
 	// deferred Close both stops the goroutine and finishes hashing before
 	// buildManifestEntry reads the sum.
 	hasher := NewAsyncHashWriter(this.hasher)
 	defer closeResource(hasher)
 	writer := io.MultiWriter(hasher, this.archive, progressWriter)
-	_, err := io.Copy(writer, reader)
-
+	_, err = io.Copy(writer, reader)
 	return err
 }
 
@@ -145,7 +156,7 @@ func (this *DirectoryPackageBuilder) symlinkOutOfBoundError(file contracts.FileI
 func (this *DirectoryPackageBuilder) buildManifestEntry(file contracts.FileInfo, symlinkSourcePath string) contracts.ArchiveItem {
 	defer this.hasher.Reset()
 	var path string
-	if _, ok := this.fileOnly(); ok == true {
+	if _, ok := this.fileOnly(); ok {
 		path = filepath.Base(file.Path())
 	} else {
 		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
@@ -181,10 +192,8 @@ func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {
 }
 
 func (this *DirectoryPackageBuilder) fileOnly() (contracts.FileInfo, bool) {
-	if len(this.storage.Listing()) == 1 {
-		if this.storage.Listing()[0].Mode().IsRegular() {
-			return this.storage.Listing()[0], true
-		}
+	if len(this.listing) == 1 && this.listing[0].Mode().IsRegular() {
+		return this.listing[0], true
 	}
 	return nil, false
 }

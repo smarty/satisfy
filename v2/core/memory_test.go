@@ -18,6 +18,9 @@ type inMemoryFileSystem struct {
 	Root         string
 	errReadFile  map[string]error
 	errChmodFile map[string]error
+	errOpen      map[string]error
+	errCreate    map[string]error
+	errListing   error
 }
 
 func newInMemoryFileSystem() *inMemoryFileSystem {
@@ -25,6 +28,8 @@ func newInMemoryFileSystem() *inMemoryFileSystem {
 		fileSystem:   make(map[string]*file),
 		errReadFile:  make(map[string]error),
 		errChmodFile: make(map[string]error),
+		errOpen:      make(map[string]error),
+		errCreate:    make(map[string]error),
 	}
 }
 
@@ -42,22 +47,37 @@ func (this *inMemoryFileSystem) Stat(path string) (contracts.FileInfo, error) {
 	}
 }
 
-func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo) {
+func (this *inMemoryFileSystem) Listing() (files []contracts.FileInfo, err error) {
 	for _, file := range this.fileSystem {
 		files = append(files, file)
 	}
 
 	slices.SortFunc(files, func(a, b contracts.FileInfo) int { return strings.Compare(a.Path(), b.Path()) })
+	return files, this.errListing
+}
+
+func (this *inMemoryFileSystem) listing() []contracts.FileInfo {
+	files, _ := this.Listing()
 	return files
 }
 
-func (this *inMemoryFileSystem) Open(path string) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader(this.fileSystem[path].contents))
+func (this *inMemoryFileSystem) Open(path string) (io.ReadCloser, error) {
+	if err := this.errOpen[path]; err != nil {
+		return nil, err
+	}
+	file, found := this.fileSystem[path]
+	if !found {
+		return nil, os.ErrNotExist
+	}
+	return io.NopCloser(bytes.NewReader(file.contents)), nil
 }
 
-func (this *inMemoryFileSystem) Create(path string) io.WriteCloser {
-	this.WriteFile(path, nil)
-	return this.fileSystem[path]
+func (this *inMemoryFileSystem) Create(path string) (io.WriteCloser, error) {
+	if err := this.errCreate[path]; err != nil {
+		return nil, err
+	}
+	_ = this.WriteFile(path, nil)
+	return this.fileSystem[path], nil
 }
 
 func (this *inMemoryFileSystem) readFile(path string) []byte {
@@ -93,13 +113,14 @@ func (this *inMemoryFileSystem) resolveSymlink(target *file) *file {
 	return nil
 }
 
-func (this *inMemoryFileSystem) WriteFile(path string, content []byte) {
+func (this *inMemoryFileSystem) WriteFile(path string, content []byte) error {
 	this.fileSystem[path] = &file{
 		path:     path,
 		contents: content,
 		mod:      InMemoryModTime,
 		mode:     os.FileMode(0),
 	}
+	return nil
 }
 
 func (this *inMemoryFileSystem) WriteDirectory(path string) {
@@ -110,18 +131,22 @@ func (this *inMemoryFileSystem) WriteDirectory(path string) {
 	}
 }
 
-func (this *inMemoryFileSystem) CreateSymlink(source, target string) {
+func (this *inMemoryFileSystem) CreateSymlink(source, target string) error {
 	this.fileSystem[target] = &file{
 		path:     target,
 		contents: nil,
 		mod:      InMemoryModTime,
 		symlink:  source,
 	}
+	return nil
 }
 
-func (this *inMemoryFileSystem) Delete(path string) {
-	this.fileSystem[path] = nil
+func (this *inMemoryFileSystem) Delete(path string) error {
+	if _, found := this.fileSystem[path]; !found {
+		return os.ErrNotExist
+	}
 	delete(this.fileSystem, path)
+	return nil
 }
 
 func (this *inMemoryFileSystem) RootPath() string {

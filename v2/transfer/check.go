@@ -1,9 +1,9 @@
 package transfer
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/smarty/satisfy/v2/contracts"
@@ -13,37 +13,29 @@ import (
 
 type CheckApp struct {
 	config contracts.UploadConfig
+	client contracts.Downloader
 }
 
 func NewCheckApp(config contracts.UploadConfig) *CheckApp {
-	return &CheckApp{config: config}
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusOK})
+	return &CheckApp{config: config, client: core.NewRetryClient(gcsClient, config.MaxRetry, time.Sleep)}
 }
 
-func (this *CheckApp) Run() {
+// Run returns contracts.ErrPackageExists when the package version described by
+// the configuration is already present on remote storage (unless overwriting).
+func (this *CheckApp) Run() error {
 	if this.config.Overwrite {
 		log.Println("[INFO] Overwrite mode enabled, skipping remote manifest check.")
-		return
+		return nil
 	}
 
-	client := this.buildRemoteStorageClient()
 	address := this.config.PackageConfig.ComposeRemoteAddress(contracts.RemoteManifestFilename)
-	body, err := client.Download(address)
-	if err == nil {
-		defer func() { _ = body.Close() }()
-		return
+	_, err := this.client.Size(address)
+	if contracts.IsNotFound(err) {
+		return nil
 	}
-
-	statusError, ok := err.(*contracts.StatusCodeError)
-	if ok && statusError.StatusCode() == http.StatusOK {
-		log.Println("[INFO] Package already exists on remote storage.")
-		os.Exit(2)
+	if err != nil {
+		return fmt.Errorf("sanity check failed: %w", err)
 	}
-
-	log.Fatalln("[WARN] Sanity check failed:", err)
-}
-
-func (this *CheckApp) buildRemoteStorageClient() contracts.Downloader {
-	client := shell.NewHTTPClient()
-	gcsClient := shell.NewGoogleCloudStorageClient(client, this.config.GoogleCredentials, []int{http.StatusNotFound})
-	return core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
+	return contracts.ErrPackageExists
 }

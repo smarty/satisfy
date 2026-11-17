@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/url"
 	"os"
@@ -83,7 +84,10 @@ func (this *PackageInstaller) InstallManifest(request contracts.InstallationRequ
 	if err != nil {
 		return contracts.Manifest{}, err
 	}
-	this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest)
+	err = this.filesystem.WriteFile(ComposeManifestPath(request.LocalPath, manifest.Name), rawManifest)
+	if err != nil {
+		return contracts.Manifest{}, err
+	}
 	return manifest, nil
 }
 
@@ -106,13 +110,12 @@ func (this *PackageInstaller) InstallPackage(manifest contracts.Manifest, reques
 	}
 	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
 	if err != nil {
-		this.revertFileSystem(paths)
-		return err
+		return errors.Join(err, this.revertFileSystem(paths))
 	}
 	actualChecksum := checksumReader.Sum(nil)
-	if bytes.Compare(actualChecksum, manifest.Archive.MD5Checksum) != 0 {
-		this.revertFileSystem(paths)
-		return fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)
+	if !bytes.Equal(actualChecksum, manifest.Archive.MD5Checksum) {
+		err = fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)
+		return errors.Join(err, this.revertFileSystem(paths))
 	}
 
 	return nil
@@ -145,9 +148,14 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			i+1, itemCount, header.Name, byteCountToString(header.Size), pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
-			this.filesystem.CreateSymlink(header.Linkname, pathItem)
+			if err = this.filesystem.CreateSymlink(header.Linkname, pathItem); err != nil {
+				return paths, err
+			}
 		} else {
-			writer := this.filesystem.Create(pathItem)
+			writer, err := this.filesystem.Create(pathItem)
+			if err != nil {
+				return paths, err
+			}
 			progressReader := archive_progress.NewArchiveProgressCounter(header.Size, func(archived, total string, done bool) {
 				if this.showProgress {
 					if done {
@@ -159,7 +167,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			})
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
-			_ = writer.Close()
+			err = errors.Join(err, writer.Close())
 			_ = progressReader.Close()
 			if err != nil {
 				return paths, err
@@ -167,8 +175,7 @@ func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request
 			if !contracts.IsExecutable(os.FileMode(header.Mode)) {
 				continue
 			}
-			err := this.filesystem.Chmod(pathItem, 0755)
-			if err != nil {
+			if err = this.filesystem.Chmod(pathItem, 0755); err != nil {
 				return paths, err
 			}
 		}
@@ -192,10 +199,18 @@ func byteCountToString(size int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
-func (this *PackageInstaller) revertFileSystem(paths []string) {
+func (this *PackageInstaller) revertFileSystem(paths []string) (err error) {
 	for _, path := range paths {
-		this.filesystem.Delete(path)
+		err = errors.Join(err, ignoreNotExist(this.filesystem.Delete(path)))
 	}
+	return err
+}
+
+func ignoreNotExist(err error) error {
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 func ComposeManifestPath(localPath, packageName string) string {
@@ -220,7 +235,7 @@ func newZStdReader(source io.Reader, _ bool) (io.ReadCloser, error) {
 	}
 }
 func newZipReader(source io.Reader, showProgress bool) (io.ReadCloser, error) {
-	return shell.NewZipArchiveReader(source, showProgress), nil
+	return shell.NewZipArchiveReader(source, showProgress)
 }
 func newGZipReader(source io.Reader, _ bool) (io.ReadCloser, error) {
 	return gzip.NewReader(source)

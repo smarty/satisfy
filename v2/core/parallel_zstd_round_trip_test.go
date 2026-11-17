@@ -79,7 +79,7 @@ func (this *ParallelZstdRoundTripFixture) TestCorruptedFrameFailsInstallAndRever
 	err := this.install(archive, manifest)
 
 	this.So(err, should.NotBeNil)
-	this.So(this.destination.Listing(), should.BeEmpty)
+	this.So(this.destination.listing(), should.BeEmpty)
 }
 
 // upload mirrors UploadApp.buildArchiveAndManifestContents.

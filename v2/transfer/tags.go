@@ -24,13 +24,7 @@ func NewTagsApp(config contracts.TagsConfig) *TagsApp {
 	return &TagsApp{config: config}
 }
 
-func (this *TagsApp) Run() {
-	if err := this.TryRun(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *TagsApp) TryRun() error {
+func (this *TagsApp) Run() error {
 	this.buildRemoteStorageClient()
 	modification := this.config.Modification
 

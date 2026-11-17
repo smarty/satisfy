@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"os"
 
@@ -119,20 +118,21 @@ func (this *ZipArchiveReader) ReadAt(p []byte, off int64) (int, error) {
 func (this *ZipArchiveReader) Close() error {
 	if this.file != nil {
 		name := this.file.Name()
-		err := this.file.Close()
-		if err != nil {
-			return err
+		closeErr := this.file.Close()
+		if errors.Is(closeErr, os.ErrClosed) {
+			closeErr = nil
 		}
-		return os.Remove(name)
+		return errors.Join(closeErr, os.Remove(name))
 	}
 	return nil
 }
 
-func NewZipArchiveReader(reader io.Reader, showProgress bool) io.ReadCloser {
+func NewZipArchiveReader(reader io.Reader, showProgress bool) (io.ReadCloser, error) {
 	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, showProgress: showProgress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
-		log.Fatalf("failed to download zip archive: %s", err)
+		_ = zipArchiveReader.Close()
+		return nil, fmt.Errorf("failed to download zip archive: %w", err)
 	}
-	return zipArchiveReader
+	return zipArchiveReader, nil
 }

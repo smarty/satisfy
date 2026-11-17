@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"slices"
@@ -103,13 +102,7 @@ func NewTagsListApp(config TagsListConfig) *TagsListApp {
 	return &TagsListApp{config: config, output: os.Stdout}
 }
 
-func (this *TagsListApp) Run() {
-	if err := this.TryRun(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *TagsListApp) TryRun() error {
+func (this *TagsListApp) Run() error {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
 	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 

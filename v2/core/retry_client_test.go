@@ -104,7 +104,7 @@ func (this *RetryFixture) TestDownloadNoRetryOnRegularErrors() {
 }
 
 var (
-	aRetryError   = fmt.Errorf("this is a retry error %w", contracts.RetryErr)
+	aRetryError   = fmt.Errorf("this is a retry error %w", contracts.ErrRetryable)
 	aRegularError = errors.New("this is a regular error")
 )
 

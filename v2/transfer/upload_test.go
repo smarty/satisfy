@@ -68,7 +68,8 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 	payload := archivePayload()
 	hasher := md5.New()
 	buffer := bytes.NewBuffer(nil)
-	compressor := compression[algorithm](io.MultiWriter(hasher, buffer), level)
+	compressor, err := newCompressor(algorithm, level, io.MultiWriter(hasher, buffer))
+	this.So(err, should.BeNil)
 	archive := shell.NewSwitchArchiveWriter(compressor)
 
 	archive.WriteHeader(contracts.ArchiveHeader{
@@ -76,7 +77,7 @@ func (this *UploadCompressionFixture) assertArchiveRoundTrip(algorithm string, l
 		Size:    int64(len("Hello World")),
 		ModTime: archiveModTime,
 	})
-	_, err := archive.Write([]byte("Hello World"))
+	_, err = archive.Write([]byte("Hello World"))
 	this.So(err, should.BeNil)
 	archive.WriteHeader(contracts.ArchiveHeader{
 		Name:       "bin/tool",
@@ -164,4 +165,10 @@ func (this *fakeArchiveDownloader) Seek(_ url.URL, start, end int64) (io.ReadClo
 
 func (this *fakeArchiveDownloader) Size(url.URL) (int64, error) {
 	return int64(len(this.body)), nil
+}
+
+func (this *UploadCompressionFixture) TestUnsupportedCompressionAlgorithmIsAnError() {
+	compressor, err := newCompressor("lzma", 1, io.Discard)
+	this.So(compressor, should.BeNil)
+	this.So(err, should.NotBeNil)
 }

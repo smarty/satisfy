@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -94,13 +93,7 @@ func NewLatestApp(config LatestConfig) *LatestApp {
 	return &LatestApp{config: config}
 }
 
-func (this *LatestApp) Run() {
-	if err := this.TryRun(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *LatestApp) TryRun() error {
+func (this *LatestApp) Run() error {
 	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
 	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, time.Sleep)
 

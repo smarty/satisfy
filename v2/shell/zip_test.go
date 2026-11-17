@@ -3,10 +3,12 @@ package shell
 import (
 	"bytes"
 	"compress/flate"
+	"errors"
 	"io"
 	"os"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/smarty/assertions/should"
@@ -29,7 +31,7 @@ func (this *ZipArchiveFixture) Setup() {
 
 func (this *ZipArchiveFixture) TestWrittenArchiveCanBeReadBack() {
 	this.writeArchive(flate.BestCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
 	defer func() { _ = reader.Close() }()
 
 	for _, entry := range zipFixtureEntries {
@@ -55,7 +57,7 @@ func (this *ZipArchiveFixture) TestWrittenArchiveCanBeReadBack() {
 
 func (this *ZipArchiveFixture) TestCloseRemovesTemporaryArchiveFile() {
 	this.writeArchive(flate.DefaultCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
 	tempName := reader.file.Name()
 
 	_, statErr := os.Stat(tempName)
@@ -71,7 +73,7 @@ func (this *ZipArchiveFixture) TestEmptyArchiveYieldsEOF() {
 	writer := NewZipArchiveWriter(this.buffer, flate.DefaultCompression)
 	this.So(writer.Close(), should.BeNil)
 
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
 	defer func() { _ = reader.Close() }()
 
 	_, err := reader.Next()
@@ -79,7 +81,7 @@ func (this *ZipArchiveFixture) TestEmptyArchiveYieldsEOF() {
 }
 
 func (this *ZipArchiveFixture) TestMalformedArchiveReportsErrorFromNext() {
-	reader := NewZipArchiveReader(strings.NewReader("this is not a zip archive"), false).(*ZipArchiveReader)
+	reader := this.openReader(strings.NewReader("this is not a zip archive"))
 	defer func() { _ = reader.Close() }()
 
 	_, err := reader.Next()
@@ -107,7 +109,7 @@ func (this *ZipArchiveFixture) TestWriterCloseIsIdempotent() {
 	this.So(writer.Close(), should.BeNil)
 	this.So(writer.Close(), should.BeNil)
 
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
 	defer func() { _ = reader.Close() }()
 
 	header, err := reader.Next()
@@ -122,7 +124,7 @@ func (this *ZipArchiveFixture) TestWriterCloseIsIdempotent() {
 
 func (this *ZipArchiveFixture) TestReadAtServesTheDownloadedArchive() {
 	this.writeArchive(flate.DefaultCompression)
-	reader := NewZipArchiveReader(bytes.NewReader(this.buffer.Bytes()), false).(*ZipArchiveReader)
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
 	defer func() { _ = reader.Close() }()
 
 	signature := make([]byte, 4)
@@ -177,4 +179,17 @@ func buildBinaryPayload() []byte {
 		payload[i] = byte(i * 7 % 253)
 	}
 	return payload
+}
+
+func (this *ZipArchiveFixture) openReader(source io.Reader) *ZipArchiveReader {
+	reader, err := NewZipArchiveReader(source, false)
+	this.So(err, should.BeNil)
+	return reader.(*ZipArchiveReader)
+}
+
+func (this *ZipArchiveFixture) TestDownloadFailureIsReturnedAsError() {
+	failure := errors.New("connection reset")
+	reader, err := NewZipArchiveReader(iotest.ErrReader(failure), false)
+	this.So(reader, should.BeNil)
+	this.So(errors.Is(err, failure), should.BeTrue)
 }

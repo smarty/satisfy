@@ -54,7 +54,7 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 }
 
 func (this *PackageInstallerFixture) loadLocalManifest(fileName string) contracts.Manifest {
-	reader := this.filesystem.Open(fileName)
+	reader, _ := this.filesystem.Open(fileName)
 	decoder := json.NewDecoder(reader)
 	var localManifest contracts.Manifest
 	_ = decoder.Decode(&localManifest)
@@ -123,7 +123,7 @@ func (this *PackageInstallerFixture) TestInstallPackageZipChecksumMismatch() {
 	err := this.installer.InstallPackage(this.buildZipManifest([]byte("mismatch")), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageMalformedZipArchive() {
@@ -132,7 +132,7 @@ func (this *PackageInstallerFixture) TestInstallPackageMalformedZipArchive() {
 	err := this.installer.InstallPackage(this.buildZipManifest(nil), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestCompressionMethodInvalid() {
@@ -150,7 +150,7 @@ func (this *PackageInstallerFixture) TestInstallPackageInvalidArchive() {
 	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
@@ -159,7 +159,18 @@ func (this *PackageInstallerFixture) TestInstallPackageDownloadError() {
 	err := this.installer.InstallPackage(this.buildManifest(nil, gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	this.So(this.filesystem.listing(), should.BeEmpty)
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageCreateErrorRevertsExtractedFiles() {
+	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	createErr := errors.New("disk full")
+	this.filesystem.errCreate["local/path/Goodbye/World"] = createErr
+
+	err := this.installer.InstallPackage(this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+
+	this.So(errors.Is(err, createErr), should.BeTrue)
+	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
@@ -168,7 +179,7 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	err := this.installer.InstallPackage(this.buildManifest([]byte("mismatch"), gzipAlgorithm), this.installationRequest(""))
 
 	this.So(err, should.NotBeNil)
-	this.So(this.filesystem.Listing(), should.BeEmpty)
+	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
 func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) contracts.Manifest {

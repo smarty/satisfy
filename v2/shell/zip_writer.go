@@ -23,19 +23,14 @@ func NewZipArchiveWriter(writer io.Writer, level int) contracts.ArchiveWriter {
 	return &ZipArchiveWriter{inner: inner}
 }
 
-func (this *ZipArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
-	var err error
-
+func (this *ZipArchiveWriter) WriteHeader(header contracts.ArchiveHeader) (err error) {
 	this.current, err = this.inner.CreateHeader(&zip.FileHeader{
 		Name:               header.Name,
 		Modified:           header.ModTime,
 		UncompressedSize64: uint64(header.Size),
 		Method:             zip.Deflate,
 	})
-
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 func (this *ZipArchiveWriter) Write(buffer []byte) (int, error) {
 	return this.current.Write(buffer)

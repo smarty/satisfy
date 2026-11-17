@@ -44,6 +44,18 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
+func (this *DirectoryPackageBuilderFixture) TestListingErrorIsReturned() {
+	listingErr := errors.New("listing failed")
+	this.fileSystem.errListing = listingErr
+
+	this.So(this.builder.Build(), should.Equal, listingErr)
+}
+func (this *DirectoryPackageBuilderFixture) TestOpenErrorIsReturned() {
+	openErr := errors.New("open failed")
+	this.fileSystem.errOpen["/in/file1.txt"] = openErr
+
+	this.So(this.builder.Build(), should.Equal, openErr)
+}
 func (this *DirectoryPackageBuilderFixture) TestContentsAreArchived() {
 	err := this.builder.Build()
 
@@ -156,12 +168,13 @@ type FakeArchiveWriter struct {
 }
 
 func NewFakeArchiveWriter() *FakeArchiveWriter { return &FakeArchiveWriter{} }
-func (this *FakeArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
+func (this *FakeArchiveWriter) WriteHeader(header contracts.ArchiveHeader) error {
 	if this.closed {
-		return
+		return nil
 	}
 	this.current = &ArchiveItem{ArchiveHeader: header}
 	this.items = append(this.items, this.current)
+	return nil
 }
 func (this *FakeArchiveWriter) Write(p []byte) (int, error) {
 	this.current.contents = append(this.current.contents, p...)

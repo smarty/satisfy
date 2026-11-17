@@ -3,7 +3,6 @@ package shell
 import (
 	"archive/tar"
 	"io"
-	"log"
 
 	"github.com/smarty/satisfy/v2/contracts"
 )
@@ -24,7 +23,7 @@ func NewTarArchiveWriter(writer io.Writer) *TarArchiveWriter {
 	return &TarArchiveWriter{Writer: tar.NewWriter(writer)}
 }
 
-func (this *TarArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
+func (this *TarArchiveWriter) WriteHeader(header contracts.ArchiveHeader) error {
 	tarHeader := &tar.Header{
 		Name:    header.Name,
 		Size:    header.Size,
@@ -38,8 +37,5 @@ func (this *TarArchiveWriter) WriteHeader(header contracts.ArchiveHeader) {
 	if header.Executable {
 		tarHeader.Mode = 0755
 	}
-	err := this.Writer.WriteHeader(tarHeader)
-	if err != nil {
-		log.Panic(err)
-	}
+	return this.Writer.WriteHeader(tarHeader)
 }

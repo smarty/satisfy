@@ -36,7 +36,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
+		return fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
 	}
 	defer func() { _ = response.Body.Close() }()
 
@@ -44,7 +44,7 @@ func (this *GoogleCloudStorageClient) Upload(request contracts.UploadRequest) er
 
 	if this.isExpectedStatus(response.StatusCode) == false {
 		if this.isSafeRetryStatus(response.StatusCode) {
-			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.RetryErr)
+			return fmt.Errorf("http error: %d (%w)", response.StatusCode, contracts.ErrRetryable)
 		}
 		return contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
 	}
@@ -62,7 +62,7 @@ func (this *GoogleCloudStorageClient) Download(request url.URL) (io.ReadCloser, 
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
+		return nil, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
 		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
@@ -82,7 +82,7 @@ func (this *GoogleCloudStorageClient) Seek(request url.URL, start, end int64) (i
 	gcsRequest.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return nil, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
+		return nil, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
 		return nil, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)
@@ -102,7 +102,7 @@ func (this *GoogleCloudStorageClient) Size(request url.URL) (int64, error) {
 	}
 	response, err := this.client.Do(gcsRequest)
 	if err != nil {
-		return 0, fmt.Errorf("http error: %s (%w)", err, contracts.RetryErr)
+		return 0, fmt.Errorf("http error: %w (%w)", err, contracts.ErrRetryable)
 	}
 	if this.isExpectedStatus(response.StatusCode) == false {
 		return 0, contracts.NewStatusCodeError(response.StatusCode, this.expectedStatus, request)

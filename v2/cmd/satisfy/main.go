@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 	"runtime/debug"
 
+	"github.com/smarty/satisfy/v2/contracts"
 	"github.com/smarty/satisfy/v2/core"
 	"github.com/smarty/satisfy/v2/shell"
 	"github.com/smarty/satisfy/v2/transfer"
@@ -38,27 +40,22 @@ func main() {
 func uploadMain(args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
 	config, err := loader.LoadConfig("upload", args)
-	if err != nil {
-		log.Fatal(err)
-	}
-	transfer.NewUploadApp(config).Run()
+	exitOnError(err)
+	exitOnError(transfer.NewCheckApp(config).Run())
+	exitOnError(transfer.NewUploadApp(config).Run())
 }
 
 func checkMain(args []string) {
 	loader := core.NewUploadConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
 	config, err := loader.LoadConfig("check", args)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	transfer.NewCheckApp(config).Run()
+	exitOnError(err)
+	exitOnError(transfer.NewCheckApp(config).Run())
 }
 
 func downloadMain(args []string) {
 	config, err := transfer.ParseDownloadConfig(args)
-	if err != nil {
-		log.Fatal(err)
-	}
-	transfer.NewDownloadApp(config).Run()
+	exitOnError(err)
+	exitOnError(transfer.NewDownloadApp(config).Run())
 }
 
 func tagsMain(args []string) {
@@ -79,26 +76,33 @@ func tagsMain(args []string) {
 func tagsModifyMain(args []string) {
 	loader := core.NewTagsConfigLoader(shell.NewDiskFileSystem(""), shell.NewEnvironment(), os.Stdin, os.Stderr)
 	config, err := loader.LoadConfig(args)
-	if err != nil {
-		log.Fatal(err)
-	}
-	transfer.NewTagsApp(config).Run()
+	exitOnError(err)
+	exitOnError(transfer.NewTagsApp(config).Run())
 }
 
 func tagsListMain(args []string) {
 	config, err := transfer.ParseTagsListConfig(args)
-	if err != nil {
-		log.Fatal(err)
-	}
-	transfer.NewTagsListApp(config).Run()
+	exitOnError(err)
+	exitOnError(transfer.NewTagsListApp(config).Run())
 }
 
 func latestMain(args []string) {
 	config, err := transfer.ParseLatestConfig(args)
-	if err != nil {
-		log.Fatal(err)
+	exitOnError(err)
+	exitOnError(transfer.NewLatestApp(config).Run())
+}
+
+// exitOnError terminates the process for a non-nil error, using exit code 2
+// when the package being uploaded already exists and 1 otherwise.
+func exitOnError(err error) {
+	if err == nil {
+		return
 	}
-	transfer.NewLatestApp(config).Run()
+	if errors.Is(err, contracts.ErrPackageExists) {
+		log.Println("[INFO]", err)
+		os.Exit(2)
+	}
+	log.Fatal(err)
 }
 
 func versionMain() {

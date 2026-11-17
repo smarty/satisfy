@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -45,20 +46,23 @@ func (this *FileContentIntegrityCheck) Verify(manifest contracts.Manifest, local
 
 func (this *FileContentIntegrityCheck) calculateChecksum(path string) ([]byte, error) {
 	hasher := this.hasher()
-	info, _ := this.fileSystem.Stat(path)
+	info, err := this.fileSystem.Stat(path)
+	if err != nil {
+		return nil, err
+	}
 	if info.Symlink() != "" {
 		_, err := io.WriteString(hasher, info.Symlink())
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		reader := this.fileSystem.Open(path)
-		_, err := io.Copy(hasher, reader)
+		reader, err := this.fileSystem.Open(path)
 		if err != nil {
 			return nil, err
 		}
-		err = reader.Close()
-		if err != nil {
+		_, err = io.Copy(hasher, reader)
+		closeErr := reader.Close()
+		if err = errors.Join(err, closeErr); err != nil {
 			return nil, err
 		}
 	}

@@ -36,14 +36,7 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 	}
 }
 
-func (this *DownloadApp) Run() {
-	err := this.TryRun()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (this *DownloadApp) TryRun() error {
+func (this *DownloadApp) Run() error {
 	errs := runConcurrently(this.concurrency, this.listing.Listing, this.install)
 	for _, err := range errs {
 		log.Println("[WARN]", err)

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -59,7 +60,9 @@ func (this *DependencyResolver) Resolve() error {
 		return nil
 	}
 
-	this.uninstallPackage(localManifest)
+	if err = this.uninstallPackage(localManifest); err != nil {
+		return fmt.Errorf("failed to uninstall previous package contents for %s: %w", this.dependency.Title(), err)
+	}
 	return this.installPackage()
 }
 
@@ -207,10 +210,12 @@ func (this *DependencyResolver) installPackage() error {
 	return nil
 }
 
-func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) {
+func (this *DependencyResolver) uninstallPackage(manifest contracts.Manifest) (err error) {
 	for _, item := range manifest.Archive.Contents {
-		this.fileSystem.Delete(filepath.Join(this.dependency.LocalDirectory, item.Path))
+		path := filepath.Join(this.dependency.LocalDirectory, item.Path)
+		err = errors.Join(err, ignoreNotExist(this.fileSystem.Delete(path)))
 	}
+	return err
 }
 
 func (this *DependencyResolver) localManifestIsLatest(manifest contracts.Manifest) bool {

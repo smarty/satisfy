@@ -5,7 +5,7 @@ import "time"
 type ArchiveWriter interface {
 	Write([]byte) (int, error)
 	Close() error
-	WriteHeader(ArchiveHeader)
+	WriteHeader(ArchiveHeader) error
 }
 
 type ArchiveHeader struct {
