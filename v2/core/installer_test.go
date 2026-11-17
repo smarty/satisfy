@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -72,6 +73,14 @@ func (this *PackageInstallerFixture) TestInstallManifestJsonDecodingError() {
 	this.downloader.prepareMalformedDownload()
 	manifest, err := this.installer.InstallManifest(this.installationRequest(""))
 	this.So(err, should.NotBeNil)
+	this.So(manifest, should.BeZeroValue)
+}
+
+func (this *PackageInstallerFixture) TestDownloadManifestReadError() {
+	readError := errors.New("connection reset")
+	this.downloader.Body = io.NopCloser(iotest.ErrReader(readError))
+	manifest, err := this.installer.DownloadManifest(this.installationRequest("").RemoteAddress)
+	this.So(err, should.Equal, readError)
 	this.So(manifest, should.BeZeroValue)
 }
 

@@ -20,7 +20,9 @@ import (
 	"github.com/smarty/satisfy/v2/shell"
 )
 
-const ForceAccessTokenRefreshInSeconds = 1800
+// accessTokenRefreshThreshold is how long archive compression may run before the
+// bearer token is refreshed, so that the upload itself does not outlive it.
+const accessTokenRefreshThreshold = 30 * time.Minute
 
 type UploadApp struct {
 	config        contracts.UploadConfig
@@ -56,12 +58,13 @@ func (this *UploadApp) Run() {
 	// The problem with this approach is if the file to upload is large, the 401 does not occur until after
 	// the entire time is spent to upload the file, so it does not fail fast. If we attempted to upload
 	// the manifest first it could be a fast fail.
-	if time.Now().UTC().Sub(start).Milliseconds() > ForceAccessTokenRefreshInSeconds {
-		var err error
-		this.config.GoogleCredentials, err = this.config.CredentialReader.Read(context.Background(), "")
-		this.buildRemoteStorageClient()
+	if needsAccessTokenRefresh(start, time.Now().UTC()) {
+		credentials, err := this.config.CredentialReader.Read(context.Background(), "")
 		if err != nil {
 			log.Println("[Error] Cannot refresh token: ", err)
+		} else {
+			this.config.GoogleCredentials = credentials
+			this.buildRemoteStorageClient()
 		}
 	}
 
@@ -266,4 +269,8 @@ func (this *UploadApp) dumpManifest() string {
 		log.Fatal(err)
 	}
 	return "\n" + string(raw)
+}
+
+func needsAccessTokenRefresh(start, now time.Time) bool {
+	return now.Sub(start) > accessTokenRefreshThreshold
 }

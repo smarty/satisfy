@@ -14,11 +14,10 @@ import (
 )
 
 type DownloadApp struct {
-	listing   contracts.DependencyListing
-	installer *core.PackageInstaller
-	integrity contracts.IntegrityCheck
-	waiter    *sync.WaitGroup
-	results   chan error
+	listing     contracts.DependencyListing
+	installer   *core.PackageInstaller
+	integrity   contracts.IntegrityCheck
+	concurrency int
 }
 
 func NewDownloadApp(config DownloadConfig) *DownloadApp {
@@ -29,13 +28,11 @@ func NewDownloadApp(config DownloadConfig) *DownloadApp {
 		core.NewFileListingIntegrityChecker(disk),
 		core.NewFileContentIntegrityCheck(md5.New, disk, !config.QuickVerification),
 	)
-	waiter := new(sync.WaitGroup)
 	return &DownloadApp{
-		listing:   config.Dependencies,
-		installer: installer,
-		integrity: integrity,
-		waiter:    waiter,
-		results:   make(chan error),
+		listing:     config.Dependencies,
+		installer:   installer,
+		integrity:   integrity,
+		concurrency: max(config.Concurrency, 1),
 	}
 }
 
@@ -47,30 +44,40 @@ func (this *DownloadApp) Run() {
 }
 
 func (this *DownloadApp) TryRun() error {
-	for _, dependency := range this.listing.Listing {
-		this.waiter.Go(func() { this.install(dependency) })
-	}
-	go this.awaitCompletion()
-	failed := 0
-	for err := range this.results {
-		failed++
+	errs := runConcurrently(this.concurrency, this.listing.Listing, this.install)
+	for _, err := range errs {
 		log.Println("[WARN]", err)
 	}
-	if failed > 0 {
-		return fmt.Errorf("[WARN] %d packages failed to install.", failed)
+	if len(errs) > 0 {
+		return fmt.Errorf("[WARN] %d packages failed to install.", len(errs))
 	}
 	return nil
 }
 
-func (this *DownloadApp) awaitCompletion() {
-	this.waiter.Wait()
-	close(this.results)
+func (this *DownloadApp) install(dependency contracts.Dependency) error {
+	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
+	return resolver.Resolve()
 }
 
-func (this *DownloadApp) install(dependency contracts.Dependency) {
-	resolver := core.NewDependencyResolver(shell.NewDiskFileSystem(""), this.integrity, this.installer, dependency)
-	err := resolver.Resolve()
-	if err != nil {
-		this.results <- err
+// runConcurrently calls work for each item, with at most limit calls in flight
+// at once, and returns the errors encountered.
+func runConcurrently[T any](limit int, items []T, work func(T) error) (errs []error) {
+	var (
+		waiter    sync.WaitGroup
+		lock      sync.Mutex
+		semaphore = make(chan struct{}, max(limit, 1))
+	)
+	for _, item := range items {
+		semaphore <- struct{}{}
+		waiter.Go(func() {
+			defer func() { <-semaphore }()
+			if err := work(item); err != nil {
+				lock.Lock()
+				errs = append(errs, err)
+				lock.Unlock()
+			}
+		})
 	}
+	waiter.Wait()
+	return errs
 }

@@ -3,11 +3,13 @@ package transfer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"runtime"
 
 	"github.com/smarty/gcs"
 
@@ -17,6 +19,7 @@ import (
 
 type DownloadConfig struct {
 	MaxRetry          int
+	Concurrency       int
 	QuickVerification bool
 	ShowProgress      bool
 	GoogleCredentials gcs.Credentials
@@ -30,6 +33,11 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		"max-retry",
 		5,
 		"How many times to retry attempts to download packages.",
+	)
+	flags.IntVar(&config.Concurrency,
+		"concurrency",
+		runtime.NumCPU(),
+		"How many packages to download and install at the same time.",
 	)
 	flags.BoolVar(&config.QuickVerification,
 		"quick",
@@ -68,6 +76,9 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 		log.Println("[WARN] Unable to parse command line flags:", err)
 		return DownloadConfig{}, err
 	}
+	if config.Concurrency < 1 {
+		return DownloadConfig{}, errors.New("-concurrency must be at least 1")
+	}
 
 	config.Dependencies, err = loadDependencyListing(config.jsonPath, flags.Args())
 	if err != nil {
@@ -77,6 +88,9 @@ func ParseDownloadConfig(args []string) (config DownloadConfig, err error) {
 
 	reader := gcs.NewCredentialsReader()
 	config.GoogleCredentials, err = reader.Read(context.Background(), config.Dependencies.Credentials)
+	if err != nil {
+		return DownloadConfig{}, fmt.Errorf("could not load Google credentials: %w", err)
+	}
 	return config, nil
 }
 

@@ -51,8 +51,10 @@ func (this *PackageInstaller) DownloadManifest(remoteAddress url.URL) (manifest 
 	defer closeResource(body)
 
 	rawManifest, err := io.ReadAll(body)
+	if err != nil {
+		return contracts.Manifest{}, err
+	}
 	err = json.Unmarshal(rawManifest, &manifest)
-
 	return manifest, err
 }
 
