@@ -213,6 +213,31 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumCoversEntireCompr
 	}
 }
 
+func (this *PackageInstallerFixture) TestInstallPackageRefusesEntryOutsideInstallationDirectory() {
+	checksum := this.downloader.prepareTarArchiveDownload(
+		&tar.Header{Name: "inside", Size: 1, Mode: 0644},
+		&tar.Header{Name: "../outside", Size: 1, Mode: 0644},
+	)
+
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+
+	this.So(err, should.NotBeNil)
+	this.So(this.filesystem.listing(), should.BeEmpty) // "inside" was rolled back
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageRefusesSymlinkPointingOutsideInstallationDirectory() {
+	for _, linkname := range []string{"../outside", "/etc/passwd", "dir/../../outside"} {
+		checksum := this.downloader.prepareTarArchiveDownload(
+			&tar.Header{Typeflag: tar.TypeSymlink, Name: "link", Linkname: linkname},
+		)
+
+		err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+
+		this.So(err, should.NotBeNil)
+		this.So(this.filesystem.listing(), should.BeEmpty)
+	}
+}
+
 func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{
@@ -319,6 +344,25 @@ func (this *FakeDownloader) prepareSingleFileArchiveDownload(compressionAlgorith
 	archiveWriter := tar.NewWriter(compressor)
 	_ = archiveWriter.WriteHeader(&tar.Header{Name: "file", Size: int64(len(content)), Mode: 0644})
 	_, _ = archiveWriter.Write(content)
+	_ = archiveWriter.Close()
+	_ = compressor.Close()
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
+	return hasher.Sum(nil)
+}
+
+// prepareTarArchiveDownload writes each header (with one byte of content for
+// regular files) into a gzip compressed tar archive.
+func (this *FakeDownloader) prepareTarArchiveDownload(headers ...*tar.Header) []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	compressor := compression[gzipAlgorithm](io.MultiWriter(hasher, writer), 4)
+	archiveWriter := tar.NewWriter(compressor)
+	for _, header := range headers {
+		_ = archiveWriter.WriteHeader(header)
+		if header.Typeflag != tar.TypeSymlink {
+			_, _ = archiveWriter.Write([]byte("x"))
+		}
+	}
 	_ = archiveWriter.Close()
 	_ = compressor.Close()
 	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))

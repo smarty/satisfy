@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -16,7 +15,7 @@ import (
 type DependencyResolverFileSystem interface {
 	model.FileChecker
 	model.FileReader
-	model.Deleter
+	model.Rooter
 }
 
 type DependencyResolver struct {
@@ -215,9 +214,13 @@ func (this *DependencyResolver) installPackage(ctx context.Context) error {
 }
 
 func (this *DependencyResolver) uninstallPackage(manifest model.Manifest) (err error) {
+	root, err := this.fileSystem.OpenRoot(this.dependency.LocalDirectory)
+	if err != nil {
+		return err
+	}
+	defer closeResource(root)
 	for _, item := range manifest.Archive.Contents {
-		path := filepath.Join(this.dependency.LocalDirectory, item.Path)
-		err = errors.Join(err, ignoreNotExist(this.fileSystem.Delete(path)))
+		err = errors.Join(err, ignoreNotExist(root.Delete(item.Path)))
 	}
 	return err
 }

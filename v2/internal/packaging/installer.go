@@ -24,11 +24,8 @@ import (
 )
 
 type PackageInstallerFileSystem interface {
-	model.FileCreator
 	model.FileWriter
-	model.Deleter
-	model.SymlinkCreator
-	model.Chmod
+	model.Rooter
 }
 
 type PackageInstaller struct {
@@ -113,47 +110,58 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	if err != nil {
 		return err
 	}
-	paths, err := this.extractArchive(reader, request, len(manifest.Archive.Contents))
+	root, err := this.filesystem.OpenRoot(request.LocalPath)
+	if err != nil {
+		return errors.Join(err, decompressor.Close())
+	}
+	defer closeResource(root)
+	names, err := this.extractArchive(reader, root, request, len(manifest.Archive.Contents))
 	closeResource(decompressor)
 	if err != nil {
-		return errors.Join(err, this.revertFileSystem(paths))
+		return errors.Join(err, revertFileSystem(root, names))
 	}
 	// The archive reader stops at its end-of-archive marker, which can leave
 	// the end of the compressed stream unread; the checksum covers all of it.
 	if _, err = io.Copy(io.Discard, checksumReader); err != nil {
-		return errors.Join(err, this.revertFileSystem(paths))
+		return errors.Join(err, revertFileSystem(root, names))
 	}
 	actualChecksum := checksumReader.Sum(nil)
 	if !bytes.Equal(actualChecksum, manifest.Archive.MD5Checksum) {
 		err = fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)
-		return errors.Join(err, this.revertFileSystem(paths))
+		return errors.Join(err, revertFileSystem(root, names))
 	}
 
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(reader ArchiveReader, request model.InstallationRequest, itemCount int) (paths []string, err error) {
+// extractArchive writes each archive entry within root and returns the names
+// of the entries it wrote, relative to root.
+func (this *PackageInstaller) extractArchive(reader ArchiveReader, root model.RootedFileSystem, request model.InstallationRequest, itemCount int) (names []string, err error) {
 	for i := 0; ; i++ {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return paths, err
+			return names, err
 		}
-		pathItem := filepath.Join(request.LocalPath, header.Name)
-		paths = append(paths, pathItem)
+		if err = checkArchiveEntry(header); err != nil {
+			return names, err
+		}
+		name := filepath.Clean(header.Name)
+		pathItem := filepath.Join(request.LocalPath, name)
+		names = append(names, name)
 		this.logger.Info("extracting archive item",
 			"item", i+1, "of", itemCount, "name", header.Name, "size", byteCountToString(header.Size), "path", pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
-			if err = this.filesystem.CreateSymlink(header.Linkname, pathItem); err != nil {
-				return paths, err
+			if err = root.CreateSymlink(header.Linkname, name); err != nil {
+				return names, err
 			}
 		} else {
-			writer, err := this.filesystem.Create(pathItem)
+			writer, err := root.Create(name)
 			if err != nil {
-				return paths, err
+				return names, err
 			}
 			progressReader := archive.NewArchiveProgressCounter(header.Size, func(written, total int64, done bool) {
 				this.progress.Report(model.Progress{
@@ -165,17 +173,29 @@ func (this *PackageInstaller) extractArchive(reader ArchiveReader, request model
 			err = errors.Join(err, writer.Close())
 			_ = progressReader.Close()
 			if err != nil {
-				return paths, err
+				return names, err
 			}
 			if !model.IsExecutable(os.FileMode(header.Mode)) {
 				continue
 			}
-			if err = this.filesystem.Chmod(pathItem, 0755); err != nil {
-				return paths, err
+			if err = root.Chmod(name, 0755); err != nil {
+				return names, err
 			}
 		}
 	}
-	return paths, nil
+	return names, nil
+}
+
+// checkArchiveEntry refuses entries that would be written outside the
+// installation directory, or symlinks that point outside it.
+func checkArchiveEntry(header *tar.Header) error {
+	if !filepath.IsLocal(header.Name) {
+		return fmt.Errorf("archive entry %q is outside the installation directory", header.Name)
+	}
+	if header.Typeflag == tar.TypeSymlink && !isLocalSymlink(header.Name, header.Linkname) {
+		return fmt.Errorf("archive symlink %q -> %q points outside the installation directory", header.Name, header.Linkname)
+	}
+	return nil
 }
 
 func byteCountToString(size int64) string {
@@ -194,9 +214,15 @@ func byteCountToString(size int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
-func (this *PackageInstaller) revertFileSystem(paths []string) (err error) {
-	for _, path := range paths {
-		err = errors.Join(err, ignoreNotExist(this.filesystem.Delete(path)))
+// isLocalSymlink reports whether a symlink at name pointing to target stays
+// within the directory that contains name.
+func isLocalSymlink(name, target string) bool {
+	return !filepath.IsAbs(target) && filepath.IsLocal(filepath.Join(filepath.Dir(name), target))
+}
+
+func revertFileSystem(root model.RootedFileSystem, names []string) (err error) {
+	for _, name := range names {
+		err = errors.Join(err, ignoreNotExist(root.Delete(name)))
 	}
 	return err
 }
