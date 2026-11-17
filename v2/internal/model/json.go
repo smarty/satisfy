@@ -1,22 +1,32 @@
 package model
 
 import (
+	"encoding/json"
 	"net/url"
-	"strings"
 )
 
+// URL is a url.URL that marshals to and from a JSON string.
 type URL url.URL
 
-func (this *URL) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + this.Value().String() + `"`), nil
+// MarshalJSON has a value receiver so that a URL is marshaled as a string
+// even when the struct holding it is marshaled by value.
+func (this URL) MarshalJSON() ([]byte, error) {
+	return json.Marshal(this.Value().String())
 }
 
+// UnmarshalJSON accepts a JSON string. A JSON null (or, for compatibility,
+// the string "null") leaves the URL unchanged.
 func (this *URL) UnmarshalJSON(p []byte) error {
-	raw := string(p)
-	if raw == `"null"` {
+	if string(p) == "null" {
 		return nil
 	}
-	raw = strings.Trim(raw, "\"")
+	var raw string
+	if err := json.Unmarshal(p, &raw); err != nil {
+		return err
+	}
+	if raw == "null" {
+		return nil
+	}
 	address, err := url.Parse(raw)
 	if err == nil {
 		*this = URL(*address)
