@@ -47,7 +47,7 @@ func (this *DependencyResolver) Resolve(ctx context.Context) error {
 
 	manifestPath := ComposeManifestPath(this.dependency.LocalDirectory, this.dependency.PackageName)
 	if !this.localManifestExists(manifestPath) {
-		return this.installPackage(ctx)
+		return this.installPackage(ctx, nil)
 	}
 
 	localManifest, err := this.loadLocalManifest(manifestPath)
@@ -62,11 +62,7 @@ func (this *DependencyResolver) Resolve(ctx context.Context) error {
 	if installed {
 		return nil
 	}
-
-	if err = this.uninstallPackage(localManifest); err != nil {
-		return fmt.Errorf("failed to uninstall previous package contents for %s: %w", this.dependency.Title(), err)
-	}
-	return this.installPackage(ctx)
+	return this.installPackage(ctx, &localManifest)
 }
 
 func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localManifest model.Manifest, err error) {
@@ -100,10 +96,16 @@ func (this *DependencyResolver) isInstalledCorrectly(ctx context.Context, localM
 			return false, nil
 		}
 	}
-	if this.dependency.PackageVersion == "latest" && !this.localManifestIsLatest(ctx, localManifest) {
-		this.logger.Info("incorrect version installed; reinstalling",
-			"installed", localManifest.Version, "package", this.dependency.Title())
-		return false, nil
+	if this.dependency.PackageVersion == "latest" {
+		isLatest, err := this.localManifestIsLatest(ctx, localManifest)
+		if err != nil {
+			return false, err
+		}
+		if !isLatest {
+			this.logger.Info("incorrect version installed; reinstalling",
+				"installed", localManifest.Version, "package", this.dependency.Title())
+			return false, nil
+		}
 	} else if this.dependency.PackageVersion != "latest" && localManifest.Version != this.dependency.PackageVersion {
 		matchesTag, err := this.localManifestMatchesRequestedTag(ctx, localManifest)
 		if err != nil {
@@ -164,7 +166,10 @@ func (this *DependencyResolver) resolveTag(ctx context.Context) (string, error) 
 	return version, nil
 }
 
-func (this *DependencyResolver) installPackage(ctx context.Context) error {
+// installPackage installs the requested version. The contents of a previous
+// installation are removed only once the new manifest has been downloaded, so
+// that a remote failure leaves a working installation in place.
+func (this *DependencyResolver) installPackage(ctx context.Context, previous *model.Manifest) error {
 	this.logger.Info("downloading manifest", "package", this.dependency.Title())
 	manifest, err := this.packageInstaller.InstallManifest(ctx, model.InstallationRequest{
 		RemoteAddress: this.dependency.ComposeRemoteManifestAddress(),
@@ -193,6 +198,12 @@ func (this *DependencyResolver) installPackage(ctx context.Context) error {
 
 	if this.dependency.PackageVersion == "latest" {
 		this.dependency.PackageVersion = manifest.Version
+	}
+
+	if previous != nil {
+		if err = this.uninstallPackage(*previous); err != nil {
+			return fmt.Errorf("failed to uninstall previous package contents for %s: %w", this.dependency.Title(), err)
+		}
 	}
 
 	// TODO:
@@ -225,12 +236,11 @@ func (this *DependencyResolver) uninstallPackage(manifest model.Manifest) (err e
 	return err
 }
 
-func (this *DependencyResolver) localManifestIsLatest(ctx context.Context, manifest model.Manifest) bool {
+func (this *DependencyResolver) localManifestIsLatest(ctx context.Context, manifest model.Manifest) (bool, error) {
 	remoteManifest, err := this.packageInstaller.DownloadManifest(ctx, this.dependency.ComposeRemoteManifestAddress())
 	if err != nil {
-		this.logger.Warn("failed to download the latest manifest", "package", this.dependency.Title(), "error", err)
-		return false
+		return false, fmt.Errorf("failed to download the latest manifest for %s: %w", this.dependency.Title(), err)
 	}
 	this.dependency.PackageVersion = remoteManifest.Version
-	return remoteManifest.Version == manifest.Version
+	return remoteManifest.Version == manifest.Version, nil
 }
