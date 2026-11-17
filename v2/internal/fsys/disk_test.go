@@ -77,3 +77,12 @@ func (this *DiskFileSystemFixture) TestCreateSymlinkReplacesExistingTarget() {
 	this.So(err, should.BeNil)
 	this.So(info.Symlink(), should.Equal, "source")
 }
+
+// Archives list entries in walk order, so a symlink can be extracted before any
+// regular file in its directory has created that directory.
+func (this *DiskFileSystemFixture) TestCreateSymlinkMakesParentDirectories() {
+	this.So(this.disk.CreateSymlink("b.txt", this.path("inner/a-link")), should.BeNil)
+	info, err := this.disk.Stat(this.path("inner/a-link"))
+	this.So(err, should.BeNil)
+	this.So(info.Symlink(), should.Equal, "b.txt")
+}

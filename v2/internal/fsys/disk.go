@@ -1,7 +1,9 @@
 package fsys
 
 import (
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -78,7 +80,12 @@ func (this *DiskFileSystem) Stat(path string) (model.FileInfo, error) {
 }
 
 func (this *DiskFileSystem) CreateSymlink(source, target string) error {
-	_ = os.Remove(target)
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	if err := os.Remove(target); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	return os.Symlink(source, target)
 }
 
