@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/flate"
 	"errors"
@@ -132,6 +133,30 @@ func (this *ZipArchiveFixture) TestReadAtServesTheDownloadedArchive() {
 	this.So(n, should.Equal, 4)
 	this.So(err, should.BeNil)
 	this.So(signature, should.Resemble, []byte("PK\x03\x04"))
+}
+
+func (this *ZipArchiveFixture) TestSymlinksAndExecutablesSurviveTheRoundTrip() {
+	writer := NewZipArchiveWriter(this.buffer, flate.DefaultCompression)
+	this.So(writer.WriteHeader(model.ArchiveHeader{Name: "bin/tool", Size: 4, ModTime: zipFixtureModTime, Executable: true}), should.BeNil)
+	_, _ = writer.Write([]byte("tool"))
+	this.So(writer.WriteHeader(model.ArchiveHeader{Name: "bin/link", Size: 4, ModTime: zipFixtureModTime, LinkName: "tool"}), should.BeNil)
+	this.So(writer.Close(), should.BeNil)
+
+	reader := this.openReader(bytes.NewReader(this.buffer.Bytes()))
+	defer func() { _ = reader.Close() }()
+
+	executable, err := reader.Next()
+	this.So(err, should.BeNil)
+	this.So(executable.Typeflag, should.Equal, byte(0)) // a regular file, as for other zip entries
+	this.So(executable.Mode, should.Equal, int64(0755))
+	contents, _ := io.ReadAll(reader)
+	this.So(string(contents), should.Equal, "tool")
+
+	link, err := reader.Next()
+	this.So(err, should.BeNil)
+	this.So(link.Typeflag, should.Equal, byte(tar.TypeSymlink))
+	this.So(link.Linkname, should.Equal, "tool")
+	this.So(link.Size, should.Equal, int64(0))
 }
 
 func (this *ZipArchiveFixture) writeArchive(level int) {

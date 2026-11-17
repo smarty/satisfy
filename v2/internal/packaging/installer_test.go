@@ -253,7 +253,7 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 }
 
 // The zip format serves as both archive and compression, so there is no tar
-// stream inside and symlinks cannot be represented.
+// stream inside.
 func (this *PackageInstallerFixture) buildZipManifest(checksum []byte) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{

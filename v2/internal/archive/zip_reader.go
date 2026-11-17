@@ -44,12 +44,29 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 		return nil, err
 	}
 	this.currentZipFileReader = reader
+
+	var (
+		typeflag byte
+		linkname string
+		size     = int64(zipHeader.UncompressedSize64)
+		mode     = int64(0644)
+	)
+	switch fileMode := zipHeader.Mode(); {
+	case fileMode&os.ModeSymlink != 0:
+		target, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+		typeflag, linkname, size = tar.TypeSymlink, string(target), 0
+	case model.IsExecutable(fileMode):
+		mode = 0755
+	}
 	return &tar.Header{
-		Typeflag:   0,
+		Typeflag:   typeflag,
 		Name:       zipHeader.Name,
-		Linkname:   "",
-		Size:       int64(zipHeader.UncompressedSize64),
-		Mode:       0644,
+		Linkname:   linkname,
+		Size:       size,
+		Mode:       mode,
 		Uid:        0,
 		Gid:        0,
 		Uname:      "",
