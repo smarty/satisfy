@@ -94,25 +94,3 @@ func (this *RunConcurrentlyFixture) TestAlreadyCancelledContextStartsNothing() {
 	this.So(started.Load(), should.Equal, 0)
 	this.So(errs, should.Resemble, []error{context.Canceled})
 }
-
-func TestAccessTokenRefreshFixture(t *testing.T) {
-	gunit.Run(new(AccessTokenRefreshFixture), t)
-}
-
-type AccessTokenRefreshFixture struct {
-	*gunit.Fixture
-	start time.Time
-}
-
-func (this *AccessTokenRefreshFixture) Setup() {
-	this.start = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-}
-
-func (this *AccessTokenRefreshFixture) TestShortRunsDoNotRefresh() {
-	this.So(needsAccessTokenRefresh(this.start, this.start.Add(2*time.Second)), should.BeFalse)
-	this.So(needsAccessTokenRefresh(this.start, this.start.Add(29*time.Minute)), should.BeFalse)
-}
-
-func (this *AccessTokenRefreshFixture) TestLongRunsRefresh() {
-	this.So(needsAccessTokenRefresh(this.start, this.start.Add(31*time.Minute)), should.BeTrue)
-}

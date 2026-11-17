@@ -51,7 +51,7 @@ func (this *TagsApp) Run(ctx context.Context) error {
 }
 
 func (this *TagsApp) buildRemoteStorageClient() {
-	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), shell.StaticCredentials(this.config.GoogleCredentials), []int{http.StatusOK})
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 }
 

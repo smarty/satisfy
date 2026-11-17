@@ -93,7 +93,7 @@ func NewLatestApp(config LatestConfig) *LatestApp {
 }
 
 func (this *LatestApp) Run(ctx context.Context) error {
-	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), shell.StaticCredentials(this.config.GoogleCredentials), []int{http.StatusOK})
 	client := core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 
 	dependency := contracts.Dependency{

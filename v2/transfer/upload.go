@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
@@ -21,10 +20,6 @@ import (
 	"github.com/smarty/satisfy/v2/core"
 	"github.com/smarty/satisfy/v2/shell"
 )
-
-// accessTokenRefreshThreshold is how long archive compression may run before the
-// bearer token is refreshed, so that the upload itself does not outlive it.
-const accessTokenRefreshThreshold = 30 * time.Minute
 
 type UploadApp struct {
 	config        contracts.UploadConfig
@@ -45,8 +40,6 @@ func NewUploadApp(config contracts.UploadConfig) *UploadApp {
 func (this *UploadApp) Run(ctx context.Context) (err error) {
 	this.buildRemoteStorageClient()
 
-	start := time.Now().UTC()
-
 	if err = this.buildArchiveAndManifestContents(ctx); err != nil {
 		return err
 	}
@@ -57,16 +50,6 @@ func (this *UploadApp) Run(ctx context.Context) (err error) {
 	}
 
 	log.Println("Manifest:", this.dumpManifest())
-
-	if needsAccessTokenRefresh(start, time.Now().UTC()) && this.config.CredentialReader != nil {
-		credentials, err := this.config.CredentialReader.Read(ctx, "")
-		if err != nil {
-			log.Println("[Error] Cannot refresh token: ", err)
-		} else {
-			this.config.GoogleCredentials = credentials
-			this.buildRemoteStorageClient()
-		}
-	}
 
 	log.Println("Uploading the archive...")
 	if err = this.uploadArchive(ctx); err != nil {
@@ -82,10 +65,6 @@ func (this *UploadApp) Run(ctx context.Context) (err error) {
 		return err
 	}
 	return this.uploadManifest(ctx, rootManifest, this.packageConfig.ComposeLatestManifestRemoteAddress())
-}
-
-func needsAccessTokenRefresh(start, now time.Time) bool {
-	return now.Sub(start) > accessTokenRefreshThreshold
 }
 
 // buildRootManifest carries the tag listing forward from the existing root
@@ -214,7 +193,13 @@ func (this *UploadApp) uploadManifest(ctx context.Context, manifest contracts.Ma
 }
 
 func (this *UploadApp) buildRemoteStorageClient() {
-	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), this.config.GoogleCredentials, []int{http.StatusOK})
+	// Compressing a large archive can outlive a bearer token, so when a reader
+	// is available the credentials are refreshed as they age.
+	var credentials shell.CredentialsSource = shell.StaticCredentials(this.config.GoogleCredentials)
+	if this.config.CredentialReader != nil {
+		credentials = shell.NewRefreshingCredentials(this.config.CredentialReader, "", shell.DefaultCredentialsMaxAge)
+	}
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), credentials, []int{http.StatusOK})
 	this.client = core.NewRetryClient(gcsClient, this.config.MaxRetry, core.DefaultRetryDelay)
 }
 

@@ -14,18 +14,22 @@ import (
 
 type GoogleCloudStorageClient struct {
 	client         *http.Client
-	credentials    gcs.Credentials
+	credentials    CredentialsSource
 	expectedStatus []int
 }
 
-func NewGoogleCloudStorageClient(client *http.Client, credentials gcs.Credentials, expectedStatus []int) *GoogleCloudStorageClient {
+func NewGoogleCloudStorageClient(client *http.Client, credentials CredentialsSource, expectedStatus []int) *GoogleCloudStorageClient {
 	return &GoogleCloudStorageClient{client: client, credentials: credentials, expectedStatus: expectedStatus}
 }
 
 func (this *GoogleCloudStorageClient) newRequest(ctx context.Context, method string, address url.URL, options ...gcs.Option) (*http.Request, error) {
+	credentials, err := this.credentials.Credentials(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not obtain Google credentials: %w", err)
+	}
 	options = append([]gcs.Option{
 		gcs.WithContext(ctx),
-		gcs.WithCredentials(this.credentials),
+		gcs.WithCredentials(credentials),
 		gcs.WithBucket(address.Host),
 		gcs.WithResource(address.Path),
 	}, options...)

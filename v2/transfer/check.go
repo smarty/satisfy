@@ -17,7 +17,7 @@ type CheckApp struct {
 }
 
 func NewCheckApp(config contracts.UploadConfig) *CheckApp {
-	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), config.GoogleCredentials, []int{http.StatusOK})
+	gcsClient := shell.NewGoogleCloudStorageClient(shell.NewHTTPClient(), shell.StaticCredentials(config.GoogleCredentials), []int{http.StatusOK})
 	return &CheckApp{config: config, client: core.NewRetryClient(gcsClient, config.MaxRetry, core.DefaultRetryDelay)}
 }
 
