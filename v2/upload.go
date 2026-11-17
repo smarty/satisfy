@@ -1,6 +1,7 @@
 package satisfy
 
 import (
+	"cmp"
 	"context"
 	"crypto/md5"
 	"encoding/json/jsontext"
@@ -13,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/klauspost/compress/flate"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/v2/internal/archive"
@@ -237,17 +239,23 @@ func newCompressor(algorithm string, level int, writer io.Writer) (io.WriteClose
 	return factory(writer, level)
 }
 
+// compression creates each algorithm's compressor. A level of 0 (unset)
+// selects the algorithm's default level rather than no compression.
 var compression = map[string]func(_ io.Writer, level int) (io.WriteCloser, error){
 	"zstd": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		level = cmp.Or(level, defaultZstdLevel)
 		return archive.NewParallelZstdWriter(writer, zstd.EncoderLevelFromZstd(level), archive.DefaultParallelZstdChunkSize)
 	},
 	"gzip": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return gzip.NewWriterLevel(writer, level)
+		return gzip.NewWriterLevel(writer, cmp.Or(level, gzip.DefaultCompression))
 	},
 	"zip": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return archive.NewZipArchiveWriter(writer, level), nil
+		return archive.NewZipArchiveWriter(writer, cmp.Or(level, flate.DefaultCompression)), nil
 	},
 }
+
+// defaultZstdLevel is zstd's own default level ("default" speed).
+const defaultZstdLevel = 3
 
 var contentType = map[string]string{
 	"zstd": "application/zstd",

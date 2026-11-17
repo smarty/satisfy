@@ -174,6 +174,8 @@ satisfy upload -json upload.json
 ```
 
 - `compression_algorithm` is one of `zstd`, `gzip`, or `zip`.
+- `compression_level` is the algorithm's level (e.g. 1–19 for zstd, 1–9 for gzip
+  and zip); omit it, or use `0`, for the algorithm's default level.
 - Provide exactly one source: `source_path`, `source_directory`, or
   `source_file`.
 - `tags` is optional; see [Tagging during upload](#tagging-during-upload).

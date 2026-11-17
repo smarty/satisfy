@@ -7,7 +7,7 @@ import (
 
 type PackageConfig struct {
 	CompressionAlgorithm string   `json:"compression_algorithm"`
-	CompressionLevel     int      `json:"compression_level"`
+	CompressionLevel     int      `json:"compression_level"` // 0 => algorithm's default level
 	SourceDirectory      string   `json:"source_directory"`
 	SourceFile           string   `json:"source_file"`
 	SourcePath           string   `json:"source_path"`
