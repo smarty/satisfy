@@ -13,11 +13,6 @@ import (
 	"github.com/smarty/satisfy/v2/internal/model"
 )
 
-type PackageBuilder interface {
-	Build(ctx context.Context) error
-	Contents() []model.ArchiveItem
-}
-
 type DirectoryPackageBuilderFileSystem interface {
 	model.PathLister
 	model.FileOpener

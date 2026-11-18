@@ -96,7 +96,7 @@ func (this *ZipArchiveFixture) TestConfiguredCompressionLevelIsApplied() {
 	this.So(compressed, should.BeLessThan, uncompressed)
 }
 
-// UploadApp closes the compressor after PackageBuilder.Build has already
+// UploadApp closes the compressor after DirectoryPackageBuilder.Build has already
 // closed the archive writer; for zip these are the same object.
 func (this *ZipArchiveFixture) TestWriterCloseIsIdempotent() {
 	writer := NewZipArchiveWriter(this.buffer, flate.DefaultCompression)

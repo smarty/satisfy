@@ -80,7 +80,7 @@ func (this *UploadCompressionFixture) TestEveryCompressionAlgorithmHasAContentTy
 }
 
 // The write side mirrors UploadApp.buildArchiveAndManifestContents (archive
-// closed by PackageBuilder.Build, then the compressor closed by the app); the
+// closed by DirectoryPackageBuilder.Build, then the compressor closed by the app); the
 // read side mirrors DownloadApp's installer wiring. Zip cannot represent
 // symlinks or executable modes, so those entries are asserted only for the
 // tar-based algorithms.

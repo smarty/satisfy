@@ -17,7 +17,7 @@ func TestDirectoryPackageBuilderFixture(t *testing.T) {
 
 type DirectoryPackageBuilderFixture struct {
 	*gunit.Fixture
-	builder    PackageBuilder
+	builder    *DirectoryPackageBuilder
 	fileSystem *inMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
