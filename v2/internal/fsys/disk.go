@@ -64,13 +64,16 @@ func (this *DiskFileSystem) Stat(path string) (model.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	source, _ := os.Readlink(path)
 	fileInfo := FileInfo{
-		path:    path,
-		size:    info.Size(),
-		mod:     info.ModTime(),
-		symlink: source,
-		mode:    info.Mode(),
+		path: path,
+		size: info.Size(),
+		mod:  info.ModTime(),
+		mode: info.Mode(),
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		if fileInfo.symlink, err = os.Readlink(path); err != nil {
+			return nil, err
+		}
 	}
 	return fileInfo, nil
 }

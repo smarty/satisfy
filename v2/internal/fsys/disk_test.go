@@ -142,3 +142,11 @@ func (this *DiskFileSystemFixture) TestOpenRootCreatesFilesSymlinksAndDeletes() 
 	_, err = os.Lstat(this.path("install/dir/file"))
 	this.So(os.IsNotExist(err), should.BeTrue)
 }
+
+func (this *DiskFileSystemFixture) TestStatOfRegularFileHasNoSymlink() {
+	this.So(this.disk.WriteFile(this.path("plain"), []byte("x")), should.BeNil)
+	info, err := this.disk.Stat(this.path("plain"))
+	this.So(err, should.BeNil)
+	this.So(info.Symlink(), should.BeEmpty)
+	this.So(info.Size(), should.Equal, int64(1))
+}
