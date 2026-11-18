@@ -128,12 +128,15 @@ func (this *DirectoryPackageBuilder) archiveContents(ctx context.Context, file m
 		return err
 	}
 	defer closeResource(reader)
-	// Hashing runs on its own goroutine so it overlaps with archiving and
-	// compression. It starts only after Open succeeds, and the
-	// deferred Close both stops the goroutine and finishes hashing before
-	// buildManifestEntry reads the sum.
-	hasher := NewAsyncHashWriter(this.hasher)
-	defer closeResource(hasher)
+	hasher := io.Writer(this.hasher)
+	if file.Size() >= asyncHashThreshold {
+		// For large files, hashing on its own goroutine overlaps with archiving
+		// and compression. The deferred Close both stops the goroutine and
+		// finishes hashing before buildManifestEntry reads the sum.
+		async := NewAsyncHashWriter(this.hasher)
+		defer closeResource(async)
+		hasher = async
+	}
 	writer := io.MultiWriter(hasher, this.archive, progressWriter)
 	_, err = io.Copy(writer, contextReader{ctx: ctx, reader: reader})
 	return err
@@ -152,6 +155,13 @@ func (this contextReader) Read(buffer []byte) (int, error) {
 	}
 	return this.reader.Read(buffer)
 }
+
+// asyncHashThreshold is the file size from which hashing on a separate
+// goroutine pays off. Below it, handing each write to the hashing goroutine
+// costs more than it saves (measured with gzip and zstd at their default
+// levels: up to ~40% slower for small files; ~50% faster for 32 MiB files
+// with gzip, which compresses on the calling goroutine).
+const asyncHashThreshold = 16 << 20
 
 func (this *DirectoryPackageBuilder) buildHeader(file model.FileInfo, fileOnly bool) (header model.ArchiveHeader, err error) {
 	if fileOnly {

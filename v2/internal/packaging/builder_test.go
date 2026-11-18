@@ -63,6 +63,20 @@ func (this *DirectoryPackageBuilderFixture) TestExcludedFilesAreLeftOut() {
 		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
 	})
 }
+
+func (this *DirectoryPackageBuilderFixture) TestLargeFilesAreHashedCompletely() {
+	large := bytes.Repeat([]byte("z"), asyncHashThreshold) // hashed on a separate goroutine
+	this.fileSystem.WriteFile("/in/large.bin", large)
+
+	err := this.builder.Build(context.Background())
+
+	this.So(err, should.BeNil)
+	contents := this.builder.Contents()
+	this.So(contents[3].Path, should.Equal, "large.bin")
+	hashed := contents[3].MD5Checksum // the fake hasher records what it was given
+	this.So(bytes.Count(hashed, []byte("z")), should.Equal, len(large))
+}
+
 func (this *DirectoryPackageBuilderFixture) TestCancelledBuildStops() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
