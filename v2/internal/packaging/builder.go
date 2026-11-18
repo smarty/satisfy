@@ -120,7 +120,7 @@ func (this *DirectoryPackageBuilder) relativePath(file model.FileInfo) string {
 }
 
 func (this *DirectoryPackageBuilder) add(ctx context.Context, file model.FileInfo, fileOnly bool) error {
-	this.logger.Info("adding file to archive", "path", file.Path())
+	this.logger.Debug("adding file to archive", "path", file.Path())
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
 		return err

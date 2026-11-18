@@ -151,7 +151,7 @@ func (this *PackageInstaller) extractArchive(reader ArchiveReader, root model.Ro
 		name := filepath.Clean(header.Name)
 		pathItem := filepath.Join(request.LocalPath, name)
 		names = append(names, name)
-		this.logger.Info("extracting archive item",
+		this.logger.Debug("extracting archive item",
 			"item", i+1, "of", itemCount, "name", header.Name, "size", archive.HumanFileSize(header.Size), "path", pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
