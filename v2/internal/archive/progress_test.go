@@ -44,7 +44,7 @@ func (this *ArchiveProgressCounter) LongTestProgress() {
 	a.Write([]byte{'t', 'e', 's', 't'})
 	a.Close()
 	this.So(this.written, should.Equal, 8)
-	this.So(HumanFileSize(this.total), should.Equal, "238.42 MB")
+	this.So(HumanFileSize(this.total), should.Equal, "238.42 MiB")
 }
 
 // The counter is written on the caller's goroutine while the ticker goroutine

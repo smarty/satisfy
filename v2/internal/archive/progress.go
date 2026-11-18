@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	suffixes = [5]string{"B", "KB", "MB", "GB", "TB"}
+	suffixes = [5]string{"B", "KiB", "MiB", "GiB", "TiB"}
 )
 
 func round(val float64, roundOn float64, places int) (newVal float64) {
@@ -28,7 +28,7 @@ func round(val float64, roundOn float64, places int) (newVal float64) {
 	return
 }
 
-// HumanFileSize renders a byte count using binary (1024) units, e.g. "1.5 MB".
+// HumanFileSize renders a byte count using binary (1024) units, e.g. "1.5 MiB".
 func HumanFileSize(size int64) string {
 	return humanFileSize(float64(size))
 }

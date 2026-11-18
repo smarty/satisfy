@@ -152,7 +152,7 @@ func (this *PackageInstaller) extractArchive(reader ArchiveReader, root model.Ro
 		pathItem := filepath.Join(request.LocalPath, name)
 		names = append(names, name)
 		this.logger.Info("extracting archive item",
-			"item", i+1, "of", itemCount, "name", header.Name, "size", byteCountToString(header.Size), "path", pathItem)
+			"item", i+1, "of", itemCount, "name", header.Name, "size", archive.HumanFileSize(header.Size), "path", pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
 			if err = root.CreateSymlink(header.Linkname, name); err != nil {
@@ -192,22 +192,6 @@ func checkArchiveEntry(header *tar.Header) error {
 		return fmt.Errorf("archive symlink %q -> %q points outside the installation directory", header.Name, header.Linkname)
 	}
 	return nil
-}
-
-func byteCountToString(size int64) string {
-	if size < 1 {
-		return "? bytes"
-	}
-	const unit = 1024
-	if size < unit {
-		return fmt.Sprintf("%d bytes", size)
-	}
-	div, exp := int64(unit), 0
-	for i := size / unit; i >= unit; i /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
 // isLocalSymlink reports whether a symlink at name pointing to target stays
