@@ -87,14 +87,11 @@ func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 }
 
 func (this *DependencyResolver) isInstalledCorrectly(ctx context.Context, localManifest model.Manifest) (bool, error) {
-	if localManifest.Name != this.dependency.PackageName {
-		if strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
-			// no-op
-		} else {
-			this.logger.Info("incorrect package installed; reinstalling",
-				"installed", localManifest.Name, "package", this.dependency.Title())
-			return false, nil
-		}
+	if localManifest.Name != this.dependency.PackageName &&
+		!strings.HasSuffix(localManifest.Name, "/"+this.dependency.PackageName) {
+		this.logger.Info("incorrect package installed; reinstalling",
+			"installed", localManifest.Name, "package", this.dependency.Title())
+		return false, nil
 	}
 	if this.dependency.PackageVersion == "latest" {
 		isLatest, err := this.localManifestIsLatest(ctx, localManifest)

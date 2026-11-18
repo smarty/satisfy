@@ -229,11 +229,11 @@ var decompressors = map[string]func(source io.Reader, progress model.ProgressFun
 }
 
 func newZStdReader(source io.Reader, _ model.ProgressFunc) (io.ReadCloser, error) {
-	if reader, err := zstd.NewReader(source); err != nil {
+	reader, err := zstd.NewReader(source)
+	if err != nil {
 		return nil, err
-	} else {
-		return reader.IOReadCloser(), nil
 	}
+	return reader.IOReadCloser(), nil
 }
 func newZipReader(source io.Reader, progress model.ProgressFunc) (io.ReadCloser, error) {
 	return archive.NewZipArchiveReader(source, progress)

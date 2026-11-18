@@ -30,7 +30,6 @@ func (this Dependency) Title() string {
 func (this Dependency) ComposeRemoteManifestAddress() url.URL {
 	if this.PackageVersion == "latest" {
 		return this.ComposeLatestManifestRemoteAddress()
-	} else {
-		return this.ComposeRemoteAddress(RemoteManifestFilename)
 	}
+	return this.ComposeRemoteAddress(RemoteManifestFilename)
 }
