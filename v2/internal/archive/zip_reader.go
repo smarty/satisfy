@@ -2,7 +2,6 @@ package archive
 
 import (
 	"archive/tar"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -13,11 +12,9 @@ import (
 )
 
 type ZipArchiveReader struct {
-	checksumReader       io.Reader
 	currentZipFileReader io.Reader
 	zipReader            *zip.Reader
 	currentFileCount     int
-	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
 	file                 *os.File
 	progress             model.ProgressFunc
@@ -128,7 +125,7 @@ func (this *ZipArchiveReader) Close() error {
 }
 
 func NewZipArchiveReader(reader io.Reader, progress model.ProgressFunc) (io.ReadCloser, error) {
-	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, progress: progress}
+	zipArchiveReader := &ZipArchiveReader{progress: progress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
 		_ = zipArchiveReader.Close()

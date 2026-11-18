@@ -43,7 +43,3 @@ func (this *FilterFixture) TestMultipleMatchesOnPackageName() {
 func (this *FilterFixture) appendDependency(name string) {
 	this.listing = append(this.listing, satisfy.Dependency{PackageName: name})
 }
-
-func (this *FilterFixture) appendFilter(name string) {
-	this.filter = append(this.filter, name)
-}
