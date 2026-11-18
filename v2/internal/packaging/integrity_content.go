@@ -35,7 +35,7 @@ func (this *FileContentIntegrityCheck) Verify(manifest model.Manifest, localPath
 		if err != nil {
 			return err
 		}
-		if bytes.Compare(checksum, item.MD5Checksum) != 0 {
+		if !bytes.Equal(checksum, item.MD5Checksum) {
 			return fmt.Errorf("checksum mismatch for \"%s\"", item.Path)
 		}
 	}
