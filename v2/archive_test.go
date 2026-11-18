@@ -81,6 +81,18 @@ func (this *ClientFixture) TestOpenArchiveStreamsEveryFile() {
 	}
 }
 
+func (this *ClientFixture) TestOpenArchiveResumesDroppedDownload() {
+	manifest := this.uploadWith("zstd", "1.0.0")
+	this.storage.dropArchiveDownloadsAfter = int(manifest.Archive.Size / 2)
+
+	files := this.readArchive(manifest)
+
+	this.So(files, should.Resemble, map[string]string{
+		"hello.txt":          "Hello, World!",
+		"nested/goodbye.txt": "Goodbye!",
+	})
+}
+
 func (this *ClientFixture) TestChecksumMismatchIsReportedAtTheEnd() {
 	manifest := this.uploadWith("zstd", "1.0.0")
 	manifest.Archive.MD5Checksum = []byte("not the checksum")

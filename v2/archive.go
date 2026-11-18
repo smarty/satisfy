@@ -58,7 +58,8 @@ func (this *Client) resolveManifest(ctx context.Context, public PackageRef, vers
 
 // OpenArchive streams the archive of the package version that manifest
 // describes (see Manifest), without writing anything to disk. The caller must
-// Close the returned reader.
+// Close the returned reader. ctx governs the whole download: when the
+// connection fails part-way, reading resumes where it stopped, using ctx.
 func (this *Client) OpenArchive(ctx context.Context, public PackageRef, manifest Manifest) (*ArchiveReader, error) {
 	ref, err := validatePackageRef(public)
 	if err != nil {
@@ -76,6 +77,7 @@ func (this *Client) OpenArchive(ctx context.Context, public PackageRef, manifest
 	if err != nil {
 		return nil, err
 	}
+	body = packaging.NewResumingReader(ctx, this.storage, address, body, manifest.Archive.Size)
 	hashed := packaging.NewHashReader(body, md5.New())
 	reader, decompressor, err := packaging.OpenArchiveReader(hashed, manifest.Archive.CompressionAlgorithm, this.progress)
 	if err != nil {

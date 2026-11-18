@@ -238,6 +238,21 @@ func (this *PackageInstallerFixture) TestInstallPackageRefusesSymlinkPointingOut
 	}
 }
 
+func (this *PackageInstallerFixture) TestInstallPackageResumesDroppedDownload() {
+	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	archiveBytes, _ := io.ReadAll(this.downloader.Body)
+	flaky := &flakyDownloader{content: archiveBytes, failAfter: len(archiveBytes) / 2}
+	installer := NewPackageInstaller(flaky, this.filesystem, nil, nil)
+	manifest := this.buildManifest(checksum, gzipAlgorithm)
+	manifest.Archive.Size = int64(len(archiveBytes))
+
+	err := installer.InstallPackage(context.Background(), manifest, this.installationRequest(""))
+
+	this.So(err, should.BeNil)
+	this.So(flaky.ranges, should.HaveLength, 1)
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+}
+
 func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{

@@ -381,6 +381,10 @@ type fakeStorage struct {
 
 	// beforeUpload, when set, runs at the start of each upload.
 	beforeUpload func(request model.UploadRequest)
+
+	// dropArchiveDownloadsAfter, when positive, makes every (non-ranged)
+	// archive download fail after that many bytes, like a dropped connection.
+	dropArchiveDownloadsAfter int
 }
 
 func newFakeStorage() *fakeStorage {
@@ -431,8 +435,16 @@ func (this *fakeStorage) Download(_ context.Context, address url.URL) (io.ReadCl
 	}
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	return generationBody{ReadCloser: io.NopCloser(bytes.NewReader(raw)), generation: this.generations[address.String()]}, nil
+	var body io.Reader = bytes.NewReader(raw)
+	if this.dropArchiveDownloadsAfter > 0 && path.Base(address.Path) == model.RemoteArchiveFilename {
+		body = io.MultiReader(bytes.NewReader(raw[:this.dropArchiveDownloadsAfter]), droppedConnection{})
+	}
+	return generationBody{ReadCloser: io.NopCloser(body), generation: this.generations[address.String()]}, nil
 }
+
+type droppedConnection struct{}
+
+func (droppedConnection) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 func (this *fakeStorage) Seek(_ context.Context, address url.URL, start, end int64) (io.ReadCloser, error) {
 	raw, err := this.object(address)

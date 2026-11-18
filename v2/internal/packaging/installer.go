@@ -102,9 +102,9 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	if err != nil {
 		return err
 	}
-
-	defer closeResource(body)
-	checksumReader := NewHashReader(body, md5.New())
+	resuming := newResumingReader(ctx, this.downloader, request.RemoteAddress, body, manifest.Archive.Size)
+	defer closeResource(resuming)
+	checksumReader := NewHashReader(resuming, md5.New())
 
 	reader, decompressor, err := OpenArchiveReader(checksumReader, manifest.Archive.CompressionAlgorithm, this.progress)
 	if err != nil {
