@@ -178,6 +178,7 @@ satisfy upload -json upload.json
   and zip); omit it, or use `0`, for the algorithm's default level.
 - Provide exactly one source: `source_path`, `source_directory`, or
   `source_file`.
+- `package_version` may not be `latest`, which names the most recent upload.
 - `tags` is optional; see [Tagging during upload](#tagging-during-upload).
 
 Flags:

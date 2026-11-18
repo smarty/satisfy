@@ -72,7 +72,7 @@ type PackageConfig struct {
 	// PackageName is the name of the package, e.g. "my/package".
 	PackageName string `json:"package_name"`
 
-	// PackageVersion is the version being uploaded.
+	// PackageVersion is the version being uploaded. "latest" is reserved.
 	PackageVersion string `json:"package_version"`
 
 	// RemoteAddress is the address under which packages live, e.g.

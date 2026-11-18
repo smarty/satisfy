@@ -131,7 +131,7 @@ func ValidateTagModification(modification TagModification) error {
 	}
 	deleted := make(map[string]struct{})
 	for _, tag := range modification.Delete {
-		if tag.Name == "" {
+		if tag.Name == "" || tag.Name == "latest" {
 			return fmt.Errorf("%w: invalid tag name to delete: %q", ErrInvalidConfig, tag.Name)
 		}
 		if _, found := added[tag.Name]; found {

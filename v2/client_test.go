@@ -190,6 +190,12 @@ func (this *ClientFixture) TestUploadRequiresExactlyOneSource() {
 	this.So(this.storage.objects, should.BeEmpty)
 }
 
+func (this *ClientFixture) TestUploadRejectsLatestAsAVersion() {
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("latest")})
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	this.So(this.storage.objects, should.BeEmpty)
+}
+
 func (this *ClientFixture) TestInvalidUploadIsRejectedBeforeAnyIO() {
 	pkg := this.pkg("1.0.0")
 	pkg.RemoteAddress = URL{}
@@ -317,6 +323,18 @@ func (this *ClientFixture) TestTagModificationDuringUploadIsNotLost() {
 	this.So(err, should.BeNil)
 	tags, _ := this.client.Tags(this.ctx, this.ref())
 	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "1.0.0"}})
+}
+
+func (this *ClientFixture) TestModifyTagsRejectsInvalidTagNamesToDelete() {
+	for _, name := range []string{"", "latest"} {
+		err := this.client.ModifyTags(this.ctx, TagModification{
+			PackageName:   "team/package",
+			RemoteAddress: this.remote,
+			Delete:        []Tag{{Name: name}},
+		})
+		this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	}
+	this.So(this.storage.objects, should.BeEmpty)
 }
 
 func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {

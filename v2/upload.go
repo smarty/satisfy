@@ -106,6 +106,8 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 		return fmt.Errorf("%w: package name is required", ErrInvalidConfig)
 	case pkg.PackageVersion == "":
 		return fmt.Errorf("%w: package version is required", ErrInvalidConfig)
+	case pkg.PackageVersion == "latest":
+		return fmt.Errorf("%w: \"latest\" is reserved and cannot be uploaded as a version", ErrInvalidConfig)
 	case pkg.RemoteAddress.Host == "":
 		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
 	}
