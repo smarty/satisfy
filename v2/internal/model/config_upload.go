@@ -2,7 +2,6 @@ package model
 
 import (
 	"net/url"
-	"path"
 )
 
 type PackageConfig struct {
@@ -22,9 +21,7 @@ func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
 }
 
 func (this PackageConfig) ComposeLatestManifestRemoteAddress() url.URL {
-	address := url.URL(this.RemoteAddress)
-	address.Path = path.Join(address.Path, this.PackageName, RemoteManifestFilename)
-	return address
+	return AppendRemotePath(url.URL(this.RemoteAddress), this.PackageName, "latest", RemoteManifestFilename)
 }
 
 // Ref returns the reference to the package being uploaded.

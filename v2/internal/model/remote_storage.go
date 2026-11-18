@@ -49,6 +49,9 @@ type Downloader interface {
 	Size(context.Context, url.URL) (int64, error)
 }
 
+// AppendRemotePath returns the address of fileName for the package version
+// under prefix, always with a leading "/". The version "latest" addresses the
+// package's root (e.g. its root manifest).
 func AppendRemotePath(prefix url.URL, packageName, version, fileName string) url.URL {
 	if version == "latest" {
 		prefix.Path = path.Join(prefix.Path, packageName, fileName)

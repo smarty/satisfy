@@ -76,3 +76,12 @@ func (this *DependencyFixture) TestTitleString() {
 
 	this.So(dependency.Title(), should.Equal, "[package-name @ 1.2.3]")
 }
+
+func (this *DependencyFixture) TestRootManifestAddressesAgreeWithoutPathPrefix() {
+	prefix := URL{Scheme: "gcs", Host: "bucket"}
+	expected := url.URL{Scheme: "gcs", Host: "bucket", Path: "/team/package/manifest.json"}
+
+	this.So(PackageConfig{RemoteAddress: prefix, PackageName: "team/package"}.ComposeLatestManifestRemoteAddress(), should.Resemble, expected)
+	this.So(Dependency{RemoteAddress: prefix, PackageName: "team/package"}.ComposeLatestManifestRemoteAddress(), should.Resemble, expected)
+	this.So(TagModificationConfig{RemoteAddress: prefix, PackageName: "team/package"}.ComposeRootManifestAddress(), should.Resemble, expected)
+}

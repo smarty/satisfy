@@ -2,7 +2,6 @@ package model
 
 import (
 	"net/url"
-	"path"
 )
 
 type TagModificationConfig struct {
@@ -13,9 +12,7 @@ type TagModificationConfig struct {
 }
 
 func (this TagModificationConfig) ComposeRootManifestAddress() url.URL {
-	address := url.URL(this.RemoteAddress)
-	address.Path = path.Join("/", address.Path, this.PackageName, RemoteManifestFilename)
-	return address
+	return AppendRemotePath(url.URL(this.RemoteAddress), this.PackageName, "latest", RemoteManifestFilename)
 }
 
 func (this TagModificationConfig) ComposeVersionedManifestAddress(version string) url.URL {
