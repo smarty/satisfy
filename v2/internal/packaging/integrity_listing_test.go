@@ -1,6 +1,8 @@
 package packaging
 
 import (
+	"fmt"
+	"io/fs"
 	"testing"
 
 	"github.com/smarty/assertions/should"
@@ -56,4 +58,21 @@ func (this *IntegrityListingFixture) TestFileSizeMismatch() {
 	this.manifest.Archive.Contents[0].Size = 0
 
 	this.So(this.checker.Verify(this.manifest, "/local"), should.NotBeNil)
+}
+
+func (this *IntegrityListingFixture) TestWrappedNotExistErrorIsReportedAsMissingFile() {
+	checker := NewFileListingIntegrityChecker(wrappedNotExist{})
+
+	err := checker.Verify(this.manifest, "/local")
+
+	this.So(err, should.NotBeNil)
+	this.So(err.Error(), should.StartWith, "filename not found")
+}
+
+// wrappedNotExist reports every path as missing, wrapping fs.ErrNotExist as
+// file systems commonly do.
+type wrappedNotExist struct{}
+
+func (wrappedNotExist) Stat(path string) (model.FileInfo, error) {
+	return nil, fmt.Errorf("stat %s: %w", path, fs.ErrNotExist)
 }

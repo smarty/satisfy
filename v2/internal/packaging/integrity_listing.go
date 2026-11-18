@@ -1,8 +1,9 @@
 package packaging
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -20,7 +21,7 @@ func (this *FileListingIntegrityChecker) Verify(manifest model.Manifest, localPa
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		fileInfo, err := this.fileSystem.Stat(fullPath)
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("filename not found for \"%s\"", fullPath)
 		}
 		if err != nil {

@@ -5,8 +5,8 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -83,7 +83,7 @@ func (this *DependencyResolver) loadLocalManifest(manifestPath string) (localMan
 
 func (this *DependencyResolver) localManifestExists(manifestPath string) bool {
 	_, err := this.fileSystem.Stat(manifestPath)
-	return !os.IsNotExist(err)
+	return !errors.Is(err, fs.ErrNotExist)
 }
 
 func (this *DependencyResolver) isInstalledCorrectly(ctx context.Context, localManifest model.Manifest) (bool, error) {
