@@ -69,7 +69,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		Version: pkg.PackageVersion,
 		Archive: model.Archive{
 			Filename:             model.RemoteArchiveFilename,
-			Size:                 uint64(built.size),
+			Size:                 built.size,
 			MD5Checksum:          built.checksum,
 			Contents:             built.contents,
 			CompressionAlgorithm: pkg.CompressionAlgorithm,
@@ -214,7 +214,7 @@ func (this *Client) uploadArchive(ctx context.Context, pkg model.PackageConfig, 
 	return this.storage.Upload(ctx, model.UploadRequest{
 		RemoteAddress: pkg.ComposeRemoteAddress(model.RemoteArchiveFilename),
 		Body:          file,
-		Size:          int64(manifest.Archive.Size),
+		Size:          manifest.Archive.Size,
 		ContentType:   contentType[manifest.Archive.CompressionAlgorithm],
 		Checksum:      manifest.Archive.MD5Checksum,
 	})

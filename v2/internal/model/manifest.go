@@ -23,7 +23,7 @@ func (this Manifest) TagVersion(name string) (version string, found bool) {
 
 type Archive struct {
 	Filename             string        `json:"filename"`
-	Size                 uint64        `json:"size"`
+	Size                 int64         `json:"size"`
 	MD5Checksum          []byte        `json:"md5"`
 	Contents             []ArchiveItem `json:"contents"`
 	CompressionAlgorithm string        `json:"compression"`

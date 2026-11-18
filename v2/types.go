@@ -127,7 +127,7 @@ type Archive struct {
 	Filename string `json:"filename"`
 
 	// Size is the size of the compressed archive in bytes.
-	Size uint64 `json:"size"`
+	Size int64 `json:"size"`
 
 	// MD5Checksum is the MD5 checksum of the compressed archive.
 	MD5Checksum []byte `json:"md5"`
