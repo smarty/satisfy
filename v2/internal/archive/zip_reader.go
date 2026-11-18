@@ -59,22 +59,12 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 		mode = 0755
 	}
 	return &tar.Header{
-		Typeflag:   typeflag,
-		Name:       zipHeader.Name,
-		Linkname:   linkname,
-		Size:       size,
-		Mode:       mode,
-		Uid:        0,
-		Gid:        0,
-		Uname:      "",
-		Gname:      "",
-		ModTime:    zipHeader.Modified,
-		AccessTime: zipHeader.Modified,
-		ChangeTime: zipHeader.Modified,
-		Devmajor:   0,
-		Devminor:   0,
-		PAXRecords: nil,
-		Format:     0,
+		Typeflag: typeflag,
+		Name:     zipHeader.Name,
+		Linkname: linkname,
+		Size:     size,
+		Mode:     mode,
+		ModTime:  zipHeader.Modified,
 	}, nil
 }
 
