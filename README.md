@@ -483,14 +483,19 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | Deleting `manifest_*.json` from a directory before uploading it | `satisfy.UploadRequest{ExcludeInstalledManifests: true}` |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |
 
-The command line is unchanged apart from these additions:
-* `-concurrency` flag for downloads
+The command line keeps its commands, flags and request files, with these
+changes:
+* downloads install at most as many packages at once as there are CPUs (v0
+  started them all at once); the new `-concurrency` flag sets the limit
 * progress shown on stderr
 * structured (`key=value`) log lines on stderr
 * `satisfy version` printing to stdout
 * `-h` exiting with code `0`
 * JSON keys in request files must match exactly (they are case-sensitive)
   and may not repeat
+* an upload config that sets more than one of `source_path`,
+  `source_directory` and `source_file` is rejected (v0 used the first one set)
+* an upload with `package_version` `latest` is rejected
 
 ## Building and testing
 
