@@ -181,7 +181,3 @@ type Progress struct {
 	// Done is set on the final report for the item.
 	Done bool
 }
-
-// StatusError is returned when remote storage responds with an unexpected
-// HTTP status code.
-type StatusError = model.StatusCodeError

@@ -235,6 +235,9 @@ func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
 func (this *ClientFixture) TestUnknownPackageIsNotFound() {
 	_, err := this.client.Latest(this.ctx, PackageRef{RemoteAddress: this.remote, Name: "no/such/package"})
 	this.So(errors.Is(err, ErrNotFound), should.BeTrue)
+	code, found := StatusCode(err)
+	this.So(code, should.Equal, http.StatusNotFound)
+	this.So(found, should.BeTrue)
 
 	err = this.client.Install(this.ctx, Dependency{
 		PackageName:    "no/such/package",

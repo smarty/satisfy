@@ -19,3 +19,14 @@ var (
 	// or inconsistent input.
 	ErrInvalidConfig = errors.New("invalid configuration")
 )
+
+// StatusCode returns the HTTP status code of the first unexpected response
+// from remote storage found in err's chain, and whether one was found. A
+// 404 also matches ErrNotFound.
+func StatusCode(err error) (int, bool) {
+	var statusErr *model.StatusCodeError
+	if errors.As(err, &statusErr) {
+		return statusErr.StatusCode(), true
+	}
+	return 0, false
+}
