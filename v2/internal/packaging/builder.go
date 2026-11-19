@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/smarty/satisfy/v2/internal/archive"
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -55,7 +56,9 @@ func (this *DirectoryPackageBuilder) WithExclusion(exclude func(relativePath str
 }
 
 // Build archives the listing. It stops with ctx's error once ctx is done,
-// checking between files and while copying each file.
+// checking between files and while copying each file. A file name that is not
+// valid UTF-8 (which the JSON manifest cannot hold) fails the build before
+// anything is archived.
 func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	listing, err := this.storage.Listing()
 	if err != nil {
@@ -63,18 +66,21 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	}
 	this.listing = listing
 	if fileInfo, ok := this.fileOnly(); ok {
+		if err = checkName(filepath.Base(fileInfo.Path()), fileInfo.Path()); err != nil {
+			return err
+		}
 		err = this.add(ctx, fileInfo, true)
 		if err != nil {
 			return err
 		}
 	} else {
-		for _, file := range listing {
+		included, err := this.included()
+		if err != nil {
+			return err
+		}
+		for _, file := range included {
 			if err = ctx.Err(); err != nil {
 				return err
-			}
-			if this.excluded(file) {
-				this.logger.Info("excluding file from archive", "path", file.Path())
-				continue
 			}
 			err = this.add(ctx, file, false)
 			if err != nil {
@@ -85,8 +91,28 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	return this.archive.Close()
 }
 
-func (this *DirectoryPackageBuilder) excluded(file model.FileInfo) bool {
-	return this.exclude != nil && this.exclude(this.relativePath(file))
+// included returns the files of the listing that are not excluded, checking
+// that their names can be recorded in the manifest.
+func (this *DirectoryPackageBuilder) included() (included []model.FileInfo, err error) {
+	for _, file := range this.listing {
+		relativePath := this.relativePath(file)
+		if this.exclude != nil && this.exclude(relativePath) {
+			this.logger.Info("excluding file from archive", "path", file.Path())
+			continue
+		}
+		if err = checkName(relativePath, file.Path()); err != nil {
+			return nil, err
+		}
+		included = append(included, file)
+	}
+	return included, nil
+}
+
+func checkName(name, fullPath string) error {
+	if utf8.ValidString(name) {
+		return nil
+	}
+	return fmt.Errorf("the file %q cannot be archived: its name is not valid UTF-8", fullPath)
 }
 
 func (this *DirectoryPackageBuilder) relativePath(file model.FileInfo) string {

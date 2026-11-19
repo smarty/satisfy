@@ -105,6 +105,15 @@ func (this *DirectoryPackageBuilderFixture) TestListingErrorIsReturned() {
 
 	this.So(this.builder.Build(context.Background()), should.Equal, listingErr)
 }
+func (this *DirectoryPackageBuilderFixture) TestNamesThatAreNotUTF8FailBeforeAnythingIsArchived() {
+	this.fileSystem.WriteFile("/in/sub/bad\xff.txt", []byte("d"))
+
+	err := this.builder.Build(context.Background())
+
+	this.So(err, should.NotBeNil)
+	this.So(err.Error(), should.ContainSubstring, "not valid UTF-8")
+	this.So(this.builder.Contents(), should.BeEmpty)
+}
 func (this *DirectoryPackageBuilderFixture) TestOpenErrorIsReturned() {
 	openErr := errors.New("open failed")
 	this.fileSystem.errOpen["/in/file1.txt"] = openErr
