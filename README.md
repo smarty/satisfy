@@ -407,9 +407,14 @@ err = client.ModifyTags(ctx, satisfy.TagModification{ /* ... */ })
 
 The library never exits the process or writes to stdout/stderr. Every failure is
 returned as an error; use `errors.Is` with `satisfy.ErrPackageExists`,
-`satisfy.ErrNotFound` and `satisfy.ErrInvalidConfig`, or `errors.As` with
-`*satisfy.StatusError`. Every method takes a `context.Context`, which cancels
-in-flight requests and retries.
+`satisfy.ErrNotFound` and `satisfy.ErrInvalidConfig`, and
+`satisfy.StatusCode(err)` for the HTTP status of an unexpected response from
+storage. Every method takes a `context.Context`, which cancels in-flight
+requests and retries. `ValidateDependencies`, `ValidatePackageConfig` and
+`ValidateTagModification` check input before any I/O.
+
+`LocalDirectory` is used exactly as given: unlike the command line, the
+library does not expand `~` or `$HOME`.
 
 Options:
 
@@ -439,9 +444,11 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | `transfer.NewTagsListApp` / `transfer.NewTagsApp` | `client.Tags` / `client.ModifyTags` |
 | `contracts.UploadConfig{GoogleCredentials, CredentialReader, MaxRetry, ...}` | `satisfy.WithCredentialsReader`, `satisfy.WithMaxRetry`, ... |
 | `contracts.PackageConfig`, `contracts.Dependency`, `contracts.Manifest`, `contracts.URL` | `satisfy.PackageConfig`, `satisfy.Dependency`, `satisfy.Manifest`, `satisfy.URL` (same JSON; same fields except `PackageConfig.RemoteAddressPrefix *URL`, which is now `RemoteAddress URL`) |
+| `contracts.DependencyListing` and its `Validate()` | `client.Install(ctx, dependencies...)`, which validates them; `satisfy.ValidateDependencies(dependencies...)` to check without installing. `~` and `$HOME` in `LocalDirectory` are no longer expanded. |
 | `contracts.TagModificationConfig` | `satisfy.TagModification` (`RemoteAddress` is a `URL` value, not a pointer) |
 | `url.Parse(address)` then `contracts.URL(*parsed)` | `satisfy.ParseURL("gcs://bucket/prefix")` (a bare `bucket/prefix` works too) |
 | `contracts.IsNotFound(err)` | `errors.Is(err, satisfy.ErrNotFound)` |
+| `errors.As` with `*contracts.StatusCodeError`, then `StatusCode()` | `satisfy.StatusCode(err)` |
 | `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries rewind the body |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |
 
