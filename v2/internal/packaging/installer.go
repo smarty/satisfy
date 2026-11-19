@@ -109,15 +109,12 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	defer closeResource(body)
 	checksumReader := NewHashReader(body, md5.New())
 
-	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
-	if !found {
-		return errors.New("invalid compression algorithm")
-	}
-	decompressor, err := factory(checksumReader, this.progress)
+	reader, decompressor, err := OpenArchiveReader(checksumReader, manifest.Archive.CompressionAlgorithm, this.progress)
 	if err != nil {
 		return err
 	}
-	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
+	paths, err := this.extractArchive(reader, request, len(manifest.Archive.Contents))
+	closeResource(decompressor)
 	if err != nil {
 		return errors.Join(err, this.revertFileSystem(paths))
 	}
@@ -130,15 +127,7 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request model.InstallationRequest, itemCount int) (paths []string, err error) {
-	defer closeResource(decompressor)
-	var reader ArchiveReader
-	if archiveReader, ok := decompressor.(ArchiveReader); ok {
-		reader = archiveReader
-	} else {
-		reader = archiveFormats[""](decompressor)
-	}
-
+func (this *PackageInstaller) extractArchive(reader ArchiveReader, request model.InstallationRequest, itemCount int) (paths []string, err error) {
 	for i := 0; ; i++ {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
@@ -249,8 +238,22 @@ type ArchiveReader interface {
 	io.Reader
 }
 
-var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
-	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
+// OpenArchiveReader decompresses source with the named algorithm and returns
+// a reader of the archive's entries, along with the decompressor, which the
+// caller must close.
+func OpenArchiveReader(source io.Reader, algorithm string, progress model.ProgressFunc) (ArchiveReader, io.Closer, error) {
+	factory, found := decompressors[algorithm]
+	if !found {
+		return nil, nil, fmt.Errorf("unsupported compression algorithm: %q", algorithm)
+	}
+	decompressor, err := factory(source, progress)
+	if err != nil {
+		return nil, nil, err
+	}
+	if reader, ok := decompressor.(ArchiveReader); ok {
+		return reader, decompressor, nil // zip
+	}
+	return tar.NewReader(decompressor), decompressor, nil
 }
 
 func closeResource(closer io.Closer) {

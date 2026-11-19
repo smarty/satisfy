@@ -403,6 +403,19 @@ exists, err := client.Exists(ctx, ref, "2026.01.B") // HEAD request; "latest" = 
 version, err := client.Latest(ctx, ref)
 tags, err := client.Tags(ctx, ref)
 err = client.ModifyTags(ctx, satisfy.TagModification{ /* ... */ })
+
+// Read a package without installing it. Manifest resolves a version, a tag,
+// or "latest" the same way Install does.
+manifest, err := client.Manifest(ctx, ref, "stable")
+archive, err := client.OpenArchive(ctx, ref, manifest)
+defer archive.Close()
+for {
+	header, err := archive.Next() // like tar.Reader; zip archives work too
+	if err == io.EOF {
+		break // the archive's checksum matched its manifest
+	}
+	// ... read the file's contents from archive
+}
 ```
 
 The library never exits the process or writes to stdout/stderr. Every failure is
