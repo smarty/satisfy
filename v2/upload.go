@@ -3,7 +3,8 @@ package satisfy
 import (
 	"context"
 	"crypto/md5"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -80,7 +81,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		},
 	}
 	if this.logger.Enabled(ctx, slog.LevelDebug) {
-		raw, _ := json.MarshalIndent(manifest, "", "  ")
+		raw, _ := json.Marshal(manifest, jsontext.WithIndent("  "))
 		this.logger.Debug("built manifest", "manifest", string(raw))
 	}
 

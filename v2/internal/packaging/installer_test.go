@@ -6,7 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/md5"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"log"
@@ -41,7 +41,12 @@ func (this *PackageInstallerFixture) Setup() {
 }
 
 func (this *PackageInstallerFixture) TestInstallManifest() {
-	originalManifest := model.Manifest{Name: "Package/Name", Version: "1.2.3"}
+	originalManifest := model.Manifest{
+		Name:    "Package/Name",
+		Version: "1.2.3",
+		// json/v2 writes nil slices as empty values, which read back as empty slices.
+		Archive: model.Archive{MD5Checksum: []byte{}, Contents: []model.ArchiveItem{}},
+	}
 	this.downloader.prepareManifestDownload(originalManifest)
 
 	request := this.installationRequest(originalManifest.Name)
@@ -56,9 +61,8 @@ func (this *PackageInstallerFixture) TestInstallManifest() {
 
 func (this *PackageInstallerFixture) loadLocalManifest(fileName string) model.Manifest {
 	reader, _ := this.filesystem.Open(fileName)
-	decoder := json.NewDecoder(reader)
 	var localManifest model.Manifest
-	_ = decoder.Decode(&localManifest)
+	_ = json.UnmarshalRead(reader, &localManifest)
 	return localManifest
 }
 

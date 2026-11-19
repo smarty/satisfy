@@ -1,7 +1,7 @@
 package model
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/smarty/assertions/should"
@@ -38,6 +38,8 @@ func (this *ManifestFixture) TestMarshalManifestWithTags() {
 	original := Manifest{
 		Name:    "package-name",
 		Version: "1.2.3",
+		// json/v2 writes nil slices as empty values, which read back as empty slices.
+		Archive: Archive{MD5Checksum: []byte{}, Contents: []ArchiveItem{}},
 		Tags: []Tag{
 			{Name: "stable", Version: "1.2.2"},
 			{Name: "experimental", Version: "1.2.3"},

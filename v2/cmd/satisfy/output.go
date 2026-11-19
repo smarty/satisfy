@@ -1,7 +1,8 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"slices"
@@ -24,7 +25,7 @@ func formatTags(tags []model.Tag, asJSON bool) (string, error) {
 		if sorted == nil {
 			sorted = []model.Tag{}
 		}
-		raw, err := json.MarshalIndent(sorted, "", "  ")
+		raw, err := json.Marshal(sorted, jsontext.WithIndent("  "))
 		if err != nil {
 			return "", err
 		}

@@ -5,7 +5,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -88,7 +89,7 @@ func (this *PackageInstaller) InstallManifest(ctx context.Context, request model
 
 	manifest.Name = request.PackageName
 	manifest.Tags = nil // the tag listing only belongs in the remote root manifest
-	rawManifest, err := json.MarshalIndent(manifest, "", "  ")
+	rawManifest, err := json.Marshal(manifest, jsontext.WithIndent("  "))
 	if err != nil {
 		return model.Manifest{}, err
 	}

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"fmt"
@@ -121,7 +122,7 @@ func readDependencyListing(path string, stdin io.Reader) (listing model.Dependen
 }
 
 func decodeDependencyListing(reader io.Reader) (listing model.DependencyListing, err error) {
-	err = json.NewDecoder(reader).Decode(&listing)
+	err = json.UnmarshalRead(reader, &listing)
 	return listing, err
 }
 
@@ -133,6 +134,6 @@ func emitExampleDependenciesFile(output io.Writer) {
 		RemoteAddress:  model.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
-	raw, _ := json.MarshalIndent(listing, "", "  ") // the example always marshals
+	raw, _ := json.Marshal(listing, jsontext.WithIndent("  ")) // the example always marshals
 	_, _ = fmt.Fprintf(output, "Example json file:\n%s\n", raw)
 }

@@ -2,7 +2,7 @@ package packaging
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/http"
@@ -387,7 +387,9 @@ func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
 	this.fileSystem.WriteFile("local/contents1", []byte("contents1"))
 	this.fileSystem.WriteFile("local/contents2", []byte("contents2"))
 	this.fileSystem.WriteFile("local/contents3", []byte("contents3"))
-	return manifest
+	var stored model.Manifest // as read back from disk
+	_ = json.Unmarshal(raw, &stored)
+	return stored
 }
 
 func (this *DependencyResolverFixture) assertPreviouslyInstalledPackageUninstalled() {

@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"log/slog"
@@ -52,7 +53,7 @@ func (this *Client) downloadManifest(ctx context.Context, address url.URL) (mani
 		return Manifest{}, err
 	}
 	defer func() { _ = body.Close() }()
-	if err = json.NewDecoder(body).Decode(&manifest); err != nil {
+	if err = json.UnmarshalRead(body, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("could not decode manifest at [%s]: %w", address.String(), err)
 	}
 	return manifest, nil
@@ -61,9 +62,7 @@ func (this *Client) downloadManifest(ctx context.Context, address url.URL) (mani
 func (this *Client) uploadManifest(ctx context.Context, manifest Manifest, address url.URL) error {
 	buffer := new(bytes.Buffer)
 	hasher := md5.New()
-	encoder := json.NewEncoder(io.MultiWriter(buffer, hasher))
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(manifest); err != nil {
+	if err := json.MarshalWrite(io.MultiWriter(buffer, hasher), manifest, jsontext.WithIndent("  ")); err != nil {
 		return err
 	}
 	return this.storage.Upload(ctx, model.UploadRequest{
