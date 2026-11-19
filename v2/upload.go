@@ -47,6 +47,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		return Manifest{}, err
 	}
 	pkg := request.Package.internal()
+	rootAddress := pkg.ComposeLatestManifestRemoteAddress()
 
 	if !request.Overwrite {
 		exists, err := this.Exists(ctx, PackageRef{RemoteAddress: request.Package.RemoteAddress, Name: pkg.PackageName}, pkg.PackageVersion)
@@ -56,6 +57,13 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		if exists {
 			return Manifest{}, fmt.Errorf("%s @ %s: %w", pkg.PackageName, pkg.PackageVersion, ErrPackageExists)
 		}
+	}
+
+	// The root manifest is updated last. Reading it now means an unreadable one
+	// fails the upload before the version exists; otherwise a rerun would stop
+	// with ErrPackageExists while latest and the tags were never updated.
+	if _, err := this.downloadManifest(ctx, rootAddress); err != nil && !model.IsNotFound(err) {
+		return Manifest{}, fmt.Errorf("could not read root manifest at [%s]: %w", rootAddress.String(), err)
 	}
 
 	built, err := this.buildArchive(ctx, pkg, request.ExcludeInstalledManifests)
@@ -89,7 +97,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename), nil); err != nil {
 		return Manifest{}, err
 	}
-	err = this.updateRootManifest(ctx, pkg.ComposeLatestManifestRemoteAddress(), func(existing model.Manifest, _ bool) (model.Manifest, error) {
+	err = this.updateRootManifest(ctx, rootAddress, func(existing model.Manifest, _ bool) (model.Manifest, error) {
 		return this.buildRootManifest(pkg, manifest, existing), nil
 	})
 	if err != nil {

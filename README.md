@@ -193,6 +193,11 @@ Flags:
 Exit codes: `0` success, `1` failure, `2` the version was already uploaded
 (unless `-overwrite` is set).
 
+An upload writes the archive, then the version's manifest, then the root
+manifest (`latest` and the tags). If it fails after the version's manifest is
+written, `latest` and the tags are not updated and a rerun exits with `2`;
+rerun with `-overwrite` to finish it.
+
 ---
 
 ### Check

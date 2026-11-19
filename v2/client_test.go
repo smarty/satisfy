@@ -204,6 +204,16 @@ func (this *ClientFixture) TestFailedBuildRemovesItsArchive() {
 	this.So(entries, should.BeEmpty)
 }
 
+func (this *ClientFixture) TestUnreadableRootManifestFailsUploadBeforeAnythingIsWritten() {
+	root := URL{Scheme: "gcs", Host: "bucket", Path: "/prefix/team/package/manifest.json"}
+	this.storage.objects[root.String()] = []byte("not json")
+
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	this.So(err, should.NotBeNil)
+	this.So(this.storage.objects, should.HaveLength, 1)
+}
+
 func (this *ClientFixture) TestUploadRejectsLatestAsAVersion() {
 	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("latest")})
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
