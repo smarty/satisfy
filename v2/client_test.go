@@ -190,6 +190,20 @@ func (this *ClientFixture) TestUploadRequiresExactlyOneSource() {
 	this.So(this.storage.objects, should.BeEmpty)
 }
 
+func (this *ClientFixture) TestFailedBuildRemovesItsArchive() {
+	archives := this.tempDir()
+	defer func() { _ = os.RemoveAll(archives) }()
+	client := New(withStorage(this.storage), withTempDirectory(archives), WithMaxRetry(0))
+	this.So(os.Symlink(os.TempDir(), filepath.Join(this.source, "escape")), should.BeNil)
+
+	_, err := client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	this.So(err, should.NotBeNil)
+	entries, err := os.ReadDir(archives)
+	this.So(err, should.BeNil)
+	this.So(entries, should.BeEmpty)
+}
+
 func (this *ClientFixture) TestUploadRejectsLatestAsAVersion() {
 	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("latest")})
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)

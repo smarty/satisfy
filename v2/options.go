@@ -24,6 +24,7 @@ type clientConfig struct {
 	logger         *slog.Logger
 	progress       model.ProgressFunc
 	storage        model.RemoteStorage // for tests: replaces the GCS client
+	tempDirectory  string              // for tests: where archives are built ("" = os.TempDir)
 }
 
 func defaultClientConfig() clientConfig {
@@ -101,4 +102,8 @@ func WithProgress(progress func(Progress)) Option {
 
 func withStorage(storage model.RemoteStorage) Option {
 	return func(this *clientConfig) { this.storage = storage }
+}
+
+func withTempDirectory(directory string) Option {
+	return func(this *clientConfig) { this.tempDirectory = directory }
 }

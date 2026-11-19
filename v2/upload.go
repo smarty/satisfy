@@ -163,15 +163,16 @@ type builtArchive struct {
 }
 
 func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig, excludeInstalledManifests bool) (built builtArchive, err error) {
-	file, err := os.CreateTemp("", "satisfy-archive-*")
+	file, err := os.CreateTemp(this.tempDirectory, "satisfy-archive-*")
 	if err != nil {
 		return builtArchive{}, err
 	}
-	built.path = file.Name()
+	// the error returns below zero built, so remember the path separately
+	path := file.Name()
 	defer func() {
 		err = errors.Join(err, file.Close())
 		if err != nil {
-			_ = os.Remove(built.path)
+			_ = os.Remove(path)
 		}
 	}()
 
@@ -199,6 +200,7 @@ func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig, e
 	if err = compressor.Close(); err != nil {
 		return builtArchive{}, err
 	}
+	built.path = path
 	built.size = counter.count
 	built.checksum = hasher.Sum(nil)
 	built.contents = builder.Contents()

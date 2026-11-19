@@ -25,6 +25,7 @@ type Client struct {
 	verifyContents bool
 	logger         *slog.Logger
 	progress       model.ProgressFunc
+	tempDirectory  string
 }
 
 // New returns a Client. It performs no I/O.
@@ -45,6 +46,7 @@ func New(options ...Option) *Client {
 		verifyContents: config.verifyContents,
 		logger:         logger,
 		progress:       config.progress,
+		tempDirectory:  config.tempDirectory,
 	}
 }
 
