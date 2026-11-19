@@ -33,13 +33,13 @@ type UploadRequest struct {
 // version. It fails with ErrPackageExists when the version already exists,
 // unless request.Overwrite is set.
 func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest, error) {
-	pkg := request.Package
-	if err := ValidatePackageConfig(pkg); err != nil {
+	if err := ValidatePackageConfig(request.Package); err != nil {
 		return Manifest{}, err
 	}
+	pkg := request.Package.internal()
 
 	if !request.Overwrite {
-		exists, err := this.Exists(ctx, pkg.Ref(), pkg.PackageVersion)
+		exists, err := this.Exists(ctx, PackageRef{RemoteAddress: request.Package.RemoteAddress, Name: pkg.PackageName}, pkg.PackageVersion)
 		if err != nil {
 			return Manifest{}, fmt.Errorf("could not check for an existing package: %w", err)
 		}
@@ -54,10 +54,10 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 	defer func() { _ = os.Remove(built.path) }()
 
-	manifest := Manifest{
+	manifest := model.Manifest{
 		Name:    pkg.PackageName,
 		Version: pkg.PackageVersion,
-		Archive: Archive{
+		Archive: model.Archive{
 			Filename:             model.RemoteArchiveFilename,
 			Size:                 uint64(built.size),
 			MD5Checksum:          built.checksum,
@@ -86,7 +86,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	if err = this.uploadManifest(ctx, rootManifest, pkg.ComposeLatestManifestRemoteAddress()); err != nil {
 		return Manifest{}, err
 	}
-	return manifest, nil
+	return publicManifest(manifest), nil
 }
 
 // ValidatePackageConfig reports incomplete or inconsistent upload input with
@@ -117,7 +117,7 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 	return nil
 }
 
-func sourcePath(pkg PackageConfig) string {
+func sourcePath(pkg model.PackageConfig) string {
 	switch {
 	case pkg.SourcePath != "":
 		return pkg.SourcePath
@@ -141,10 +141,10 @@ type builtArchive struct {
 	path     string
 	size     int64
 	checksum []byte
-	contents []ArchiveItem
+	contents []model.ArchiveItem
 }
 
-func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (built builtArchive, err error) {
+func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (built builtArchive, err error) {
 	file, err := os.CreateTemp("", "satisfy-archive-*")
 	if err != nil {
 		return builtArchive{}, err
@@ -184,7 +184,7 @@ func (this *Client) buildArchive(ctx context.Context, pkg PackageConfig) (built 
 	return built, nil
 }
 
-func (this *Client) uploadArchive(ctx context.Context, pkg PackageConfig, manifest Manifest, path string) error {
+func (this *Client) uploadArchive(ctx context.Context, pkg model.PackageConfig, manifest model.Manifest, path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -202,10 +202,10 @@ func (this *Client) uploadArchive(ctx context.Context, pkg PackageConfig, manife
 // buildRootManifest carries the tag listing forward from the existing root
 // manifest and points any tags named in the package config at the version
 // being uploaded. The versioned manifest never includes tags.
-func (this *Client) buildRootManifest(ctx context.Context, pkg PackageConfig, manifest Manifest) (Manifest, error) {
+func (this *Client) buildRootManifest(ctx context.Context, pkg model.PackageConfig, manifest model.Manifest) (model.Manifest, error) {
 	existing, err := this.downloadManifest(ctx, pkg.ComposeLatestManifestRemoteAddress())
 	if err != nil && !model.IsNotFound(err) { // not found: first upload of this package
-		return Manifest{}, fmt.Errorf("could not read existing root manifest (needed to preserve tags): %w", err)
+		return model.Manifest{}, fmt.Errorf("could not read existing root manifest (needed to preserve tags): %w", err)
 	}
 	rootManifest := manifest
 	rootManifest.Tags = model.MergeTags(existing.Tags, pkg.Tags, pkg.PackageVersion)

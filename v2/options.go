@@ -91,7 +91,12 @@ func WithLogger(logger *slog.Logger) Option {
 // WithProgress receives byte-level progress while archiving, downloading and
 // extracting. The callback may be called from several goroutines at once.
 func WithProgress(progress func(Progress)) Option {
-	return func(this *clientConfig) { this.progress = progress }
+	return func(this *clientConfig) {
+		this.progress = nil
+		if progress != nil {
+			this.progress = func(report model.Progress) { progress(publicProgress(report)) }
+		}
+	}
 }
 
 func withStorage(storage model.RemoteStorage) Option {

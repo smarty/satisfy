@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/smarty/satisfy/v2/internal/fsys"
-	"github.com/smarty/satisfy/v2/internal/model"
 	"github.com/smarty/satisfy/v2/internal/packaging"
 )
 
@@ -26,8 +25,8 @@ func (this *Client) Install(ctx context.Context, dependencies ...Dependency) err
 		packaging.NewFileListingIntegrityChecker(disk),
 		packaging.NewFileContentIntegrityCheck(md5.New, disk, this.verifyContents),
 	)
-	errs := runConcurrently(ctx, this.concurrency, dependencies, func(dependency model.Dependency) error {
-		return packaging.NewDependencyResolver(disk, integrity, installer, dependency, this.logger).Resolve(ctx)
+	errs := runConcurrently(ctx, this.concurrency, dependencies, func(dependency Dependency) error {
+		return packaging.NewDependencyResolver(disk, integrity, installer, dependency.internal(), this.logger).Resolve(ctx)
 	})
 	return errors.Join(errs...)
 }

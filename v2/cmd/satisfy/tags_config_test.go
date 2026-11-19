@@ -12,7 +12,6 @@ import (
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestTagsConfigLoaderFixture(t *testing.T) {
@@ -26,7 +25,7 @@ type TagsConfigLoaderFixture struct {
 	storage      *inMemoryFileSystem
 	environment  FakeEnvironment
 	stdin        *bytes.Buffer
-	modification model.TagModificationConfig
+	modification satisfy.TagModification
 }
 
 func (this *TagsConfigLoaderFixture) Setup() {
@@ -37,14 +36,14 @@ func (this *TagsConfigLoaderFixture) Setup() {
 	credentialsPath := "/path/to/google-credentials.json"
 	this.environment["GOOGLE_APPLICATION_CREDENTIALS"] = credentialsPath
 	this.storage.WriteFile(strings.TrimSpace(credentialsPath), []byte(googleCredentialsJSON))
-	this.modification = model.TagModificationConfig{
+	this.modification = satisfy.TagModification{
 		PackageName:   "cat-sound-data",
-		RemoteAddress: model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
-		Add: []model.Tag{
+		RemoteAddress: satisfy.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		Add: []satisfy.Tag{
 			{Name: "stable", Version: "2026.02.A"},
 			{Name: "marks-favorite", Version: "2026.01.B"},
 		},
-		Delete: []model.Tag{
+		Delete: []satisfy.Tag{
 			{Name: "active-build-test"},
 		},
 	}
@@ -115,7 +114,7 @@ func (this *TagsConfigLoaderFixture) TestBlankPackageName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankRemoteAddress() {
-	this.modification.RemoteAddress = model.URL{}
+	this.modification.RemoteAddress = satisfy.URL{}
 
 	_, err := this.loadConfig()
 
@@ -132,7 +131,7 @@ func (this *TagsConfigLoaderFixture) TestNoModifications() {
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
-	this.modification.Add = append(this.modification.Add, model.Tag{Name: "", Version: "2026.01.A"})
+	this.modification.Add = append(this.modification.Add, satisfy.Tag{Name: "", Version: "2026.01.A"})
 
 	_, err := this.loadConfig()
 
@@ -140,7 +139,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
-	this.modification.Add = append(this.modification.Add, model.Tag{Name: "latest", Version: "2026.01.A"})
+	this.modification.Add = append(this.modification.Add, satisfy.Tag{Name: "latest", Version: "2026.01.A"})
 
 	_, err := this.loadConfig()
 
@@ -148,7 +147,7 @@ func (this *TagsConfigLoaderFixture) TestReservedAddedTagName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
-	this.modification.Add = append(this.modification.Add, model.Tag{Name: "stale", Version: ""})
+	this.modification.Add = append(this.modification.Add, satisfy.Tag{Name: "stale", Version: ""})
 
 	_, err := this.loadConfig()
 
@@ -156,7 +155,7 @@ func (this *TagsConfigLoaderFixture) TestBlankAddedTagVersion() {
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
-	this.modification.Add = append(this.modification.Add, model.Tag{Name: "stable", Version: "2026.01.A"})
+	this.modification.Add = append(this.modification.Add, satisfy.Tag{Name: "stable", Version: "2026.01.A"})
 
 	_, err := this.loadConfig()
 
@@ -164,7 +163,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateAddedTagName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
-	this.modification.Delete = append(this.modification.Delete, model.Tag{Name: ""})
+	this.modification.Delete = append(this.modification.Delete, satisfy.Tag{Name: ""})
 
 	_, err := this.loadConfig()
 
@@ -172,7 +171,7 @@ func (this *TagsConfigLoaderFixture) TestBlankDeletedTagName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
-	this.modification.Delete = append(this.modification.Delete, model.Tag{Name: "active-build-test"})
+	this.modification.Delete = append(this.modification.Delete, satisfy.Tag{Name: "active-build-test"})
 
 	_, err := this.loadConfig()
 
@@ -180,7 +179,7 @@ func (this *TagsConfigLoaderFixture) TestDuplicateDeletedTagName() {
 }
 
 func (this *TagsConfigLoaderFixture) TestTagNameInBothAddAndDelete() {
-	this.modification.Delete = append(this.modification.Delete, model.Tag{Name: "stable"})
+	this.modification.Delete = append(this.modification.Delete, satisfy.Tag{Name: "stable"})
 
 	_, err := this.loadConfig()
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/internal/model"
 )
 
@@ -113,15 +114,15 @@ type RenderProgressFixture struct {
 }
 
 func (this *RenderProgressFixture) TestInProgressRedrawsTheLine() {
-	rendered := renderProgress(model.Progress{
-		Phase: model.ProgressExtracting, Name: "file.txt", Written: 1024, Total: 2048,
+	rendered := renderProgress(satisfy.Progress{
+		Phase: satisfy.ProgressExtracting, Name: "file.txt", Written: 1024, Total: 2048,
 	})
 	this.So(rendered, should.Equal, "\033[2K\rExtracting file.txt: 1 KB of 2 KB.")
 }
 
 func (this *RenderProgressFixture) TestDoneEndsTheLine() {
-	rendered := renderProgress(model.Progress{
-		Phase: model.ProgressArchiving, Name: "file.txt", Written: 1024, Total: 1024, Done: true,
+	rendered := renderProgress(satisfy.Progress{
+		Phase: satisfy.ProgressArchiving, Name: "file.txt", Written: 1024, Total: 1024, Done: true,
 	})
 	this.So(strings.HasSuffix(rendered, "\n"), should.BeTrue)
 	this.So(rendered, should.ContainSubstring, "Done archiving file.txt (1 KB)")

@@ -3,10 +3,10 @@ package main
 import (
 	"slices"
 
-	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2"
 )
 
-func Filter(original []model.Dependency, filter []string) (filtered []model.Dependency) {
+func Filter(original []satisfy.Dependency, filter []string) (filtered []satisfy.Dependency) {
 	if len(filter) == 0 {
 		return original
 	}

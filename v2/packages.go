@@ -24,7 +24,7 @@ func (this *Client) Tags(ctx context.Context, ref PackageRef) ([]Tag, error) {
 	if err != nil {
 		return nil, err
 	}
-	tags := slices.Clone(manifest.Tags)
+	tags := publicTags(manifest.Tags)
 	slices.SortFunc(tags, func(a, b Tag) int { return strings.Compare(a.Name, b.Name) })
 	return tags, nil
 }
@@ -33,14 +33,14 @@ func (this *Client) Tags(ctx context.Context, ref PackageRef) ([]Tag, error) {
 // storage, using a HEAD request. version must be a literal version (tags are
 // not resolved); "latest" reports whether any version has been uploaded.
 func (this *Client) Exists(ctx context.Context, ref PackageRef, version string) (bool, error) {
-	ref, err := validatePackageRef(ref)
+	internal, err := validatePackageRef(ref)
 	if err != nil {
 		return false, err
 	}
 	if version == "" {
 		return false, fmt.Errorf("%w: package version is required", ErrInvalidConfig)
 	}
-	_, err = this.storage.Size(ctx, ref.ComposeManifestAddress(version))
+	_, err = this.storage.Size(ctx, internal.ComposeManifestAddress(version))
 	if model.IsNotFound(err) {
 		return false, nil
 	}
@@ -50,27 +50,27 @@ func (this *Client) Exists(ctx context.Context, ref PackageRef, version string) 
 	return true, nil
 }
 
-func (this *Client) rootManifest(ctx context.Context, ref PackageRef) (Manifest, error) {
-	ref, err := validatePackageRef(ref)
+func (this *Client) rootManifest(ctx context.Context, public PackageRef) (model.Manifest, error) {
+	ref, err := validatePackageRef(public)
 	if err != nil {
-		return Manifest{}, err
+		return model.Manifest{}, err
 	}
 	address := ref.ComposeRootManifestAddress()
 	manifest, err := this.downloadManifest(ctx, address)
 	if model.IsNotFound(err) {
-		return Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
+		return model.Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
 			ref.Name, address.String(), err)
 	}
 	if err != nil {
-		return Manifest{}, fmt.Errorf("could not read root manifest for package %q: %w", ref.Name, err)
+		return model.Manifest{}, fmt.Errorf("could not read root manifest for package %q: %w", ref.Name, err)
 	}
 	return manifest, nil
 }
 
 // validatePackageRef reports an incomplete reference with an error matching
-// ErrInvalidConfig and returns the reference with its name normalized.
-func validatePackageRef(ref PackageRef) (PackageRef, error) {
-	ref = ref.Normalized()
+// ErrInvalidConfig and returns it, with its name normalized, for internal use.
+func validatePackageRef(public PackageRef) (model.PackageRef, error) {
+	ref := public.internal()
 	switch {
 	case ref.Name == "":
 		return ref, fmt.Errorf("%w: package name is required", ErrInvalidConfig)
@@ -82,10 +82,11 @@ func validatePackageRef(ref PackageRef) (PackageRef, error) {
 
 // ModifyTags adds, moves and deletes tags of a package. Every version being
 // tagged must already exist; otherwise nothing is changed.
-func (this *Client) ModifyTags(ctx context.Context, modification TagModification) error {
-	if err := ValidateTagModification(modification); err != nil {
+func (this *Client) ModifyTags(ctx context.Context, public TagModification) error {
+	if err := ValidateTagModification(public); err != nil {
 		return err
 	}
+	modification := public.internal()
 	address := modification.ComposeRootManifestAddress()
 	rootManifest, err := this.downloadManifest(ctx, address)
 	if model.IsNotFound(err) {
@@ -148,7 +149,7 @@ func ValidateTagModification(modification TagModification) error {
 
 // verifyVersionsExist guards against dangling tags by confirming each version
 // to be tagged has a manifest on remote storage.
-func (this *Client) verifyVersionsExist(ctx context.Context, modification TagModification) error {
+func (this *Client) verifyVersionsExist(ctx context.Context, modification model.TagModificationConfig) error {
 	verified := make(map[string]struct{})
 	for _, tag := range modification.Add {
 		if _, done := verified[tag.Version]; done {
@@ -168,7 +169,7 @@ func (this *Client) verifyVersionsExist(ctx context.Context, modification TagMod
 	return nil
 }
 
-func (this *Client) logModifications(rootManifest Manifest, modification TagModification) {
+func (this *Client) logModifications(rootManifest model.Manifest, modification model.TagModificationConfig) {
 	for _, tag := range modification.Add {
 		if existing, found := rootManifest.TagVersion(tag.Name); found {
 			this.logger.Info("updating tag", "tag", tag.Name, "from", existing, "to", tag.Version)

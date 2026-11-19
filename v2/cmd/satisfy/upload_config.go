@@ -20,7 +20,7 @@ type uploadCommandConfig struct {
 	CredentialReader  gcs.CredentialsReader
 	GoogleCredentials gcs.Credentials
 	Overwrite         bool
-	PackageConfig     model.PackageConfig
+	PackageConfig     satisfy.PackageConfig
 	JSONPath          string
 	ShowProgress      bool
 }
@@ -112,10 +112,10 @@ exit code 2: package has already been uploaded`)
 	return config, err
 }
 
-func (this *UploadConfigLoader) parseConfigFile(path string) (config model.PackageConfig, err error) {
+func (this *UploadConfigLoader) parseConfigFile(path string) (config satisfy.PackageConfig, err error) {
 	data, err := this.readRawJSON(path)
 	if err != nil {
-		return model.PackageConfig{}, err
+		return satisfy.PackageConfig{}, err
 	}
 	return config, json.Unmarshal(data, &config)
 }

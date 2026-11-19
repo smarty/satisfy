@@ -16,7 +16,7 @@ import (
 type tagsCommandConfig struct {
 	MaxRetry          int
 	GoogleCredentials gcs.Credentials
-	Modification      model.TagModificationConfig
+	Modification      satisfy.TagModification
 	JSONPath          string
 }
 
@@ -93,10 +93,10 @@ exit code 1: general failure (see stderr for details)`)
 	return config, err
 }
 
-func (this *TagsConfigLoader) parseConfigFile(path string) (config model.TagModificationConfig, err error) {
+func (this *TagsConfigLoader) parseConfigFile(path string) (config satisfy.TagModification, err error) {
 	data, err := readRawJSON(this.storage, this.stdin, path)
 	if err != nil {
-		return model.TagModificationConfig{}, err
+		return satisfy.TagModification{}, err
 	}
 	return config, json.Unmarshal(data, &config)
 }

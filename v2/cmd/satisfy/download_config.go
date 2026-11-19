@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 const stdinPath = "_STDIN_"
@@ -160,10 +159,10 @@ func decodeDependencyListing(reader io.Reader) (listing dependencyListing, err e
 
 func emitExampleDependenciesFile(output io.Writer) {
 	var listing dependencyListing
-	listing.Listing = append(listing.Listing, model.Dependency{
+	listing.Listing = append(listing.Listing, satisfy.Dependency{
 		PackageName:    "example_package_name",
 		PackageVersion: "0.0.1",
-		RemoteAddress:  model.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
+		RemoteAddress:  satisfy.URL{Scheme: "gcs", Host: "bucket_name", Path: "/path/prefix"},
 		LocalDirectory: "local/path",
 	})
 	raw, _ := json.Marshal(listing, jsontext.WithIndent("  ")) // the example always marshals

@@ -47,19 +47,19 @@ func New(options ...Option) *Client {
 	}
 }
 
-func (this *Client) downloadManifest(ctx context.Context, address url.URL) (manifest Manifest, err error) {
+func (this *Client) downloadManifest(ctx context.Context, address url.URL) (manifest model.Manifest, err error) {
 	body, err := this.storage.Download(ctx, address)
 	if err != nil {
-		return Manifest{}, err
+		return model.Manifest{}, err
 	}
 	defer func() { _ = body.Close() }()
 	if err = json.UnmarshalRead(body, &manifest); err != nil {
-		return Manifest{}, fmt.Errorf("could not decode manifest at [%s]: %w", address.String(), err)
+		return model.Manifest{}, fmt.Errorf("could not decode manifest at [%s]: %w", address.String(), err)
 	}
 	return manifest, nil
 }
 
-func (this *Client) uploadManifest(ctx context.Context, manifest Manifest, address url.URL) error {
+func (this *Client) uploadManifest(ctx context.Context, manifest model.Manifest, address url.URL) error {
 	buffer := new(bytes.Buffer)
 	hasher := md5.New()
 	if err := json.MarshalWrite(io.MultiWriter(buffer, hasher), manifest, jsontext.WithIndent("  ")); err != nil {
