@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -217,4 +218,22 @@ func (this *ZipArchiveFixture) TestDownloadFailureIsReturnedAsError() {
 	reader, err := NewZipArchiveReader(iotest.ErrReader(failure), nil)
 	this.So(reader, should.BeNil)
 	this.So(errors.Is(err, failure), should.BeTrue)
+}
+
+func (this *ZipArchiveFixture) TestDownloadFailureStopsProgressReports() {
+	var reports []model.Progress
+	var lock sync.Mutex
+	_, err := NewZipArchiveReader(iotest.ErrReader(errors.New("connection reset")), func(progress model.Progress) {
+		lock.Lock()
+		defer lock.Unlock()
+		reports = append(reports, progress)
+	})
+	this.So(err, should.NotBeNil)
+
+	lock.Lock()
+	defer lock.Unlock()
+	this.So(reports, should.NotBeEmpty)
+	if len(reports) > 0 {
+		this.So(reports[len(reports)-1].Done, should.BeTrue) // Close ran, so no reports follow
+	}
 }

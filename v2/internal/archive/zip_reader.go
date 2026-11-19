@@ -80,14 +80,14 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	multiWriter := io.MultiWriter(tmp, progress)
 	this.size, err = io.Copy(multiWriter, reader)
-
+	// close the counter even when the copy failed, or its goroutine (and the
+	// periodic progress reports) would outlive the download
+	closeErr := progress.Close()
 	if err != nil {
 		return errors.Join(err, tmp.Close())
 	}
-
-	err = progress.Close()
-	if err != nil {
-		return err
+	if closeErr != nil {
+		return closeErr
 	}
 
 	_, err = tmp.Seek(0, io.SeekStart)
