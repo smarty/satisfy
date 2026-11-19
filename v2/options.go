@@ -53,7 +53,9 @@ func WithCredentials(credentials gcs.Credentials) Option {
 }
 
 // WithCredentialsReader reads credentials from reader on first use and again
-// whenever they are 30 minutes old. Without this option or WithCredentials,
+// whenever they are 30 minutes old; if reading them again fails, the old
+// credentials are used until they are 45 minutes old, and a 401 response
+// discards them. Without this option or WithCredentials,
 // credentials are discovered from the environment by gcs.NewCredentialsReader.
 func WithCredentialsReader(reader gcs.CredentialsReader) Option {
 	return func(this *clientConfig) {

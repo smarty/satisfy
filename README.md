@@ -445,7 +445,7 @@ Options:
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `WithCredentialsReader(reader)` | environment discovery (see [Authentication](#authentication)) | Read credentials on first use and again once they are 30 minutes old. |
+| `WithCredentialsReader(reader)` | environment discovery (see [Authentication](#authentication)) | Read credentials on first use and again once they are 30 minutes old. If a re-read fails, the old credentials are used until they are 45 minutes old. |
 | `WithCredentials(credentials)` | — | Use fixed credentials (tokens expire; prefer a reader for long uploads). |
 | `WithHTTPClient(client)` | tuned client | HTTP client used to reach GCS. |
 | `WithMaxRetry(n)` / `WithRetryDelay(d)` | `5` / `3s` | Retry policy for failed requests. |
