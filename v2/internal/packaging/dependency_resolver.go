@@ -115,7 +115,10 @@ func (this *DependencyResolver) isInstalledCorrectly(ctx context.Context, localM
 		}
 	}
 
-	verifyErr := this.integrityChecker.Verify(localManifest, this.dependency.LocalDirectory)
+	verifyErr := this.integrityChecker.Verify(ctx, localManifest, this.dependency.LocalDirectory)
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	if verifyErr != nil {
 		this.logger.Info("integrity check failed; reinstalling", "package", this.dependency.Title(), "error", verifyErr)
 		return false, nil

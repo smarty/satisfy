@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"testing"
@@ -42,7 +43,7 @@ func (this *IntegrityListingFixture) Setup() {
 }
 
 func (this *IntegrityListingFixture) TestFileListingIntegrityCheck() {
-	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.BeNil)
 }
 
 func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
@@ -51,19 +52,19 @@ func (this *IntegrityListingFixture) TestManifestFileNotOnFileSystem() {
 		Size: 5,
 	})
 
-	this.So(this.checker.Verify(this.manifest, "/local"), should.NotBeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.NotBeNil)
 }
 
 func (this *IntegrityListingFixture) TestFileSizeMismatch() {
 	this.manifest.Archive.Contents[0].Size = 0
 
-	this.So(this.checker.Verify(this.manifest, "/local"), should.NotBeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.NotBeNil)
 }
 
 func (this *IntegrityListingFixture) TestWrappedNotExistErrorIsReportedAsMissingFile() {
 	checker := NewFileListingIntegrityChecker(wrappedNotExist{})
 
-	err := checker.Verify(this.manifest, "/local")
+	err := checker.Verify(context.Background(), this.manifest, "/local")
 
 	this.So(err, should.NotBeNil)
 	this.So(err.Error(), should.StartWith, "filename not found")

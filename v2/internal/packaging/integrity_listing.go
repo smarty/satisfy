@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -17,7 +18,7 @@ func NewFileListingIntegrityChecker(fileSystem model.FileChecker) *FileListingIn
 	return &FileListingIntegrityChecker{fileSystem: fileSystem}
 }
 
-func (this *FileListingIntegrityChecker) Verify(manifest model.Manifest, localPath string) error {
+func (this *FileListingIntegrityChecker) Verify(_ context.Context, manifest model.Manifest, localPath string) error {
 	for _, item := range manifest.Archive.Contents {
 		fullPath := filepath.Join(localPath, item.Path)
 		fileInfo, err := this.fileSystem.Stat(fullPath)

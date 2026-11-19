@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"context"
 	"hash"
 	"testing"
 
@@ -54,18 +55,26 @@ func (this *FileContentIntegrityCheckFixture) newHasher() hash.Hash {
 func (this *FileContentIntegrityCheckFixture) TestFileContentsIntact() {
 	this.checker.enabled = true
 
-	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.BeNil)
 }
 
 func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsCauseErrorWhenEnabled() {
 	this.checker.enabled = true
 	this.fileSystem.WriteFile("/local/bb", []byte("modified"))
 
-	this.So(this.checker.Verify(this.manifest, "/local"), should.NotBeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.NotBeNil)
 }
 
 func (this *FileContentIntegrityCheckFixture) TestIncorrectFileContentsIgnoredWhenDisabled() {
 	this.fileSystem.WriteFile("/local/bb", []byte("modified"))
 
-	this.So(this.checker.Verify(this.manifest, "/local"), should.BeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, "/local"), should.BeNil)
+}
+
+func (this *FileContentIntegrityCheckFixture) TestCancelledVerificationStops() {
+	this.checker.enabled = true
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	this.So(this.checker.Verify(ctx, this.manifest, "/local"), should.Equal, context.Canceled)
 }

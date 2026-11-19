@@ -124,6 +124,20 @@ func (this *DependencyResolverFixture) TestIntegrityCheckFailure() {
 	this.So(this.integrityChecker.manifest, should.Resemble, localManifest)
 }
 
+func (this *DependencyResolverFixture) TestCancelledIntegrityCheckStopsWithoutReinstalling() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
+	ctx, cancel := context.WithCancel(context.Background())
+	this.integrityChecker.onVerify = cancel
+	this.integrityChecker.err = context.Canceled
+
+	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency, nil)
+	err := this.resolver.Resolve(ctx)
+
+	this.So(err, should.Equal, context.Canceled)
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+}
+
 func (this *DependencyResolverFixture) TestAlreadyInstalledCorrectly() {
 	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
 
