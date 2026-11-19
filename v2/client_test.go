@@ -78,6 +78,10 @@ func (this *ClientFixture) pkg(version string, tags ...string) PackageConfig {
 	}
 }
 
+func (this *ClientFixture) ref() PackageRef {
+	return PackageRef{RemoteAddress: this.remote, Name: "team/package"}
+}
+
 func (this *ClientFixture) dependency(version string) Dependency {
 	return Dependency{
 		PackageName:    "team/package",
@@ -117,15 +121,42 @@ func (this *ClientFixture) TestUploadExistingVersionFailsWithErrPackageExists() 
 }
 
 func (this *ClientFixture) TestExists() {
-	exists, err := this.client.Exists(this.ctx, this.pkg("1.0.0"))
+	exists, err := this.client.Exists(this.ctx, this.ref(), "1.0.0")
 	this.So(err, should.BeNil)
 	this.So(exists, should.BeFalse)
 
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
 
-	exists, err = this.client.Exists(this.ctx, this.pkg("1.0.0"))
+	exists, err = this.client.Exists(this.ctx, this.ref(), "1.0.0")
 	this.So(err, should.BeNil)
 	this.So(exists, should.BeTrue)
+}
+
+func (this *ClientFixture) TestExistsLatestReportsWhetherAnyVersionWasUploaded() {
+	exists, err := this.client.Exists(this.ctx, this.ref(), "latest")
+	this.So(err, should.BeNil)
+	this.So(exists, should.BeFalse)
+
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	exists, err = this.client.Exists(this.ctx, this.ref(), "latest")
+	this.So(err, should.BeNil)
+	this.So(exists, should.BeTrue)
+}
+
+func (this *ClientFixture) TestIncompletePackageRefIsRejected() {
+	for _, ref := range []PackageRef{
+		{RemoteAddress: this.remote},
+		{RemoteAddress: this.remote, Name: "/"},
+		{Name: "team/package"},
+	} {
+		_, err := this.client.Exists(this.ctx, ref, "1.0.0")
+		this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+		_, err = this.client.Latest(this.ctx, ref)
+		this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	}
+	_, err := this.client.Exists(this.ctx, this.ref(), "")
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *ClientFixture) TestInvalidUploadIsRejectedBeforeAnyIO() {
@@ -140,11 +171,11 @@ func (this *ClientFixture) TestLatestAndTags() {
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0", "beta")})
 
-	latest, err := this.client.Latest(this.ctx, this.remote, "team/package")
+	latest, err := this.client.Latest(this.ctx, this.ref())
 	this.So(err, should.BeNil)
 	this.So(latest, should.Equal, "2.0.0")
 
-	tags, err := this.client.Tags(this.ctx, this.remote, "team/package")
+	tags, err := this.client.Tags(this.ctx, this.ref())
 	this.So(err, should.BeNil)
 	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "1.0.0"}})
 }
@@ -168,7 +199,7 @@ func (this *ClientFixture) TestModifyTags() {
 	})
 	this.So(err, should.BeNil)
 
-	tags, _ := this.client.Tags(this.ctx, this.remote, "team/package")
+	tags, _ := this.client.Tags(this.ctx, this.ref())
 	this.So(tags, should.Resemble, []Tag{{Name: "stable", Version: "2.0.0"}})
 }
 
@@ -197,7 +228,7 @@ func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
 }
 
 func (this *ClientFixture) TestUnknownPackageIsNotFound() {
-	_, err := this.client.Latest(this.ctx, this.remote, "no/such/package")
+	_, err := this.client.Latest(this.ctx, PackageRef{RemoteAddress: this.remote, Name: "no/such/package"})
 	this.So(errors.Is(err, ErrNotFound), should.BeTrue)
 
 	err = this.client.Install(this.ctx, Dependency{

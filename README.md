@@ -394,9 +394,10 @@ if errors.Is(err, satisfy.ErrPackageExists) {
 }
 
 // Inspect packages.
-exists, err := client.Exists(ctx, packageConfig)
-version, err := client.Latest(ctx, remoteAddress, "cat-sound-data")
-tags, err := client.Tags(ctx, remoteAddress, "cat-sound-data")
+ref := satisfy.PackageRef{RemoteAddress: remoteAddress, Name: "cat-sound-data"}
+exists, err := client.Exists(ctx, ref, "2026.01.B") // HEAD request; "latest" = any version uploaded
+version, err := client.Latest(ctx, ref)
+tags, err := client.Tags(ctx, ref)
 err = client.ModifyTags(ctx, satisfy.TagModification{ /* ... */ })
 ```
 
@@ -427,10 +428,10 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | v0 | v2 |
 |----|----|
 | `transfer.NewUploadApp(config).Run()` (exits the process on failure, and with code 2 if the version exists) | `client.Upload(ctx, satisfy.UploadRequest{Package: pkg, Overwrite: overwrite})` returns an error; check `errors.Is(err, satisfy.ErrPackageExists)` |
-| `transfer.NewCheckApp(config).Run()` | `client.Exists(ctx, pkg)` |
+| `transfer.NewCheckApp(config).Run()` | `client.Exists(ctx, ref, version)` |
 | `transfer.NewDownloadApp(config).Run()` | `client.Install(ctx, dependencies...)` |
 | `core.NewPackageInstaller(core.NewRetryClient(shell.NewGoogleCloudStorageClient(...)), ...)` wired by hand | `satisfy.New(options...)` |
-| `transfer.NewLatestApp(config).Run()` (prints to stdout) | `client.Latest(ctx, remoteAddress, name)` returns the version |
+| `transfer.NewLatestApp(config).Run()` (prints to stdout) | `client.Latest(ctx, satisfy.PackageRef{RemoteAddress: remoteAddress, Name: name})` returns the version |
 | `transfer.NewTagsListApp` / `transfer.NewTagsApp` | `client.Tags` / `client.ModifyTags` |
 | `contracts.UploadConfig{GoogleCredentials, CredentialReader, MaxRetry, ...}` | `satisfy.WithCredentialsReader`, `satisfy.WithMaxRetry`, ... |
 | `contracts.PackageConfig`, `contracts.Dependency`, `contracts.Manifest`, `contracts.URL` | `satisfy.PackageConfig`, `satisfy.Dependency`, `satisfy.Manifest`, `satisfy.URL` (same fields and JSON) |

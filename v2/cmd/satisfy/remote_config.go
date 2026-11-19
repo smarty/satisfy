@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/smarty/satisfy/v2/internal/model"
+	"github.com/smarty/satisfy/v2"
 )
 
 // remotePackageFlags are the flags shared by commands that look up a single
@@ -42,33 +42,31 @@ func (this *remotePackageFlags) register(flags *flag.FlagSet) {
 	)
 }
 
-// resolve validates the flags and returns the package name and the remote
-// address under which packages live.
-func (this *remotePackageFlags) resolve() (packageName string, remoteAddress model.URL, err error) {
+// resolve validates the flags and returns the package they identify.
+func (this *remotePackageFlags) resolve() (ref satisfy.PackageRef, err error) {
 	if this.bucket == "" {
-		return "", model.URL{}, errors.New("-bucket is required")
+		return satisfy.PackageRef{}, errors.New("-bucket is required")
 	}
 	if strings.Contains(this.bucket, "/") {
-		return "", model.URL{}, errors.New("-bucket should be a bare bucket name (no scheme, no slashes)")
+		return satisfy.PackageRef{}, errors.New("-bucket should be a bare bucket name (no scheme, no slashes)")
 	}
 
-	packageName = strings.Trim(this.packageName, "/")
-	if packageName == "" {
-		return "", model.URL{}, errors.New("-package is required")
+	ref.Name = strings.Trim(this.packageName, "/")
+	if ref.Name == "" {
+		return satisfy.PackageRef{}, errors.New("-package is required")
 	}
 
-	remoteAddress = model.URL{Scheme: "gcs", Host: this.bucket}
+	ref.RemoteAddress = satisfy.URL{Scheme: "gcs", Host: this.bucket}
 	if prefix := strings.Trim(this.prefix, "/"); prefix != "" {
-		remoteAddress.Path = "/" + prefix
+		ref.RemoteAddress.Path = "/" + prefix
 	}
-	return packageName, remoteAddress, nil
+	return ref, nil
 }
 
 // remotePackageConfig identifies one package's root manifest.
 type remotePackageConfig struct {
-	PackageName   string
-	RemoteAddress model.URL
-	MaxRetry      int
+	Package  satisfy.PackageRef
+	MaxRetry int
 }
 
 func parseLatestConfig(args []string, stderr io.Writer) (config remotePackageConfig, err error) {
@@ -84,7 +82,7 @@ func parseLatestConfig(args []string, stderr io.Writer) (config remotePackageCon
 	if err = flags.Parse(args); err != nil {
 		return remotePackageConfig{}, err
 	}
-	config.PackageName, config.RemoteAddress, err = remote.resolve()
+	config.Package, err = remote.resolve()
 	if err != nil {
 		return remotePackageConfig{}, err
 	}
@@ -116,7 +114,7 @@ func parseTagsListConfig(args []string, stderr io.Writer) (config tagsListComman
 	if err = flags.Parse(args); err != nil {
 		return tagsListCommandConfig{}, err
 	}
-	config.PackageName, config.RemoteAddress, err = remote.resolve()
+	config.Package, err = remote.resolve()
 	if err != nil {
 		return tagsListCommandConfig{}, err
 	}

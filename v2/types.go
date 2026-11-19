@@ -7,6 +7,10 @@ type (
 	// marshals to and from a JSON string.
 	URL = model.URL
 
+	// PackageRef identifies a package on remote storage: the address under
+	// which packages live (e.g. gcs://bucket/prefix) and the package's name.
+	PackageRef = model.PackageRef
+
 	// Dependency describes a package version to install into a local directory.
 	// PackageVersion may be a version, a tag, or "latest".
 	Dependency = model.Dependency

@@ -43,12 +43,14 @@ func checkCommand(ctx context.Context, env environment, args []string) error {
 		return nil
 	}
 	client := env.client(satisfy.WithCredentials(config.GoogleCredentials), satisfy.WithMaxRetry(config.MaxRetry))
-	exists, err := client.Exists(ctx, config.PackageConfig)
+	pkg := config.PackageConfig
+	ref := satisfy.PackageRef{RemoteAddress: *pkg.RemoteAddressPrefix, Name: pkg.PackageName}
+	exists, err := client.Exists(ctx, ref, pkg.PackageVersion)
 	if err != nil {
 		return fmt.Errorf("sanity check failed: %w", err)
 	}
 	if exists {
-		return fmt.Errorf("%s @ %s: %w", config.PackageConfig.PackageName, config.PackageConfig.PackageVersion, satisfy.ErrPackageExists)
+		return fmt.Errorf("%s @ %s: %w", pkg.PackageName, pkg.PackageVersion, satisfy.ErrPackageExists)
 	}
 	return nil
 }
@@ -89,7 +91,7 @@ func latestCommand(ctx context.Context, env environment, args []string) error {
 		return err
 	}
 	client := env.client(satisfy.WithCredentials(credentials), satisfy.WithMaxRetry(config.MaxRetry))
-	version, err := client.Latest(ctx, config.RemoteAddress, config.PackageName)
+	version, err := client.Latest(ctx, config.Package)
 	if err != nil {
 		return err
 	}
@@ -107,7 +109,7 @@ func tagsListCommand(ctx context.Context, env environment, args []string) error 
 		return err
 	}
 	client := env.client(satisfy.WithCredentials(credentials), satisfy.WithMaxRetry(config.MaxRetry))
-	tags, err := client.Tags(ctx, config.RemoteAddress, config.PackageName)
+	tags, err := client.Tags(ctx, config.Package)
 	if err != nil {
 		return err
 	}

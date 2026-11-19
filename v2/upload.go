@@ -28,21 +28,6 @@ type UploadRequest struct {
 	Overwrite bool
 }
 
-// Exists reports whether the package version is already on remote storage.
-func (this *Client) Exists(ctx context.Context, pkg PackageConfig) (bool, error) {
-	if pkg.RemoteAddressPrefix == nil {
-		return false, fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
-	}
-	_, err := this.storage.Size(ctx, pkg.ComposeRemoteAddress(model.RemoteManifestFilename))
-	if model.IsNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 // Upload archives the package's source, uploads the archive and its manifest,
 // and points the package's root manifest (and any configured tags) at the new
 // version. It fails with ErrPackageExists when the version already exists,
@@ -54,7 +39,8 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 
 	if !request.Overwrite {
-		exists, err := this.Exists(ctx, pkg)
+		ref := PackageRef{RemoteAddress: *pkg.RemoteAddressPrefix, Name: pkg.PackageName}
+		exists, err := this.Exists(ctx, ref, pkg.PackageVersion)
 		if err != nil {
 			return Manifest{}, fmt.Errorf("could not check for an existing package: %w", err)
 		}

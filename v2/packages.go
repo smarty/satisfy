@@ -9,10 +9,9 @@ import (
 	"github.com/smarty/satisfy/v2/internal/model"
 )
 
-// Latest returns the most recently uploaded version of the package stored
-// under remoteAddress.
-func (this *Client) Latest(ctx context.Context, remoteAddress URL, packageName string) (string, error) {
-	manifest, err := this.rootManifest(ctx, remoteAddress, packageName)
+// Latest returns the most recently uploaded version of the package.
+func (this *Client) Latest(ctx context.Context, ref PackageRef) (string, error) {
+	manifest, err := this.rootManifest(ctx, ref)
 	if err != nil {
 		return "", err
 	}
@@ -20,8 +19,8 @@ func (this *Client) Latest(ctx context.Context, remoteAddress URL, packageName s
 }
 
 // Tags returns the package's tags, sorted by name.
-func (this *Client) Tags(ctx context.Context, remoteAddress URL, packageName string) ([]Tag, error) {
-	manifest, err := this.rootManifest(ctx, remoteAddress, packageName)
+func (this *Client) Tags(ctx context.Context, ref PackageRef) ([]Tag, error) {
+	manifest, err := this.rootManifest(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -30,22 +29,55 @@ func (this *Client) Tags(ctx context.Context, remoteAddress URL, packageName str
 	return tags, nil
 }
 
-func (this *Client) rootManifest(ctx context.Context, remoteAddress URL, packageName string) (Manifest, error) {
-	packageName = strings.Trim(packageName, "/")
-	if packageName == "" {
-		return Manifest{}, fmt.Errorf("%w: package name is required", ErrInvalidConfig)
+// Exists reports whether a manifest for the package version is on remote
+// storage, using a HEAD request. version must be a literal version (tags are
+// not resolved); "latest" reports whether any version has been uploaded.
+func (this *Client) Exists(ctx context.Context, ref PackageRef, version string) (bool, error) {
+	ref, err := validatePackageRef(ref)
+	if err != nil {
+		return false, err
 	}
-	dependency := Dependency{PackageName: packageName, RemoteAddress: remoteAddress}
-	address := dependency.ComposeLatestManifestRemoteAddress()
+	if version == "" {
+		return false, fmt.Errorf("%w: package version is required", ErrInvalidConfig)
+	}
+	_, err = this.storage.Size(ctx, ref.ComposeManifestAddress(version))
+	if model.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (this *Client) rootManifest(ctx context.Context, ref PackageRef) (Manifest, error) {
+	ref, err := validatePackageRef(ref)
+	if err != nil {
+		return Manifest{}, err
+	}
+	address := ref.ComposeRootManifestAddress()
 	manifest, err := this.downloadManifest(ctx, address)
 	if model.IsNotFound(err) {
 		return Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
-			packageName, address.String(), err)
+			ref.Name, address.String(), err)
 	}
 	if err != nil {
-		return Manifest{}, fmt.Errorf("could not read root manifest for package %q: %w", packageName, err)
+		return Manifest{}, fmt.Errorf("could not read root manifest for package %q: %w", ref.Name, err)
 	}
 	return manifest, nil
+}
+
+// validatePackageRef reports an incomplete reference with an error matching
+// ErrInvalidConfig and returns the reference with its name normalized.
+func validatePackageRef(ref PackageRef) (PackageRef, error) {
+	ref = ref.Normalized()
+	switch {
+	case ref.Name == "":
+		return ref, fmt.Errorf("%w: package name is required", ErrInvalidConfig)
+	case ref.RemoteAddress.Host == "":
+		return ref, fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
+	}
+	return ref, nil
 }
 
 // ModifyTags adds, moves and deletes tags of a package. Every version being
