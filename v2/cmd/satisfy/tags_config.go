@@ -9,7 +9,6 @@ import (
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // tagsCommandConfig is the configuration for the tags modify command.
@@ -22,12 +21,12 @@ type tagsCommandConfig struct {
 
 type TagsConfigLoader struct {
 	reader  gcs.CredentialsReader
-	storage model.FileReader
+	storage fileReader
 	stdin   io.Reader
 	stderr  io.Writer
 }
 
-func NewTagsConfigLoader(storage model.FileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *TagsConfigLoader {
+func NewTagsConfigLoader(storage fileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *TagsConfigLoader {
 	vaultAddress, _ := env.LookupEnv("VAULT_ADDR")
 	vaultToken, _ := env.LookupEnv("VAULT_TOKEN")
 

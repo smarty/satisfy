@@ -10,7 +10,6 @@ import (
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 // uploadCommandConfig is the configuration for the upload and check
@@ -25,14 +24,19 @@ type uploadCommandConfig struct {
 	ShowProgress      bool
 }
 
+// fileReader reads configuration and credential files.
+type fileReader interface {
+	ReadFile(path string) ([]byte, error)
+}
+
 type UploadConfigLoader struct {
 	reader  gcs.CredentialsReader
-	storage model.FileReader
+	storage fileReader
 	stdin   io.Reader
 	stderr  io.Writer
 }
 
-func NewUploadConfigLoader(storage model.FileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
+func NewUploadConfigLoader(storage fileReader, env environmentVariables, stdin io.Reader, stderr io.Writer) *UploadConfigLoader {
 	vaultAddress, _ := env.LookupEnv("VAULT_ADDR")
 	vaultToken, _ := env.LookupEnv("VAULT_TOKEN")
 
@@ -124,7 +128,7 @@ func (this *UploadConfigLoader) readRawJSON(path string) (data []byte, err error
 	return readRawJSON(this.storage, this.stdin, path)
 }
 
-func readRawJSON(storage model.FileReader, stdin io.Reader, path string) (data []byte, err error) {
+func readRawJSON(storage fileReader, stdin io.Reader, path string) (data []byte, err error) {
 	if path == "" {
 		return nil, errBlankJSONPath
 	}

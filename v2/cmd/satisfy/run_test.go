@@ -11,7 +11,6 @@ import (
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
 	"github.com/smarty/satisfy/v2"
-	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestRunFixture(t *testing.T) {
@@ -96,7 +95,7 @@ func (this *ExitCodeFixture) TestSuccess() {
 }
 
 func (this *ExitCodeFixture) TestPackageExistsIsExitCodeTwo() {
-	err := fmt.Errorf("wrapped: %w", model.ErrPackageExists)
+	err := fmt.Errorf("wrapped: %w", satisfy.ErrPackageExists)
 	this.So(exitCode(this.env, err), should.Equal, exitPackageExists)
 }
 
