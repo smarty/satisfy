@@ -158,6 +158,15 @@ func (this *ClientFixture) TestIncompletePackageRefIsRejected() {
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 }
 
+func (this *ClientFixture) TestUploadRequiresExactlyOneSource() {
+	pkg := this.pkg("1.0.0")
+	pkg.SourceFile = filepath.Join(this.source, "hello.txt")
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: pkg})
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	this.So(err.Error(), should.ContainSubstring, "only one of")
+	this.So(this.storage.objects, should.BeEmpty)
+}
+
 func (this *ClientFixture) TestInvalidUploadIsRejectedBeforeAnyIO() {
 	pkg := this.pkg("1.0.0")
 	pkg.RemoteAddress = URL{}

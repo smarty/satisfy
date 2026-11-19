@@ -99,8 +99,12 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 		return fmt.Errorf("%w: package version is required", ErrInvalidConfig)
 	case pkg.RemoteAddress.Host == "":
 		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
-	case sourcePath(pkg) == "":
+	}
+	switch sources := countNonBlank(pkg.SourcePath, pkg.SourceDirectory, pkg.SourceFile); {
+	case sources == 0:
 		return fmt.Errorf("%w: source path, source directory or source file is required", ErrInvalidConfig)
+	case sources > 1:
+		return fmt.Errorf("%w: only one of source path, source directory and source file may be given", ErrInvalidConfig)
 	}
 	if _, found := compression[pkg.CompressionAlgorithm]; !found {
 		return fmt.Errorf("%w: unsupported compression algorithm: %q", ErrInvalidConfig, pkg.CompressionAlgorithm)
@@ -122,6 +126,15 @@ func sourcePath(pkg PackageConfig) string {
 	default:
 		return pkg.SourceFile
 	}
+}
+
+func countNonBlank(values ...string) (count int) {
+	for _, value := range values {
+		if value != "" {
+			count++
+		}
+	}
+	return count
 }
 
 type builtArchive struct {
