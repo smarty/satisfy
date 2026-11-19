@@ -391,6 +391,10 @@ err = client.Install(ctx, satisfy.Dependency{
 	LocalDirectory: "data",
 })
 
+// See which version is installed (e.g. what "stable" resolved to). Fails with
+// an error matching fs.ErrNotExist when the package is not installed there.
+installed, err := satisfy.InstalledManifest("data", "cat-sound-data")
+
 // Upload a package version.
 manifest, err := client.Upload(ctx, satisfy.UploadRequest{Package: satisfy.PackageConfig{ /* ... */ }})
 if errors.Is(err, satisfy.ErrPackageExists) {

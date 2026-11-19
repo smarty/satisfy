@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -193,6 +194,32 @@ func (this *ClientFixture) TestInstallByTag() {
 
 	this.So(this.client.Install(this.ctx, this.dependency("stable")), should.BeNil)
 	this.So(this.readTarget("hello.txt"), should.Equal, "Hello, World!")
+}
+
+func (this *ClientFixture) TestInstalledManifestNamesTheResolvedVersion() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+
+	_, err := InstalledManifest(this.target, "team/package")
+	this.So(errors.Is(err, fs.ErrNotExist), should.BeTrue)
+
+	this.So(this.client.Install(this.ctx, this.dependency("stable")), should.BeNil)
+	manifest, err := InstalledManifest(this.target, "team/package")
+	this.So(err, should.BeNil)
+	this.So(manifest.Name, should.Equal, "team/package")
+	this.So(manifest.Version, should.Equal, "1.0.0")
+
+	this.So(this.client.Install(this.ctx, this.dependency("latest")), should.BeNil)
+	manifest, err = InstalledManifest(this.target, "team/package")
+	this.So(err, should.BeNil)
+	this.So(manifest.Version, should.Equal, "2.0.0")
+}
+
+func (this *ClientFixture) TestInstalledManifestRequiresDirectoryAndName() {
+	_, err := InstalledManifest("", "team/package")
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	_, err = InstalledManifest(this.target, "")
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 }
 
 func (this *ClientFixture) TestModifyTags() {

@@ -3,10 +3,14 @@ package satisfy
 import (
 	"context"
 	"crypto/md5"
+	"encoding/json/v2"
 	"errors"
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/smarty/satisfy/v2/internal/fsys"
+	"github.com/smarty/satisfy/v2/internal/model"
 	"github.com/smarty/satisfy/v2/internal/packaging"
 )
 
@@ -29,6 +33,28 @@ func (this *Client) Install(ctx context.Context, dependencies ...Dependency) err
 		return packaging.NewDependencyResolver(disk, integrity, installer, dependency.internal(), this.logger).Resolve(ctx)
 	})
 	return errors.Join(errs...)
+}
+
+// InstalledManifest returns the manifest Install recorded for the package in
+// localDirectory, which names the version installed there (the version that
+// "latest" or a tag resolved to). localDirectory is used as given, as
+// Install uses it. It reads only the local manifest and does
+// not verify the installed files. When the package is not installed, the
+// error matches fs.ErrNotExist.
+func InstalledManifest(localDirectory, packageName string) (Manifest, error) {
+	if localDirectory == "" || packageName == "" {
+		return Manifest{}, fmt.Errorf("%w: local directory and package name are required", ErrInvalidConfig)
+	}
+	path := packaging.ComposeManifestPath(localDirectory, packageName)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return Manifest{}, err
+	}
+	var manifest model.Manifest
+	if err = json.Unmarshal(raw, &manifest); err != nil {
+		return Manifest{}, fmt.Errorf("could not decode installed manifest at %q: %w", path, err)
+	}
+	return publicManifest(manifest), nil
 }
 
 // runConcurrently calls work for each item, with at most limit calls in flight
