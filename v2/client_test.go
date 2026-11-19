@@ -419,7 +419,7 @@ func (this *fakeStorage) Upload(_ context.Context, request model.UploadRequest) 
 	if this.beforeUpload != nil {
 		this.beforeUpload(request)
 	}
-	raw, err := io.ReadAll(request.Body)
+	raw, err := io.ReadAll(io.NewSectionReader(request.Body, 0, request.Size))
 	if err != nil {
 		return err
 	}

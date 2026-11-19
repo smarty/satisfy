@@ -479,7 +479,7 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | `url.Parse(address)` then `contracts.URL(*parsed)` | `satisfy.ParseURL("gcs://bucket/prefix")` (a bare `bucket/prefix` works too) |
 | `contracts.IsNotFound(err)` | `errors.Is(err, satisfy.ErrNotFound)` |
 | `errors.As` with `*contracts.StatusCodeError`, then `StatusCode()` | `satisfy.StatusCode(err)` |
-| `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries rewind the body |
+| `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries send the body again |
 | Deleting `manifest_*.json` from a directory before uploading it | `satisfy.UploadRequest{ExcludeInstalledManifests: true}` |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |
 

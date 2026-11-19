@@ -21,11 +21,13 @@ type Uploader interface {
 	Upload(context.Context, UploadRequest) error
 }
 
-// UploadRequest describes an object to upload. Body is rewound to its start
-// before every attempt, so it may be sent more than once.
+// UploadRequest describes an object to upload: Size bytes of Body, from
+// offset 0. Every attempt reads Body through its own io.SectionReader, so it
+// may be sent more than once, even while an abandoned attempt is still
+// reading it.
 type UploadRequest struct {
 	RemoteAddress url.URL
-	Body          io.ReadSeeker
+	Body          io.ReaderAt
 	Size          int64
 	ContentType   string
 	Checksum      []byte

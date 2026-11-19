@@ -66,6 +66,21 @@ func (this *GoogleCloudStorageClientFixture) TestFailedPreconditionIsReported() 
 	this.So(errors.Is(err, model.ErrRetryable), should.BeFalse)
 }
 
+// net/http may still be reading an attempt's body after Do returns. A late
+// read of an abandoned attempt's body must not disturb the next attempt.
+func (this *GoogleCloudStorageClientFixture) TestALateReadOfAnAbandonedAttemptDoesNotDisturbTheNextOne() {
+	this.transport.readBody = 3 // the first attempt reads part of its body and is abandoned
+	request := model.UploadRequest{RemoteAddress: this.address, Body: strings.NewReader("payload"), Size: 7}
+	this.So(this.client.Upload(context.Background(), request), should.BeNil)
+	abandoned := this.transport.request.Body
+
+	this.transport.readBody = 0
+	this.transport.beforeRead = func() { _, _ = abandoned.Read(make([]byte, 2)) }
+	this.So(this.client.Upload(context.Background(), request), should.BeNil)
+
+	this.So(this.transport.bodies, should.Resemble, []string{"pay", "payload"})
+}
+
 func (this *GoogleCloudStorageClientFixture) TestDownloadReportsObjectGeneration() {
 	this.transport.header.Set("x-goog-generation", "1700000000000001")
 	body, err := this.client.Download(context.Background(), this.address)
@@ -140,6 +155,10 @@ type fakeTransport struct {
 	status  int
 	header  http.Header
 	request *http.Request
+
+	readBody   int64  // when positive, read only this many bytes of the body
+	beforeRead func() // runs before the body is read
+	bodies     []string
 }
 
 func (this *fakeTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -147,8 +166,16 @@ func (this *fakeTransport) RoundTrip(request *http.Request) (*http.Response, err
 	if this.err != nil {
 		return nil, this.err
 	}
+	if this.beforeRead != nil {
+		this.beforeRead()
+	}
 	if request.Body != nil {
-		_, _ = io.Copy(io.Discard, request.Body)
+		var body io.Reader = request.Body
+		if this.readBody > 0 {
+			body = io.LimitReader(body, this.readBody)
+		}
+		raw, _ := io.ReadAll(body)
+		this.bodies = append(this.bodies, string(raw))
 	}
 	return &http.Response{
 		StatusCode: this.status,

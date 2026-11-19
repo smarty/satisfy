@@ -37,11 +37,6 @@ func NewRetryClient(inner model.RemoteStorage, maxRetry int, delay time.Duration
 
 func (this *RetryClient) Upload(ctx context.Context, request model.UploadRequest) error {
 	return this.retry(ctx, "upload", func() error {
-		if request.Body != nil {
-			if _, err := request.Body.Seek(0, io.SeekStart); err != nil {
-				return err
-			}
-		}
 		return this.inner.Upload(ctx, request)
 	})
 }
