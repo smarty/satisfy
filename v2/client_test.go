@@ -159,6 +159,27 @@ func (this *ClientFixture) TestIncompletePackageRefIsRejected() {
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 }
 
+func (this *ClientFixture) TestUploadCanExcludeInstalledManifests() {
+	this.writeSource("manifest_team___package.json", "{}")
+	this.writeSource("nested/manifest_other.json", "{}")
+	this.writeSource("nested/manifest.json", "kept: not an installed manifest")
+
+	manifest, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0"), ExcludeInstalledManifests: true})
+	this.So(err, should.BeNil)
+	this.So(archivePaths(manifest), should.Resemble, []string{"hello.txt", "nested/goodbye.txt", "nested/manifest.json"})
+
+	manifest, err = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+	this.So(err, should.BeNil)
+	this.So(archivePaths(manifest), should.HaveLength, 5)
+}
+
+func archivePaths(manifest Manifest) (paths []string) {
+	for _, item := range manifest.Archive.Contents {
+		paths = append(paths, item.Path)
+	}
+	return paths
+}
+
 func (this *ClientFixture) TestUploadRequiresExactlyOneSource() {
 	pkg := this.pkg("1.0.0")
 	pkg.SourceFile = filepath.Join(this.source, "hello.txt")

@@ -395,8 +395,13 @@ err = client.Install(ctx, satisfy.Dependency{
 // an error matching fs.ErrNotExist when the package is not installed there.
 installed, err := satisfy.InstalledManifest("data", "cat-sound-data")
 
-// Upload a package version.
-manifest, err := client.Upload(ctx, satisfy.UploadRequest{Package: satisfy.PackageConfig{ /* ... */ }})
+// Upload a package version. ExcludeInstalledManifests leaves out the
+// manifest_*.json files Install writes, for directories packages were
+// installed into.
+manifest, err := client.Upload(ctx, satisfy.UploadRequest{
+	Package:                   satisfy.PackageConfig{ /* ... */ },
+	ExcludeInstalledManifests: true,
+})
 if errors.Is(err, satisfy.ErrPackageExists) {
 	// already uploaded; set Overwrite: true to replace it
 }
@@ -467,6 +472,7 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | `contracts.IsNotFound(err)` | `errors.Is(err, satisfy.ErrNotFound)` |
 | `errors.As` with `*contracts.StatusCodeError`, then `StatusCode()` | `satisfy.StatusCode(err)` |
 | `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries rewind the body |
+| Deleting `manifest_*.json` from a directory before uploading it | `satisfy.UploadRequest{ExcludeInstalledManifests: true}` |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |
 
 The command line is unchanged apart from these additions:

@@ -32,6 +32,7 @@ type DirectoryPackageBuilder struct {
 	listing  []model.FileInfo
 	logger   *slog.Logger
 	progress model.ProgressFunc
+	exclude  func(relativePath string) bool
 }
 
 func NewDirectoryPackageBuilder(
@@ -40,7 +41,7 @@ func NewDirectoryPackageBuilder(
 	hasher hash.Hash,
 	logger *slog.Logger,
 	progress model.ProgressFunc,
-) PackageBuilder {
+) *DirectoryPackageBuilder {
 	return &DirectoryPackageBuilder{
 		storage:  storage,
 		archive:  archive,
@@ -48,6 +49,14 @@ func NewDirectoryPackageBuilder(
 		logger:   model.LoggerOrDiscard(logger),
 		progress: progress,
 	}
+}
+
+// WithExclusion leaves out of a directory's archive every file for which
+// exclude returns true, given the file's path relative to the directory. It
+// has no effect when the source is a single file.
+func (this *DirectoryPackageBuilder) WithExclusion(exclude func(relativePath string) bool) *DirectoryPackageBuilder {
+	this.exclude = exclude
+	return this
 }
 
 // Build archives the listing. It stops with ctx's error once ctx is done,
@@ -68,6 +77,10 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
+			if this.excluded(file) {
+				this.logger.Info("excluding file from archive", "path", file.Path())
+				continue
+			}
 			err = this.add(ctx, file, false)
 			if err != nil {
 				return err
@@ -75,6 +88,14 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 		}
 	}
 	return this.archive.Close()
+}
+
+func (this *DirectoryPackageBuilder) excluded(file model.FileInfo) bool {
+	return this.exclude != nil && this.exclude(this.relativePath(file))
+}
+
+func (this *DirectoryPackageBuilder) relativePath(file model.FileInfo) string {
+	return strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
 }
 
 func (this *DirectoryPackageBuilder) add(ctx context.Context, file model.FileInfo, fileOnly bool) error {
@@ -140,7 +161,7 @@ func (this *DirectoryPackageBuilder) buildHeader(file model.FileInfo, fileOnly b
 	if fileOnly {
 		header.Name = filepath.Base(file.Path())
 	} else {
-		header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+		header.Name = this.relativePath(file)
 	}
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
@@ -180,7 +201,7 @@ func (this *DirectoryPackageBuilder) buildManifestEntry(file model.FileInfo, sym
 	if _, ok := this.fileOnly(); ok {
 		path = filepath.Base(file.Path())
 	} else {
-		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+		path = this.relativePath(file)
 	}
 	return model.ArchiveItem{
 		Path:        path,

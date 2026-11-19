@@ -46,6 +46,23 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
+func (this *DirectoryPackageBuilderFixture) TestExcludedFilesAreLeftOut() {
+	var seen []string
+	builder := NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, nil).
+		WithExclusion(func(relativePath string) bool {
+			seen = append(seen, relativePath)
+			return relativePath == "file1.txt" || relativePath == "sub/file0.txt"
+		})
+
+	err := builder.Build(context.Background())
+
+	this.So(err, should.BeNil)
+	this.So(seen, should.Resemble, []string{"file0.txt", "file1.txt", "inner/link.txt", "sub/file0.txt"})
+	this.So(builder.Contents(), should.Resemble, []model.ArchiveItem{
+		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
+	})
+}
 func (this *DirectoryPackageBuilderFixture) TestCancelledBuildStops() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

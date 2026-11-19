@@ -10,6 +10,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
+	"path/filepath"
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
@@ -26,6 +28,12 @@ type UploadRequest struct {
 	// Overwrite replaces the package version when it already exists instead
 	// of failing with ErrPackageExists.
 	Overwrite bool
+
+	// ExcludeInstalledManifests leaves out of a directory's archive the
+	// manifest_*.json files that Install writes (at any depth), so a
+	// directory that packages were installed into can be uploaded as is. It
+	// has no effect when the source is a single file.
+	ExcludeInstalledManifests bool
 }
 
 // Upload archives the package's source, uploads the archive and its manifest,
@@ -48,7 +56,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		}
 	}
 
-	built, err := this.buildArchive(ctx, pkg)
+	built, err := this.buildArchive(ctx, pkg, request.ExcludeInstalledManifests)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -117,6 +125,13 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 	return nil
 }
 
+// isInstalledManifest reports whether the file at relativePath is named like
+// the manifests Install writes.
+func isInstalledManifest(relativePath string) bool {
+	matched, _ := path.Match("manifest_*.json", path.Base(filepath.ToSlash(relativePath)))
+	return matched
+}
+
 func sourcePath(pkg model.PackageConfig) string {
 	switch {
 	case pkg.SourcePath != "":
@@ -144,7 +159,7 @@ type builtArchive struct {
 	contents []model.ArchiveItem
 }
 
-func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (built builtArchive, err error) {
+func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig, excludeInstalledManifests bool) (built builtArchive, err error) {
 	file, err := os.CreateTemp("", "satisfy-archive-*")
 	if err != nil {
 		return builtArchive{}, err
@@ -171,6 +186,9 @@ func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (
 		this.logger,
 		this.progress,
 	)
+	if excludeInstalledManifests {
+		builder.WithExclusion(isInstalledManifest)
+	}
 	if err = builder.Build(ctx); err != nil {
 		_ = compressor.Close()
 		return builtArchive{}, err
