@@ -34,6 +34,11 @@ func (this *URL) UnmarshalJSON(p []byte) error {
 	return err
 }
 
+// String returns the address in URL form, e.g. "gcs://bucket/prefix".
+func (this URL) String() string {
+	return this.Value().String()
+}
+
 func (this URL) Value() *url.URL {
 	standard := url.URL(this)
 	return &standard

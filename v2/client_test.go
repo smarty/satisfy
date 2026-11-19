@@ -66,14 +66,13 @@ func (this *ClientFixture) writeSource(name, content string) {
 }
 
 func (this *ClientFixture) pkg(version string, tags ...string) PackageConfig {
-	prefix := this.remote
 	return PackageConfig{
 		CompressionAlgorithm: "zstd",
 		CompressionLevel:     1,
 		SourceDirectory:      this.source,
 		PackageName:          "team/package",
 		PackageVersion:       version,
-		RemoteAddressPrefix:  &prefix,
+		RemoteAddress:        this.remote,
 		Tags:                 tags,
 	}
 }
@@ -161,7 +160,7 @@ func (this *ClientFixture) TestIncompletePackageRefIsRejected() {
 
 func (this *ClientFixture) TestInvalidUploadIsRejectedBeforeAnyIO() {
 	pkg := this.pkg("1.0.0")
-	pkg.RemoteAddressPrefix = nil
+	pkg.RemoteAddress = URL{}
 	_, err := this.client.Upload(this.ctx, UploadRequest{Package: pkg})
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 	this.So(this.storage.objects, should.BeEmpty)
@@ -190,11 +189,10 @@ func (this *ClientFixture) TestInstallByTag() {
 func (this *ClientFixture) TestModifyTags() {
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
-	prefix := this.remote
 
 	err := this.client.ModifyTags(this.ctx, TagModification{
 		PackageName:   "team/package",
-		RemoteAddress: &prefix,
+		RemoteAddress: this.remote,
 		Add:           []Tag{{Name: "stable", Version: "2.0.0"}},
 	})
 	this.So(err, should.BeNil)
@@ -204,24 +202,22 @@ func (this *ClientFixture) TestModifyTags() {
 }
 
 func (this *ClientFixture) TestModifyTagsRejectsDuplicateAndConflictingTags() {
-	prefix := this.remote
 	for _, modification := range []TagModification{
 		{Add: []Tag{{Name: "a", Version: "1"}, {Name: "a", Version: "2"}}},
 		{Delete: []Tag{{Name: "a"}, {Name: "a"}}},
 		{Add: []Tag{{Name: "a", Version: "1"}}, Delete: []Tag{{Name: "a"}}},
 	} {
-		modification.PackageName, modification.RemoteAddress = "team/package", &prefix
+		modification.PackageName, modification.RemoteAddress = "team/package", this.remote
 		this.So(errors.Is(this.client.ModifyTags(this.ctx, modification), ErrInvalidConfig), should.BeTrue)
 	}
 }
 
 func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
-	prefix := this.remote
 
 	err := this.client.ModifyTags(this.ctx, TagModification{
 		PackageName:   "team/package",
-		RemoteAddress: &prefix,
+		RemoteAddress: this.remote,
 		Add:           []Tag{{Name: "stable", Version: "9.9.9"}},
 	})
 	this.So(errors.Is(err, ErrNotFound), should.BeTrue)

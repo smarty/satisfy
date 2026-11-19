@@ -39,8 +39,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 
 	if !request.Overwrite {
-		ref := PackageRef{RemoteAddress: *pkg.RemoteAddressPrefix, Name: pkg.PackageName}
-		exists, err := this.Exists(ctx, ref, pkg.PackageVersion)
+		exists, err := this.Exists(ctx, pkg.Ref(), pkg.PackageVersion)
 		if err != nil {
 			return Manifest{}, fmt.Errorf("could not check for an existing package: %w", err)
 		}
@@ -98,7 +97,7 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 		return fmt.Errorf("%w: package name is required", ErrInvalidConfig)
 	case pkg.PackageVersion == "":
 		return fmt.Errorf("%w: package version is required", ErrInvalidConfig)
-	case pkg.RemoteAddressPrefix == nil:
+	case pkg.RemoteAddress.Host == "":
 		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
 	case sourcePath(pkg) == "":
 		return fmt.Errorf("%w: source path, source directory or source file is required", ErrInvalidConfig)

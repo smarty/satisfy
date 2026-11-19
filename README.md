@@ -379,11 +379,15 @@ client := satisfy.New(
 	satisfy.WithMaxRetry(3),
 )
 
+// Remote addresses are satisfy.URL values: build one directly, e.g.
+// satisfy.URL{Scheme: "gcs", Host: "cats-data-dev"}, or parse one.
+remoteAddress, err := satisfy.ParseURL("gcs://cats-data-dev") // or just "cats-data-dev"
+
 // Install (download) packages; already-installed versions are skipped.
-err := client.Install(ctx, satisfy.Dependency{
+err = client.Install(ctx, satisfy.Dependency{
 	PackageName:    "cat-sound-data",
 	PackageVersion: "stable", // a version, a tag, or "latest"
-	RemoteAddress:  satisfy.URL{Scheme: "gcs", Host: "cats-data-dev"},
+	RemoteAddress:  remoteAddress,
 	LocalDirectory: "data",
 })
 
@@ -434,7 +438,9 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | `transfer.NewLatestApp(config).Run()` (prints to stdout) | `client.Latest(ctx, satisfy.PackageRef{RemoteAddress: remoteAddress, Name: name})` returns the version |
 | `transfer.NewTagsListApp` / `transfer.NewTagsApp` | `client.Tags` / `client.ModifyTags` |
 | `contracts.UploadConfig{GoogleCredentials, CredentialReader, MaxRetry, ...}` | `satisfy.WithCredentialsReader`, `satisfy.WithMaxRetry`, ... |
-| `contracts.PackageConfig`, `contracts.Dependency`, `contracts.Manifest`, `contracts.URL` | `satisfy.PackageConfig`, `satisfy.Dependency`, `satisfy.Manifest`, `satisfy.URL` (same fields and JSON) |
+| `contracts.PackageConfig`, `contracts.Dependency`, `contracts.Manifest`, `contracts.URL` | `satisfy.PackageConfig`, `satisfy.Dependency`, `satisfy.Manifest`, `satisfy.URL` (same JSON; same fields except `PackageConfig.RemoteAddressPrefix *URL`, which is now `RemoteAddress URL`) |
+| `contracts.TagModificationConfig` | `satisfy.TagModification` (`RemoteAddress` is a `URL` value, not a pointer) |
+| `url.Parse(address)` then `contracts.URL(*parsed)` | `satisfy.ParseURL("gcs://bucket/prefix")` (a bare `bucket/prefix` works too) |
 | `contracts.IsNotFound(err)` | `errors.Is(err, satisfy.ErrNotFound)` |
 | `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries rewind the body |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |

@@ -115,7 +115,7 @@ func ValidateTagModification(modification TagModification) error {
 	switch {
 	case modification.PackageName == "":
 		return fmt.Errorf("%w: package name is required", ErrInvalidConfig)
-	case modification.RemoteAddress == nil:
+	case modification.RemoteAddress.Host == "":
 		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
 	case len(modification.Add) == 0 && len(modification.Delete) == 0:
 		return fmt.Errorf("%w: at least one tag addition or deletion is required", ErrInvalidConfig)

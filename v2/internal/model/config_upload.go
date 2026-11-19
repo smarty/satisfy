@@ -13,16 +13,21 @@ type PackageConfig struct {
 	SourcePath           string   `json:"source_path"`
 	PackageName          string   `json:"package_name"`
 	PackageVersion       string   `json:"package_version"`
-	RemoteAddressPrefix  *URL     `json:"remote_address"`
+	RemoteAddress        URL      `json:"remote_address"`
 	Tags                 []string `json:"tags,omitempty"`
 }
 
 func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
-	return AppendRemotePath(url.URL(*this.RemoteAddressPrefix), this.PackageName, this.PackageVersion, filename)
+	return AppendRemotePath(url.URL(this.RemoteAddress), this.PackageName, this.PackageVersion, filename)
 }
 
 func (this PackageConfig) ComposeLatestManifestRemoteAddress() url.URL {
-	address := url.URL(*this.RemoteAddressPrefix)
+	address := url.URL(this.RemoteAddress)
 	address.Path = path.Join(address.Path, this.PackageName, RemoteManifestFilename)
 	return address
+}
+
+// Ref returns the reference to the package being uploaded.
+func (this PackageConfig) Ref() PackageRef {
+	return PackageRef{RemoteAddress: this.RemoteAddress, Name: this.PackageName}
 }

@@ -4,7 +4,8 @@ import "github.com/smarty/satisfy/v2/internal/model"
 
 type (
 	// URL is a remote storage address such as gcs://bucket/path/prefix. It
-	// marshals to and from a JSON string.
+	// marshals to and from a JSON string. Build one directly, e.g.
+	// URL{Scheme: "gcs", Host: "bucket"}, or with ParseURL.
 	URL = model.URL
 
 	// PackageRef identifies a package on remote storage: the address under

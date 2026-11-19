@@ -85,7 +85,7 @@ func (this *UploadConfigLoaderFixture) TestValidJSONFromStdIn() {
 		SourceDirectory:      "source",
 		PackageName:          "package",
 		PackageVersion:       "version",
-		RemoteAddressPrefix:  &model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		RemoteAddress:        model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
 	}
 	raw, _ := json.Marshal(packageConfig)
 	this.stdin.Write(raw)
@@ -222,8 +222,8 @@ func (this *UploadConfigLoaderFixture) TestValidatePackageVersionIsNotBlank() {
 	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
-func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressPrefixIsNotNil() {
-	this.pkgConfig.RemoteAddressPrefix = nil
+func (this *UploadConfigLoaderFixture) TestValidateRemoteAddressIsNotBlank() {
+	this.pkgConfig.RemoteAddress = model.URL{}
 	raw, _ := json.Marshal(this.pkgConfig.configure())
 	this.storage.WriteFile("config.json", raw)
 	args := []string{"-json", "config.json"}
@@ -281,7 +281,7 @@ type FakePackageConfig struct {
 	SourceDirectory      string
 	PackageName          string
 	PackageVersion       string
-	RemoteAddressPrefix  *model.URL
+	RemoteAddress        model.URL
 	Tags                 []string
 }
 
@@ -291,7 +291,7 @@ func NewFakePackageConfig() *FakePackageConfig {
 		SourceDirectory:      "source",
 		PackageName:          "package",
 		PackageVersion:       "version",
-		RemoteAddressPrefix:  &model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		RemoteAddress:        model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
 	}
 }
 
@@ -302,7 +302,7 @@ func (this *FakePackageConfig) configure() model.PackageConfig {
 		SourceDirectory:      this.SourceDirectory,
 		PackageName:          this.PackageName,
 		PackageVersion:       this.PackageVersion,
-		RemoteAddressPrefix:  this.RemoteAddressPrefix,
+		RemoteAddress:        this.RemoteAddress,
 		Tags:                 this.Tags,
 	}
 }

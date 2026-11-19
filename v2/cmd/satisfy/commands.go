@@ -44,8 +44,7 @@ func checkCommand(ctx context.Context, env environment, args []string) error {
 	}
 	client := env.client(satisfy.WithCredentials(config.GoogleCredentials), satisfy.WithMaxRetry(config.MaxRetry))
 	pkg := config.PackageConfig
-	ref := satisfy.PackageRef{RemoteAddress: *pkg.RemoteAddressPrefix, Name: pkg.PackageName}
-	exists, err := client.Exists(ctx, ref, pkg.PackageVersion)
+	exists, err := client.Exists(ctx, pkg.Ref(), pkg.PackageVersion)
 	if err != nil {
 		return fmt.Errorf("sanity check failed: %w", err)
 	}

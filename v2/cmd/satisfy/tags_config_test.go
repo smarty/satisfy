@@ -39,7 +39,7 @@ func (this *TagsConfigLoaderFixture) Setup() {
 	this.storage.WriteFile(strings.TrimSpace(credentialsPath), []byte(googleCredentialsJSON))
 	this.modification = model.TagModificationConfig{
 		PackageName:   "cat-sound-data",
-		RemoteAddress: &model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
+		RemoteAddress: model.URL{Scheme: "gcs", Host: "host", Path: "/path"},
 		Add: []model.Tag{
 			{Name: "stable", Version: "2026.02.A"},
 			{Name: "marks-favorite", Version: "2026.01.B"},
@@ -114,8 +114,8 @@ func (this *TagsConfigLoaderFixture) TestBlankPackageName() {
 	this.So(errors.Is(err, satisfy.ErrInvalidConfig), should.BeTrue)
 }
 
-func (this *TagsConfigLoaderFixture) TestNilRemoteAddress() {
-	this.modification.RemoteAddress = nil
+func (this *TagsConfigLoaderFixture) TestBlankRemoteAddress() {
+	this.modification.RemoteAddress = model.URL{}
 
 	_, err := this.loadConfig()
 
