@@ -16,8 +16,6 @@ func TestArchiveProgressCounter(t *testing.T) {
 
 type ArchiveProgressCounter struct {
 	*gunit.Fixture
-	written int64
-	total   int64
 }
 
 func (this *ArchiveProgressCounter) Setup() {
@@ -33,18 +31,22 @@ func (this *ArchiveProgressCounter) TestRound() {
 	this.So(rounded, should.Equal, 26.225)
 }
 
-func (this *ArchiveProgressCounter) LongTestProgress() {
-	a := NewArchiveProgressCounter(250_000_000, func(written, total int64, done bool) {
-		this.written = written
-		this.total = total
+func (this *ArchiveProgressCounter) TestFinalReportCarriesWrittenAndTotal() {
+	var lock sync.Mutex
+	var written, total int64
+	counter := NewArchiveProgressCounter(250_000_000, func(w, t int64, done bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		written, total = w, t
 	})
-	a.Write([]byte{'t', 'e', 's', 't'})
-	time.Sleep(3 * time.Second)
-	this.So(this.written, should.Equal, 4)
-	a.Write([]byte{'t', 'e', 's', 't'})
-	a.Close()
-	this.So(this.written, should.Equal, 8)
-	this.So(HumanFileSize(this.total), should.Equal, "238.42 MiB")
+	_, _ = counter.Write([]byte("test"))
+	_, _ = counter.Write([]byte("test"))
+	this.So(counter.Close(), should.BeNil)
+
+	lock.Lock()
+	defer lock.Unlock()
+	this.So(written, should.Equal, 8)
+	this.So(HumanFileSize(total), should.Equal, "238.42 MiB")
 }
 
 // The counter is written on the caller's goroutine while the ticker goroutine
