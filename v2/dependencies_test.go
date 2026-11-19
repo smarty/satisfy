@@ -2,7 +2,6 @@ package satisfy
 
 import (
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/smarty/assertions/should"
@@ -61,31 +60,4 @@ func (this *ValidateDependenciesFixture) TestValidationDoesNotModifyItsInput() {
 	dependencies := []Dependency{dependency("name", "1.2.3", "bucket", "~/path")}
 	this.So(ValidateDependencies(dependencies...), should.BeNil)
 	this.So(dependencies[0].LocalDirectory, should.Equal, "~/path")
-}
-
-func (this *ValidateDependenciesFixture) TestLocalDirectoriesAreResolvedAgainstHome() {
-	home := os.Getenv("HOME")
-	original := []Dependency{
-		dependency("name", "1.2.3", "bucket", "~/"),
-		dependency("name", "1.2.3", "bucket", "~/path1"),
-		dependency("name", "1.2.3", "bucket", "$HOME/path2"),
-		dependency("name", "1.2.3", "bucket", "${HOME}/path3"),
-		dependency("name", "1.2.3", "bucket", "relative"),
-	}
-
-	resolved := resolveLocalDirectories(original)
-
-	this.So(original[1].LocalDirectory, should.Equal, "~/path1")
-	this.So(resolved[0].LocalDirectory, should.Equal, home)
-	this.So(resolved[1].LocalDirectory, should.Equal, home+"/path1")
-	this.So(resolved[2].LocalDirectory, should.Equal, home+"/path2")
-	this.So(resolved[3].LocalDirectory, should.Equal, home+"/path3")
-	this.So(resolved[4].LocalDirectory, should.Equal, "relative")
-}
-
-func (this *ValidateDependenciesFixture) TestHomeRelativeDuplicatesAreDetected() {
-	this.assertInvalid(
-		dependency("name", "1.2.3", "bucket", "~/path"),
-		dependency("name", "1.2.3", "bucket", os.Getenv("HOME")+"/path"),
-	)
 }

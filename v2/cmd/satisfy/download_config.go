@@ -9,7 +9,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -105,6 +107,7 @@ func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr
 		return dependencyListing{}, err
 	}
 
+	dependencies.Listing = resolveLocalDirectories(dependencies.Listing)
 	if err = satisfy.ValidateDependencies(dependencies.Listing...); err != nil {
 		return dependencyListing{}, err
 	}
@@ -116,6 +119,26 @@ func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr
 		emitExampleDependenciesFile(stderr)
 	}
 	return dependencies, nil
+}
+
+// resolveLocalDirectories returns a copy of dependencies with a leading "~/",
+// "$HOME" or "${HOME}" in each local directory replaced by the home directory.
+func resolveLocalDirectories(dependencies []satisfy.Dependency) []satisfy.Dependency {
+	resolved := make([]satisfy.Dependency, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		dependency.LocalDirectory = resolveLocalDirectory(dependency.LocalDirectory)
+		resolved = append(resolved, dependency)
+	}
+	return resolved
+}
+
+func resolveLocalDirectory(value string) string {
+	for _, prefix := range []string{"~/", "${HOME}", "$HOME"} {
+		if rest, found := strings.CutPrefix(value, prefix); found {
+			return filepath.Join(os.Getenv("HOME"), rest)
+		}
+	}
+	return value
 }
 
 func readDependencyListing(path string, stdin io.Reader) (listing dependencyListing, err error) {

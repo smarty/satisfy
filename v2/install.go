@@ -26,7 +26,7 @@ func (this *Client) Install(ctx context.Context, dependencies ...Dependency) err
 		packaging.NewFileListingIntegrityChecker(disk),
 		packaging.NewFileContentIntegrityCheck(md5.New, disk, this.verifyContents),
 	)
-	errs := runConcurrently(ctx, this.concurrency, resolveLocalDirectories(dependencies), func(dependency model.Dependency) error {
+	errs := runConcurrently(ctx, this.concurrency, dependencies, func(dependency model.Dependency) error {
 		return packaging.NewDependencyResolver(disk, integrity, installer, dependency, this.logger).Resolve(ctx)
 	})
 	return errors.Join(errs...)

@@ -2,9 +2,7 @@ package satisfy
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 // ValidateDependencies reports incomplete dependencies, and dependencies that
@@ -23,7 +21,7 @@ func ValidateDependencies(dependencies ...Dependency) error {
 		case dependency.LocalDirectory == "":
 			return fmt.Errorf("%w: local directory is required (package %q)", ErrInvalidConfig, dependency.PackageName)
 		}
-		directory := filepath.Clean(resolveLocalDirectory(dependency.LocalDirectory))
+		directory := filepath.Clean(dependency.LocalDirectory)
 		key := dependency.PackageName + " " + directory
 		if _, found := installed[key]; found {
 			return fmt.Errorf("%w: package %q is installed into %q more than once",
@@ -32,24 +30,4 @@ func ValidateDependencies(dependencies ...Dependency) error {
 		installed[key] = struct{}{}
 	}
 	return nil
-}
-
-// resolveLocalDirectories returns a copy of dependencies with a leading "~/",
-// "$HOME" or "${HOME}" in each local directory replaced by the home directory.
-func resolveLocalDirectories(dependencies []Dependency) []Dependency {
-	resolved := make([]Dependency, 0, len(dependencies))
-	for _, dependency := range dependencies {
-		dependency.LocalDirectory = resolveLocalDirectory(dependency.LocalDirectory)
-		resolved = append(resolved, dependency)
-	}
-	return resolved
-}
-
-func resolveLocalDirectory(value string) string {
-	for _, prefix := range []string{"~/", "${HOME}", "$HOME"} {
-		if rest, found := strings.CutPrefix(value, prefix); found {
-			return filepath.Join(os.Getenv("HOME"), rest)
-		}
-	}
-	return value
 }
