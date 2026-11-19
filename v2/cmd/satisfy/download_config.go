@@ -11,10 +11,19 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/smarty/satisfy/v2"
 	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 const stdinPath = "_STDIN_"
+
+// dependencyListing is the JSON document read by the download command.
+type dependencyListing struct {
+	// Credentials is an optional access token. When it is blank, credentials
+	// are discovered from the environment.
+	Credentials string               `json:"credentials"`
+	Listing     []satisfy.Dependency `json:"dependencies"`
+}
 
 // downloadCommandConfig is the configuration for the default (download)
 // command: the library configuration plus the options only the CLI uses.
@@ -22,7 +31,7 @@ type downloadCommandConfig struct {
 	MaxRetry          int
 	Concurrency       int
 	QuickVerification bool
-	Dependencies      model.DependencyListing
+	Dependencies      dependencyListing
 	JSONPath          string
 	ShowProgress      bool
 }
@@ -87,17 +96,17 @@ func parseDownloadConfig(args []string, stdin io.Reader, stderr io.Writer) (conf
 	return config, nil
 }
 
-func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr io.Writer) (model.DependencyListing, error) {
+func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr io.Writer) (dependencyListing, error) {
 	dependencies, err := readDependencyListing(path, stdin)
 	if errors.Is(err, fs.ErrNotExist) {
 		emitExampleDependenciesFile(stderr)
 	}
 	if err != nil {
-		return model.DependencyListing{}, err
+		return dependencyListing{}, err
 	}
 
-	if err = dependencies.Validate(); err != nil {
-		return model.DependencyListing{}, err
+	if err = satisfy.ValidateDependencies(dependencies.Listing...); err != nil {
+		return dependencyListing{}, err
 	}
 
 	dependencies.Listing = Filter(dependencies.Listing, filter)
@@ -109,7 +118,7 @@ func loadDependencyListing(path string, filter []string, stdin io.Reader, stderr
 	return dependencies, nil
 }
 
-func readDependencyListing(path string, stdin io.Reader) (listing model.DependencyListing, err error) {
+func readDependencyListing(path string, stdin io.Reader) (listing dependencyListing, err error) {
 	if path == stdinPath {
 		return decodeDependencyListing(stdin)
 	}
@@ -121,13 +130,13 @@ func readDependencyListing(path string, stdin io.Reader) (listing model.Dependen
 	return decodeDependencyListing(file)
 }
 
-func decodeDependencyListing(reader io.Reader) (listing model.DependencyListing, err error) {
+func decodeDependencyListing(reader io.Reader) (listing dependencyListing, err error) {
 	err = json.UnmarshalRead(reader, &listing)
 	return listing, err
 }
 
 func emitExampleDependenciesFile(output io.Writer) {
-	var listing model.DependencyListing
+	var listing dependencyListing
 	listing.Listing = append(listing.Listing, model.Dependency{
 		PackageName:    "example_package_name",
 		PackageVersion: "0.0.1",

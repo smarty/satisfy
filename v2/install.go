@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"errors"
-	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/smarty/satisfy/v2/internal/fsys"
@@ -18,9 +16,8 @@ import (
 // installed concurrently; the returned error joins the failure of every
 // dependency that could not be installed.
 func (this *Client) Install(ctx context.Context, dependencies ...Dependency) error {
-	listing := DependencyListing{Listing: slices.Clone(dependencies)}
-	if err := listing.Validate(); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	if err := ValidateDependencies(dependencies...); err != nil {
+		return err
 	}
 
 	disk := fsys.NewDiskFileSystem("")
@@ -29,7 +26,7 @@ func (this *Client) Install(ctx context.Context, dependencies ...Dependency) err
 		packaging.NewFileListingIntegrityChecker(disk),
 		packaging.NewFileContentIntegrityCheck(md5.New, disk, this.verifyContents),
 	)
-	errs := runConcurrently(ctx, this.concurrency, listing.Listing, func(dependency model.Dependency) error {
+	errs := runConcurrently(ctx, this.concurrency, resolveLocalDirectories(dependencies), func(dependency model.Dependency) error {
 		return packaging.NewDependencyResolver(disk, integrity, installer, dependency, this.logger).Resolve(ctx)
 	})
 	return errors.Join(errs...)

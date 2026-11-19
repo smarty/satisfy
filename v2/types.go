@@ -16,9 +16,6 @@ type (
 	// PackageVersion may be a version, a tag, or "latest".
 	Dependency = model.Dependency
 
-	// DependencyListing is the JSON document listing the dependencies to install.
-	DependencyListing = model.DependencyListing
-
 	// PackageConfig describes a package version to build and upload.
 	PackageConfig = model.PackageConfig
 

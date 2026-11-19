@@ -2,95 +2,21 @@ package model
 
 import (
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gunit"
 )
 
-func TestDependencyListingFixture(t *testing.T) {
-	gunit.Run(new(DependencyListingFixture), t)
+func TestDependencyFixture(t *testing.T) {
+	gunit.Run(new(DependencyFixture), t)
 }
 
-type DependencyListingFixture struct {
+type DependencyFixture struct {
 	*gunit.Fixture
-
-	listing DependencyListing
 }
 
-func (this *DependencyListingFixture) Setup() {
-	this.listing = DependencyListing{}
-}
-
-func (this *DependencyListingFixture) TestValidateEachDependencyIsPopulated_NoError() {
-	this.appendDependency("name", "1.2.3", "host", "directory")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.BeNil)
-}
-
-func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveALocalDirectory() {
-	this.appendDependency("name", "1.2.3", "host", "")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.NotBeNil)
-}
-
-func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveAName() {
-	this.appendDependency("", "1.2.3", "host", "local")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.NotBeNil)
-}
-
-func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveAVersion() {
-	this.appendDependency("name", "", "host", "local")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.NotBeNil)
-}
-
-func (this *DependencyListingFixture) TestValidateEachDependencyMustHaveARemoteAddress() {
-	this.appendDependency("name", "1.2.3", "", "local")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.NotBeNil)
-}
-
-func (this *DependencyListingFixture) TestValidateResolvesLocalDirectory() {
-	this.appendDependency("name", "1.2.3", "address", "~/")
-	this.appendDependency("name", "1.2.3", "address", "~/path1")
-	this.appendDependency("name", "1.2.3", "address", "$HOME/path2")
-	this.appendDependency("name", "1.2.3", "address", "${HOME}/path3")
-
-	err := this.listing.Validate()
-	home := os.Getenv("HOME")
-
-	this.So(err, should.BeNil)
-	this.So(this.listing.Listing, should.Resemble, []Dependency{
-		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home},
-		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path1"},
-		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path2"},
-		{PackageName: "name", PackageVersion: "1.2.3", RemoteAddress: URL{Host: "address"}, LocalDirectory: home + "/path3"},
-	})
-}
-
-func (this *DependencyListingFixture) TestMultiplePackagesWithSameNameCannotBeInstalledToTheSamePlace() {
-	this.appendDependency("name", "1.2.3", "address1", "local")
-	this.appendDependency("name", "1.2.3", "address2", "local")
-
-	err := this.listing.Validate()
-
-	this.So(err, should.NotBeNil)
-}
-
-func (this *DependencyListingFixture) TestAppendRemoteAddress() {
+func (this *DependencyFixture) TestAppendRemoteAddress() {
 	address, err := url.Parse("https://www.google.com/folder")
 	this.So(err, should.BeNil)
 	dependency := Dependency{
@@ -103,7 +29,7 @@ func (this *DependencyListingFixture) TestAppendRemoteAddress() {
 	this.So(actual.String(), should.Equal, "https://www.google.com/folder/package-name/1.2.3/filename")
 }
 
-func (this *DependencyListingFixture) TestAppendRemoteAddressLatest() {
+func (this *DependencyFixture) TestAppendRemoteAddressLatest() {
 	address, err := url.Parse("https://www.google.com/folder")
 	this.So(err, should.BeNil)
 	dependency := Dependency{
@@ -116,7 +42,7 @@ func (this *DependencyListingFixture) TestAppendRemoteAddressLatest() {
 	this.So(actual.String(), should.Equal, "https://www.google.com/folder/package-name/manifest")
 }
 
-func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddress() {
+func (this *DependencyFixture) TestComposeLatestManifestRemoteAddress() {
 	dependency := Dependency{
 		PackageName:   "master-address-list/2026/04/premium/az",
 		RemoteAddress: URL{Scheme: "gcs", Host: "my-bucket"},
@@ -129,7 +55,7 @@ func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddress() {
 	})
 }
 
-func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddressWithPathPrefix() {
+func (this *DependencyFixture) TestComposeLatestManifestRemoteAddressWithPathPrefix() {
 	dependency := Dependency{
 		PackageName:   "master-address-list/2026/04/premium/az",
 		RemoteAddress: URL{Scheme: "gcs", Host: "my-bucket", Path: "/releases"},
@@ -142,21 +68,11 @@ func (this *DependencyListingFixture) TestComposeLatestManifestRemoteAddressWith
 	})
 }
 
-func (this *DependencyListingFixture) TestTitleString() {
+func (this *DependencyFixture) TestTitleString() {
 	dependency := Dependency{
 		PackageName:    "package-name",
 		PackageVersion: "1.2.3",
 	}
 
 	this.So(dependency.Title(), should.Equal, "[package-name @ 1.2.3]")
-}
-func (this *DependencyListingFixture) appendDependency(name, version, address, directory string) {
-	this.listing.Listing = append(this.listing.Listing, Dependency{
-		PackageName:    name,
-		PackageVersion: version,
-		RemoteAddress: URL{
-			Host: address,
-		},
-		LocalDirectory: directory,
-	})
 }
