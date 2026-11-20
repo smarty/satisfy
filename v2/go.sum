@@ -1,0 +1,8 @@
+github.com/klauspost/compress v1.20.0 h1:a3C1ke2ohxFymNlb2HWAHjDeKCI90scRskErZkR0ezA=
+github.com/klauspost/compress v1.20.0/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
+github.com/smarty/assertions v1.16.0 h1:EvHNkdRA4QHMrn75NZSoUQ/mAUXAYWfatfB01yTCzfY=
+github.com/smarty/assertions v1.16.0/go.mod h1:duaaFdCS0K9dnoM50iyek/eYINOZ64gbh1Xlf6LG7AI=
+github.com/smarty/gcs v1.4.3 h1:Qff49SOKzbbyRvHrrwNQVLnyKCuZnjVGR0eeOks/aHc=
+github.com/smarty/gcs v1.4.3/go.mod h1:0+bJUvgK9gsXFnAYYmvD5vzmgXk9NZ9v1KJERe56Ucw=
+github.com/smarty/gunit v1.6.0 h1:27yDmXz5ydI6bYN0A1ltJvtekRY6H3bQJZz0ifJIeVY=
+github.com/smarty/gunit v1.6.0/go.mod h1:4kEWyZ1xFTEwkEfCpjmIRejP9CHn2Q9F4NP6SmAR+fg=
