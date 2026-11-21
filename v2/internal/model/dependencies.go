@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"net/url"
-	"path"
 )
 
 type Dependency struct {
@@ -22,9 +21,7 @@ func (this Dependency) ComposeRemoteAddress(fileName string) url.URL {
 	)
 }
 func (this Dependency) ComposeLatestManifestRemoteAddress() url.URL {
-	address := url.URL(this.RemoteAddress)
-	address.Path = path.Join("/", address.Path, this.PackageName, RemoteManifestFilename)
-	return address
+	return AppendRemotePath(url.URL(this.RemoteAddress), this.PackageName, "latest", RemoteManifestFilename)
 }
 func (this Dependency) Title() string {
 	return fmt.Sprintf("[%s @ %s]", this.PackageName, this.PackageVersion)
@@ -33,7 +30,6 @@ func (this Dependency) Title() string {
 func (this Dependency) ComposeRemoteManifestAddress() url.URL {
 	if this.PackageVersion == "latest" {
 		return this.ComposeLatestManifestRemoteAddress()
-	} else {
-		return this.ComposeRemoteAddress(RemoteManifestFilename)
 	}
+	return this.ComposeRemoteAddress(RemoteManifestFilename)
 }

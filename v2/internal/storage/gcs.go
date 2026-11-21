@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 
 	"github.com/smarty/gcs"
 	"github.com/smarty/satisfy/v2/internal/model"
@@ -49,13 +50,16 @@ func (this *GoogleCloudStorageClient) do(request *http.Request) (*http.Response,
 
 func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request model.UploadRequest) error {
 	gcsRequest, err := this.newRequest(ctx, "PUT", request.RemoteAddress,
-		gcs.PutWithContent(withoutClose{Reader: request.Body}),
+		gcs.PutWithContent(io.NewSectionReader(request.Body, 0, request.Size)),
 		gcs.PutWithContentLength(request.Size),
 		gcs.PutWithContentMD5(request.Checksum),
 		gcs.PutWithContentType(request.ContentType),
 	)
 	if err != nil {
 		return err
+	}
+	if request.IfGenerationMatch != nil {
+		gcsRequest.Header.Set("x-goog-if-generation-match", strconv.FormatInt(*request.IfGenerationMatch, 10))
 	}
 	response, err := this.do(gcsRequest)
 	if err != nil {
@@ -66,10 +70,7 @@ func (this *GoogleCloudStorageClient) Upload(ctx context.Context, request model.
 	_, _ = io.Copy(io.Discard, response.Body)
 
 	if !this.isExpectedStatus(response.StatusCode) {
-		if this.isSafeRetryStatus(response.StatusCode) {
-			return fmt.Errorf("http error: %d (%w)", response.StatusCode, model.ErrRetryable)
-		}
-		return model.NewStatusCodeError(response.StatusCode, this.expectedStatus, request.RemoteAddress)
+		return this.statusError(response.StatusCode, request.RemoteAddress)
 	}
 	return nil
 }
@@ -99,10 +100,21 @@ func (this *GoogleCloudStorageClient) body(request *http.Request, address url.UR
 	if !this.isExpectedStatus(response.StatusCode) {
 		_, _ = io.Copy(io.Discard, response.Body)
 		_ = response.Body.Close()
-		return nil, model.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
+		return nil, this.statusError(response.StatusCode, address)
+	}
+	if generation, err := strconv.ParseInt(response.Header.Get("x-goog-generation"), 10, 64); err == nil {
+		return generationBody{ReadCloser: response.Body, generation: generation}, nil
 	}
 	return response.Body, nil
 }
+
+// generationBody is a downloaded body that knows its object's generation.
+type generationBody struct {
+	io.ReadCloser
+	generation int64
+}
+
+func (this generationBody) Generation() int64 { return this.generation }
 
 // Size uses an HTTP HEAD to find out how many bytes are available in total.
 func (this *GoogleCloudStorageClient) Size(ctx context.Context, address url.URL) (int64, error) {
@@ -116,15 +128,34 @@ func (this *GoogleCloudStorageClient) Size(ctx context.Context, address url.URL)
 	}
 	_ = response.Body.Close()
 	if !this.isExpectedStatus(response.StatusCode) {
-		return 0, model.NewStatusCodeError(response.StatusCode, this.expectedStatus, address)
+		return 0, this.statusError(response.StatusCode, address)
 	}
 	return response.ContentLength, nil
 }
 
+// statusError reports an unexpected status, marking it retryable when sending
+// the same request again may succeed. A 401 is retryable only when the
+// credentials can be read again (they may have expired).
+func (this *GoogleCloudStorageClient) statusError(statusCode int, address url.URL) error {
+	err := model.NewStatusCodeError(statusCode, this.expectedStatus, address)
+	if statusCode == http.StatusUnauthorized {
+		invalidator, ok := this.credentials.(interface{ Invalidate() })
+		if !ok {
+			return err
+		}
+		invalidator.Invalidate()
+		return fmt.Errorf("%w (%w)", err, model.ErrRetryable)
+	}
+	if this.isSafeRetryStatus(statusCode) {
+		return fmt.Errorf("%w (%w)", err, model.ErrRetryable)
+	}
+	return err
+}
+
 func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
 	switch statusCode {
-	case http.StatusUnauthorized,
-		http.StatusRequestTimeout,
+	case http.StatusRequestTimeout,
+		http.StatusTooManyRequests,
 		http.StatusInternalServerError,
 		http.StatusBadGateway,
 		http.StatusServiceUnavailable,
@@ -138,8 +169,3 @@ func (this *GoogleCloudStorageClient) isSafeRetryStatus(statusCode int) bool {
 func (this *GoogleCloudStorageClient) isExpectedStatus(statusCode int) bool {
 	return slices.Contains(this.expectedStatus, statusCode)
 }
-
-// withoutClose hides any Close method on an upload body: net/http closes
-// request bodies after sending, which would prevent the body from being
-// rewound and sent again on retry.
-type withoutClose struct{ io.Reader }

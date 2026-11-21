@@ -24,11 +24,8 @@ import (
 )
 
 type PackageInstallerFileSystem interface {
-	model.FileCreator
 	model.FileWriter
-	model.Deleter
-	model.SymlinkCreator
-	model.Chmod
+	model.Rooter
 }
 
 type PackageInstaller struct {
@@ -105,104 +102,107 @@ func (this *PackageInstaller) InstallPackage(ctx context.Context, manifest model
 	if err != nil {
 		return err
 	}
+	resuming := newResumingReader(ctx, this.downloader, request.RemoteAddress, body, manifest.Archive.Size)
+	defer closeResource(resuming)
+	checksumReader := NewHashReader(resuming, md5.New())
 
-	defer closeResource(body)
-	checksumReader := NewHashReader(body, md5.New())
-
-	factory, found := decompressors[manifest.Archive.CompressionAlgorithm]
-	if !found {
-		return errors.New("invalid compression algorithm")
-	}
-	decompressor, err := factory(checksumReader, this.progress)
+	reader, decompressor, err := OpenArchiveReader(checksumReader, manifest.Archive.CompressionAlgorithm, this.progress)
 	if err != nil {
 		return err
 	}
-	paths, err := this.extractArchive(decompressor, request, len(manifest.Archive.Contents))
+	root, err := this.filesystem.OpenRoot(request.LocalPath)
 	if err != nil {
-		return errors.Join(err, this.revertFileSystem(paths))
+		return errors.Join(err, decompressor.Close())
+	}
+	defer closeResource(root)
+	names, err := this.extractArchive(reader, root, request, len(manifest.Archive.Contents))
+	closeResource(decompressor)
+	if err != nil {
+		return errors.Join(err, revertFileSystem(root, names))
+	}
+	// The archive reader stops at its end-of-archive marker, which can leave
+	// the end of the compressed stream unread; the checksum covers all of it.
+	if _, err = io.Copy(io.Discard, checksumReader); err != nil {
+		return errors.Join(err, revertFileSystem(root, names))
 	}
 	actualChecksum := checksumReader.Sum(nil)
 	if !bytes.Equal(actualChecksum, manifest.Archive.MD5Checksum) {
 		err = fmt.Errorf("checksum mismatch: actual [%x] != expected [%x]", actualChecksum, manifest.Archive.MD5Checksum)
-		return errors.Join(err, this.revertFileSystem(paths))
+		return errors.Join(err, revertFileSystem(root, names))
 	}
 
 	return nil
 }
 
-func (this *PackageInstaller) extractArchive(decompressor io.ReadCloser, request model.InstallationRequest, itemCount int) (paths []string, err error) {
-	defer closeResource(decompressor)
-	var reader ArchiveReader
-	if archiveReader, ok := decompressor.(ArchiveReader); ok {
-		reader = archiveReader
-	} else {
-		reader = archiveFormats[""](decompressor)
-	}
-
+// extractArchive writes each archive entry within root and returns the names
+// of the entries it wrote, relative to root.
+func (this *PackageInstaller) extractArchive(reader ArchiveReader, root model.RootedFileSystem, request model.InstallationRequest, itemCount int) (names []string, err error) {
 	for i := 0; ; i++ {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return paths, err
+			return names, err
 		}
-		pathItem := filepath.Join(request.LocalPath, header.Name)
-		paths = append(paths, pathItem)
-		this.logger.Info("extracting archive item",
-			"item", i+1, "of", itemCount, "name", header.Name, "size", byteCountToString(header.Size), "path", pathItem)
+		if err = checkArchiveEntry(header); err != nil {
+			return names, err
+		}
+		name := filepath.Clean(header.Name)
+		pathItem := filepath.Join(request.LocalPath, name)
+		names = append(names, name)
+		this.logger.Debug("extracting archive item",
+			"item", i+1, "of", itemCount, "name", header.Name, "size", archive.HumanFileSize(header.Size), "path", pathItem)
 
 		if header.Typeflag == tar.TypeSymlink {
-			if err = this.filesystem.CreateSymlink(header.Linkname, pathItem); err != nil {
-				return paths, err
+			if err = root.CreateSymlink(header.Linkname, name); err != nil {
+				return names, err
 			}
 		} else {
-			writer, err := this.filesystem.Create(pathItem)
+			writer, err := root.Create(name)
 			if err != nil {
-				return paths, err
+				return names, err
 			}
-			progressReader := archive.NewArchiveProgressCounter(header.Size, func(written, total int64, done bool) {
-				this.progress.Report(model.Progress{
-					Phase: model.ProgressExtracting, Name: pathItem, Written: written, Total: total, Done: done,
-				})
-			})
+			progressReader := archive.NewProgressCounter(this.progress, model.ProgressExtracting, pathItem, header.Size)
 			multiWriter := io.MultiWriter(writer, progressReader)
 			_, err = io.Copy(multiWriter, reader)
 			err = errors.Join(err, writer.Close())
 			_ = progressReader.Close()
 			if err != nil {
-				return paths, err
+				return names, err
 			}
 			if !model.IsExecutable(os.FileMode(header.Mode)) {
 				continue
 			}
-			if err = this.filesystem.Chmod(pathItem, 0755); err != nil {
-				return paths, err
+			if err = root.Chmod(name, 0755); err != nil {
+				return names, err
 			}
 		}
 	}
-	return paths, nil
+	return names, nil
 }
 
-func byteCountToString(size int64) string {
-	if size < 1 {
-		return "? bytes"
+// checkArchiveEntry refuses entries that would be written outside the
+// installation directory, or symlinks that point outside it.
+func checkArchiveEntry(header *tar.Header) error {
+	if !filepath.IsLocal(header.Name) {
+		return fmt.Errorf("archive entry %q is outside the installation directory", header.Name)
 	}
-	const unit = 1024
-	if size < unit {
-		return fmt.Sprintf("%d bytes", size)
+	if header.Typeflag == tar.TypeSymlink && !isLocalSymlink(header.Name, header.Linkname) {
+		return fmt.Errorf("archive symlink %q -> %q points outside the installation directory", header.Name, header.Linkname)
 	}
-	div, exp := int64(unit), 0
-	for i := size / unit; i >= unit; i /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(size)/float64(div), "KMGTPE"[exp])
+	return nil
 }
 
-func (this *PackageInstaller) revertFileSystem(paths []string) (err error) {
-	for _, path := range paths {
-		err = errors.Join(err, ignoreNotExist(this.filesystem.Delete(path)))
+// isLocalSymlink reports whether a symlink at name pointing to target stays
+// within the directory that contains name.
+func isLocalSymlink(name, target string) bool {
+	return !filepath.IsAbs(target) && filepath.IsLocal(filepath.Join(filepath.Dir(name), target))
+}
+
+func revertFileSystem(root model.RootedFileSystem, names []string) (err error) {
+	for _, name := range names {
+		err = errors.Join(err, ignoreNotExist(root.Delete(name)))
 	}
 	return err
 }
@@ -229,11 +229,11 @@ var decompressors = map[string]func(source io.Reader, progress model.ProgressFun
 }
 
 func newZStdReader(source io.Reader, _ model.ProgressFunc) (io.ReadCloser, error) {
-	if reader, err := zstd.NewReader(source); err != nil {
+	reader, err := zstd.NewReader(source)
+	if err != nil {
 		return nil, err
-	} else {
-		return reader.IOReadCloser(), nil
 	}
+	return reader.IOReadCloser(), nil
 }
 func newZipReader(source io.Reader, progress model.ProgressFunc) (io.ReadCloser, error) {
 	return archive.NewZipArchiveReader(source, progress)
@@ -249,8 +249,22 @@ type ArchiveReader interface {
 	io.Reader
 }
 
-var archiveFormats = map[string]func(reader io.Reader) ArchiveReader{
-	"": func(reader io.Reader) ArchiveReader { return tar.NewReader(reader) },
+// OpenArchiveReader decompresses source with the named algorithm and returns
+// a reader of the archive's entries, along with the decompressor, which the
+// caller must close.
+func OpenArchiveReader(source io.Reader, algorithm string, progress model.ProgressFunc) (ArchiveReader, io.Closer, error) {
+	factory, found := decompressors[algorithm]
+	if !found {
+		return nil, nil, fmt.Errorf("unsupported compression algorithm: %q", algorithm)
+	}
+	decompressor, err := factory(source, progress)
+	if err != nil {
+		return nil, nil, err
+	}
+	if reader, ok := decompressor.(ArchiveReader); ok {
+		return reader, decompressor, nil // zip
+	}
+	return tar.NewReader(decompressor), decompressor, nil
 }
 
 func closeResource(closer io.Closer) {

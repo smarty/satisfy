@@ -17,7 +17,7 @@ func TestDirectoryPackageBuilderFixture(t *testing.T) {
 
 type DirectoryPackageBuilderFixture struct {
 	*gunit.Fixture
-	builder    PackageBuilder
+	builder    *DirectoryPackageBuilder
 	fileSystem *inMemoryFileSystem
 	archive    *FakeArchiveWriter
 	hasher     *FakeHasher
@@ -46,6 +46,37 @@ func (this *DirectoryPackageBuilderFixture) TestContentsAreInventoried() {
 		{Path: "sub/file0.txt", Size: 3, MD5Checksum: []byte("ccc [HASHED]")},
 	})
 }
+func (this *DirectoryPackageBuilderFixture) TestExcludedFilesAreLeftOut() {
+	var seen []string
+	builder := NewDirectoryPackageBuilder(this.fileSystem, this.archive, this.hasher, nil, nil).
+		WithExclusion(func(relativePath string) bool {
+			seen = append(seen, relativePath)
+			return relativePath == "file1.txt" || relativePath == "sub/file0.txt"
+		})
+
+	err := builder.Build(context.Background())
+
+	this.So(err, should.BeNil)
+	this.So(seen, should.Resemble, []string{"file0.txt", "file1.txt", "inner/link.txt", "sub/file0.txt"})
+	this.So(builder.Contents(), should.Resemble, []model.ArchiveItem{
+		{Path: "file0.txt", Size: 1, MD5Checksum: []byte("a [HASHED]")},
+		{Path: "inner/link.txt", Size: 12, MD5Checksum: []byte("../file0.txt [HASHED]")},
+	})
+}
+
+func (this *DirectoryPackageBuilderFixture) TestLargeFilesAreHashedCompletely() {
+	large := bytes.Repeat([]byte("z"), asyncHashThreshold) // hashed on a separate goroutine
+	this.fileSystem.WriteFile("/in/large.bin", large)
+
+	err := this.builder.Build(context.Background())
+
+	this.So(err, should.BeNil)
+	contents := this.builder.Contents()
+	this.So(contents[3].Path, should.Equal, "large.bin")
+	hashed := contents[3].MD5Checksum // the fake hasher records what it was given
+	this.So(bytes.Count(hashed, []byte("z")), should.Equal, len(large))
+}
+
 func (this *DirectoryPackageBuilderFixture) TestCancelledBuildStops() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -73,6 +104,15 @@ func (this *DirectoryPackageBuilderFixture) TestListingErrorIsReturned() {
 	this.fileSystem.errListing = listingErr
 
 	this.So(this.builder.Build(context.Background()), should.Equal, listingErr)
+}
+func (this *DirectoryPackageBuilderFixture) TestNamesThatAreNotUTF8FailBeforeAnythingIsArchived() {
+	this.fileSystem.WriteFile("/in/sub/bad\xff.txt", []byte("d"))
+
+	err := this.builder.Build(context.Background())
+
+	this.So(err, should.NotBeNil)
+	this.So(err.Error(), should.ContainSubstring, "not valid UTF-8")
+	this.So(this.builder.Contents(), should.BeEmpty)
 }
 func (this *DirectoryPackageBuilderFixture) TestOpenErrorIsReturned() {
 	openErr := errors.New("open failed")
@@ -129,6 +169,17 @@ func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkOutOfBoundsNotAll
 	this.fileSystem.CreateSymlink("../../out/of-bounds.txt", "/in/link.txt")
 	err := this.builder.Build(context.Background())
 	this.So(err, should.NotBeNil)
+}
+func (this *DirectoryPackageBuilderFixture) TestSymlinkIntoSiblingWithSharedPrefixNotAllowed() {
+	this.fileSystem.CreateSymlink("/in-other/file.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.NotBeNil)
+
+	this.fileSystem.CreateSymlink("../in-other/file.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.NotBeNil)
+}
+func (this *DirectoryPackageBuilderFixture) TestAbsoluteSymlinkInBoundsIsAllowed() {
+	this.fileSystem.CreateSymlink("/in/file0.txt", "/in/link.txt")
+	this.So(this.builder.Build(context.Background()), should.BeNil)
 }
 func (this *DirectoryPackageBuilderFixture) TestRelativeSymlinkInBoundsIsAllowed() {
 	this.fileSystem.CreateSymlink("../file0.txt", "/in/inner/link.txt")

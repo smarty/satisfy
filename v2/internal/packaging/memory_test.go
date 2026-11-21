@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -149,9 +150,58 @@ func (this *inMemoryFileSystem) Delete(path string) error {
 	return nil
 }
 
+func (this *inMemoryFileSystem) OpenRoot(dir string) (model.RootedFileSystem, error) {
+	return inMemoryRoot{fileSystem: this, dir: dir}, nil
+}
+
 func (this *inMemoryFileSystem) RootPath() string {
 	return this.Root
 }
+
+/////////////////////////////////////////////////
+
+// inMemoryRoot confines operations to dir, refusing names that leave it, as an
+// os.Root does.
+type inMemoryRoot struct {
+	fileSystem *inMemoryFileSystem
+	dir        string
+}
+
+func (this inMemoryRoot) path(name string) (string, error) {
+	if !filepath.IsLocal(name) {
+		return "", fmt.Errorf("path escapes from parent: %q", name)
+	}
+	return filepath.Join(this.dir, name), nil
+}
+func (this inMemoryRoot) Create(name string) (io.WriteCloser, error) {
+	path, err := this.path(name)
+	if err != nil {
+		return nil, err
+	}
+	return this.fileSystem.Create(path)
+}
+func (this inMemoryRoot) CreateSymlink(source, target string) error {
+	path, err := this.path(target)
+	if err != nil {
+		return err
+	}
+	return this.fileSystem.CreateSymlink(source, path)
+}
+func (this inMemoryRoot) Chmod(name string, mode os.FileMode) error {
+	path, err := this.path(name)
+	if err != nil {
+		return err
+	}
+	return this.fileSystem.Chmod(path, mode)
+}
+func (this inMemoryRoot) Delete(name string) error {
+	path, err := this.path(name)
+	if err != nil {
+		return err
+	}
+	return this.fileSystem.Delete(path)
+}
+func (this inMemoryRoot) Close() error { return nil }
 
 /////////////////////////////////////////////////
 

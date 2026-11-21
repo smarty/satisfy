@@ -3,6 +3,7 @@ package archive
 import (
 	"archive/zip"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/klauspost/compress/flate"
@@ -23,13 +24,30 @@ func NewZipArchiveWriter(writer io.Writer, level int) model.ArchiveWriter {
 	return &ZipArchiveWriter{inner: inner}
 }
 
+// WriteHeader starts an entry. Like the tar writer, it records executables
+// with mode 0755 and other files with 0644; a symlink is recorded with
+// os.ModeSymlink and its target as the entry's content (the zip convention).
 func (this *ZipArchiveWriter) WriteHeader(header model.ArchiveHeader) (err error) {
-	this.current, err = this.inner.CreateHeader(&zip.FileHeader{
+	fileHeader := &zip.FileHeader{
 		Name:               header.Name,
 		Modified:           header.ModTime,
 		UncompressedSize64: uint64(header.Size),
 		Method:             zip.Deflate,
-	})
+	}
+	switch {
+	case header.LinkName != "":
+		fileHeader.SetMode(os.ModeSymlink | 0777)
+		fileHeader.UncompressedSize64 = uint64(len(header.LinkName))
+	case header.Executable:
+		fileHeader.SetMode(0755)
+	default:
+		fileHeader.SetMode(0644)
+	}
+	this.current, err = this.inner.CreateHeader(fileHeader)
+	if err != nil || header.LinkName == "" {
+		return err
+	}
+	_, err = io.WriteString(this.current, header.LinkName)
 	return err
 }
 func (this *ZipArchiveWriter) Write(buffer []byte) (int, error) {

@@ -1,6 +1,7 @@
 package packaging
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -32,13 +33,13 @@ func (this *CompoundIntegrityCheckFixture) Setup() {
 }
 
 func (this *CompoundIntegrityCheckFixture) TestAllInnerIntegrityTestsPass() {
-	this.So(this.checker.Verify(this.manifest, this.localPath), should.BeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, this.localPath), should.BeNil)
 }
 
 func (this *CompoundIntegrityCheckFixture) TestAnyIntegrityTestsFail() {
 	this.innerB.err = errors.New("test")
 
-	this.So(this.checker.Verify(this.manifest, this.localPath), should.NotBeNil)
+	this.So(this.checker.Verify(context.Background(), this.manifest, this.localPath), should.NotBeNil)
 	this.So(this.innerA.manifest, should.Resemble, this.manifest)
 	this.So(this.innerA.localPath, should.Equal, this.localPath)
 	this.So(this.innerB.manifest, should.Resemble, this.manifest)
@@ -51,10 +52,14 @@ type FakeIntegrityCheck struct {
 	err       error
 	manifest  model.Manifest
 	localPath string
+	onVerify  func()
 }
 
-func (this *FakeIntegrityCheck) Verify(manifest model.Manifest, localPath string) error {
+func (this *FakeIntegrityCheck) Verify(_ context.Context, manifest model.Manifest, localPath string) error {
 	this.manifest = manifest
 	this.localPath = localPath
+	if this.onVerify != nil {
+		this.onVerify()
+	}
 	return this.err
 }

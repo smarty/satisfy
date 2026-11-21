@@ -1,6 +1,10 @@
 package packaging
 
-import "github.com/smarty/satisfy/v2/internal/model"
+import (
+	"context"
+
+	"github.com/smarty/satisfy/v2/internal/model"
+)
 
 type CompoundIntegrityCheck struct {
 	inners []model.IntegrityCheck
@@ -10,9 +14,9 @@ func NewCompoundIntegrityCheck(inners ...model.IntegrityCheck) *CompoundIntegrit
 	return &CompoundIntegrityCheck{inners: inners}
 }
 
-func (this *CompoundIntegrityCheck) Verify(manifest model.Manifest, localPath string) error {
+func (this *CompoundIntegrityCheck) Verify(ctx context.Context, manifest model.Manifest, localPath string) error {
 	for _, inner := range this.inners {
-		err := inner.Verify(manifest, localPath)
+		err := inner.Verify(ctx, manifest, localPath)
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package archive
 
 import (
 	"archive/tar"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -13,11 +12,9 @@ import (
 )
 
 type ZipArchiveReader struct {
-	checksumReader       io.Reader
 	currentZipFileReader io.Reader
 	zipReader            *zip.Reader
 	currentFileCount     int
-	lastBytesRetrieved   *bytes.Buffer
 	size                 int64
 	file                 *os.File
 	progress             model.ProgressFunc
@@ -44,23 +41,30 @@ func (this *ZipArchiveReader) Next() (*tar.Header, error) {
 		return nil, err
 	}
 	this.currentZipFileReader = reader
+
+	var (
+		typeflag byte
+		linkname string
+		size     = int64(zipHeader.UncompressedSize64)
+		mode     = int64(0644)
+	)
+	switch fileMode := zipHeader.Mode(); {
+	case fileMode&os.ModeSymlink != 0:
+		target, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+		typeflag, linkname, size = tar.TypeSymlink, string(target), 0
+	case model.IsExecutable(fileMode):
+		mode = 0755
+	}
 	return &tar.Header{
-		Typeflag:   0,
-		Name:       zipHeader.Name,
-		Linkname:   "",
-		Size:       int64(zipHeader.UncompressedSize64),
-		Mode:       0644,
-		Uid:        0,
-		Gid:        0,
-		Uname:      "",
-		Gname:      "",
-		ModTime:    zipHeader.Modified,
-		AccessTime: zipHeader.Modified,
-		ChangeTime: zipHeader.Modified,
-		Devmajor:   0,
-		Devminor:   0,
-		PAXRecords: nil,
-		Format:     0,
+		Typeflag: typeflag,
+		Name:     zipHeader.Name,
+		Linkname: linkname,
+		Size:     size,
+		Mode:     mode,
+		ModTime:  zipHeader.Modified,
 	}, nil
 }
 
@@ -72,22 +76,18 @@ func (this *ZipArchiveReader) DownloadArchiveToTemp(reader io.Reader) error {
 
 	this.file = tmp
 
-	progress := NewArchiveProgressCounter(this.size, func(written, total int64, done bool) {
-		this.progress.Report(model.Progress{
-			Phase: model.ProgressDownloading, Name: "zip archive", Written: written, Total: total, Done: done,
-		})
-	})
+	progress := NewProgressCounter(this.progress, model.ProgressDownloading, "zip archive", this.size)
 
 	multiWriter := io.MultiWriter(tmp, progress)
 	this.size, err = io.Copy(multiWriter, reader)
-
+	// close the counter even when the copy failed, or its goroutine (and the
+	// periodic progress reports) would outlive the download
+	closeErr := progress.Close()
 	if err != nil {
 		return errors.Join(err, tmp.Close())
 	}
-
-	err = progress.Close()
-	if err != nil {
-		return err
+	if closeErr != nil {
+		return closeErr
 	}
 
 	_, err = tmp.Seek(0, io.SeekStart)
@@ -115,7 +115,7 @@ func (this *ZipArchiveReader) Close() error {
 }
 
 func NewZipArchiveReader(reader io.Reader, progress model.ProgressFunc) (io.ReadCloser, error) {
-	zipArchiveReader := &ZipArchiveReader{checksumReader: reader, progress: progress}
+	zipArchiveReader := &ZipArchiveReader{progress: progress}
 	err := zipArchiveReader.DownloadArchiveToTemp(reader)
 	if err != nil {
 		_ = zipArchiveReader.Close()

@@ -174,8 +174,11 @@ satisfy upload -json upload.json
 ```
 
 - `compression_algorithm` is one of `zstd`, `gzip`, or `zip`.
+- `compression_level` is the algorithm's level (e.g. 1–19 for zstd, 1–9 for gzip
+  and zip); omit it, or use `0`, for the algorithm's default level.
 - Provide exactly one source: `source_path`, `source_directory`, or
   `source_file`.
+- `package_version` may not be `latest`, which names the most recent upload.
 - `tags` is optional; see [Tagging during upload](#tagging-during-upload).
 
 Flags:
@@ -189,6 +192,11 @@ Flags:
 
 Exit codes: `0` success, `1` failure, `2` the version was already uploaded
 (unless `-overwrite` is set).
+
+An upload writes the archive, then the version's manifest, then the root
+manifest (`latest` and the tags). If it fails after the version's manifest is
+written, `latest` and the tags are not updated and a rerun exits with `2`;
+rerun with `-overwrite` to finish it.
 
 ---
 
@@ -391,8 +399,17 @@ err = client.Install(ctx, satisfy.Dependency{
 	LocalDirectory: "data",
 })
 
-// Upload a package version.
-manifest, err := client.Upload(ctx, satisfy.UploadRequest{Package: satisfy.PackageConfig{ /* ... */ }})
+// See which version is installed (e.g. what "stable" resolved to). Fails with
+// an error matching fs.ErrNotExist when the package is not installed there.
+installed, err := satisfy.InstalledManifest("data", "cat-sound-data")
+
+// Upload a package version. ExcludeInstalledManifests leaves out the
+// manifest_*.json files Install writes, for directories packages were
+// installed into.
+manifest, err := client.Upload(ctx, satisfy.UploadRequest{
+	Package:                   satisfy.PackageConfig{ /* ... */ },
+	ExcludeInstalledManifests: true,
+})
 if errors.Is(err, satisfy.ErrPackageExists) {
 	// already uploaded; set Overwrite: true to replace it
 }
@@ -403,6 +420,19 @@ exists, err := client.Exists(ctx, ref, "2026.01.B") // HEAD request; "latest" = 
 version, err := client.Latest(ctx, ref)
 tags, err := client.Tags(ctx, ref)
 err = client.ModifyTags(ctx, satisfy.TagModification{ /* ... */ })
+
+// Read a package without installing it. Manifest resolves a version, a tag,
+// or "latest" the same way Install does.
+manifest, err := client.Manifest(ctx, ref, "stable")
+archive, err := client.OpenArchive(ctx, ref, manifest)
+defer archive.Close()
+for {
+	header, err := archive.Next() // like tar.Reader; zip archives work too
+	if err == io.EOF {
+		break // the archive's checksum matched its manifest
+	}
+	// ... read the file's contents from archive
+}
 ```
 
 The library never exits the process or writes to stdout/stderr. Every failure is
@@ -420,7 +450,7 @@ Options:
 
 | Option | Default | Meaning |
 |--------|---------|---------|
-| `WithCredentialsReader(reader)` | environment discovery (see [Authentication](#authentication)) | Read credentials on first use and again once they are 30 minutes old. |
+| `WithCredentialsReader(reader)` | environment discovery (see [Authentication](#authentication)) | Read credentials on first use and again once they are 30 minutes old. If a re-read fails, the old credentials are used until they are 45 minutes old. |
 | `WithCredentials(credentials)` | — | Use fixed credentials (tokens expire; prefer a reader for long uploads). |
 | `WithHTTPClient(client)` | tuned client | HTTP client used to reach GCS. |
 | `WithMaxRetry(n)` / `WithRetryDelay(d)` | `5` / `3s` | Retry policy for failed requests. |
@@ -449,17 +479,23 @@ ready. v0 stays available at `github.com/smarty/satisfy`.
 | `url.Parse(address)` then `contracts.URL(*parsed)` | `satisfy.ParseURL("gcs://bucket/prefix")` (a bare `bucket/prefix` works too) |
 | `contracts.IsNotFound(err)` | `errors.Is(err, satisfy.ErrNotFound)` |
 | `errors.As` with `*contracts.StatusCodeError`, then `StatusCode()` | `satisfy.StatusCode(err)` |
-| `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries rewind the body |
+| `transfer.FileWrapper` for re-sendable upload bodies | not needed: retries send the body again |
+| Deleting `manifest_*.json` from a directory before uploading it | `satisfy.UploadRequest{ExcludeInstalledManifests: true}` |
 | `contracts`, `core`, `shell` packages | internal; use the `satisfy` package |
 
-The command line is unchanged apart from these additions:
-* `-concurrency` flag for downloads
+The command line keeps its commands, flags and request files, with these
+changes:
+* downloads install at most as many packages at once as there are CPUs (v0
+  started them all at once); the new `-concurrency` flag sets the limit
 * progress shown on stderr
 * structured (`key=value`) log lines on stderr
 * `satisfy version` printing to stdout
 * `-h` exiting with code `0`
 * JSON keys in request files must match exactly (they are case-sensitive)
   and may not repeat
+* an upload config that sets more than one of `source_path`,
+  `source_directory` and `source_file` is rejected (v0 used the first one set)
+* an upload with `package_version` `latest` is rejected
 
 ## Building and testing
 

@@ -116,7 +116,7 @@ func (this *RenderProgressFixture) TestInProgressRedrawsTheLine() {
 	rendered := renderProgress(satisfy.Progress{
 		Phase: satisfy.ProgressExtracting, Name: "file.txt", Written: 1024, Total: 2048,
 	})
-	this.So(rendered, should.Equal, "\033[2K\rExtracting file.txt: 1 KB of 2 KB.")
+	this.So(rendered, should.Equal, "\033[2K\rExtracting file.txt: 1 KiB of 2 KiB.")
 }
 
 func (this *RenderProgressFixture) TestDoneEndsTheLine() {
@@ -124,5 +124,5 @@ func (this *RenderProgressFixture) TestDoneEndsTheLine() {
 		Phase: satisfy.ProgressArchiving, Name: "file.txt", Written: 1024, Total: 1024, Done: true,
 	})
 	this.So(strings.HasSuffix(rendered, "\n"), should.BeTrue)
-	this.So(rendered, should.ContainSubstring, "Done archiving file.txt (1 KB)")
+	this.So(rendered, should.ContainSubstring, "Done archiving file.txt (1 KiB)")
 }

@@ -87,23 +87,21 @@ func (this *Client) ModifyTags(ctx context.Context, public TagModification) erro
 		return err
 	}
 	modification := public.internal()
-	address := modification.ComposeRootManifestAddress()
-	rootManifest, err := this.downloadManifest(ctx, address)
-	if model.IsNotFound(err) {
-		return fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
-			modification.PackageName, address.String(), err)
-	}
-	if err != nil {
-		return fmt.Errorf("could not read root manifest: %w", err)
-	}
-
-	if err = this.verifyVersionsExist(ctx, modification); err != nil {
+	if err := this.verifyVersionsExist(ctx, modification); err != nil {
 		return err
 	}
 
-	this.logModifications(rootManifest, modification)
-	rootManifest.Tags = model.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
-	if err = this.uploadManifest(ctx, rootManifest, address); err != nil {
+	address := modification.ComposeRootManifestAddress()
+	err := this.updateRootManifest(ctx, address, func(rootManifest model.Manifest, found bool) (model.Manifest, error) {
+		if !found {
+			return model.Manifest{}, fmt.Errorf("no root manifest found for package %q at [%s] (has the package been uploaded?): %w",
+				modification.PackageName, address.String(), ErrNotFound)
+		}
+		this.logModifications(rootManifest, modification)
+		rootManifest.Tags = model.ApplyTagModifications(rootManifest.Tags, modification.Add, modification.Delete)
+		return rootManifest, nil
+	})
+	if err != nil {
 		return err
 	}
 	this.logger.Info("tags updated", "package", modification.PackageName)
@@ -133,7 +131,7 @@ func ValidateTagModification(modification TagModification) error {
 	}
 	deleted := make(map[string]struct{})
 	for _, tag := range modification.Delete {
-		if tag.Name == "" {
+		if tag.Name == "" || tag.Name == "latest" {
 			return fmt.Errorf("%w: invalid tag name to delete: %q", ErrInvalidConfig, tag.Name)
 		}
 		if _, found := added[tag.Name]; found {

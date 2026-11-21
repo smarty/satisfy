@@ -9,6 +9,7 @@ import (
 	"github.com/smarty/assertions/should"
 	"github.com/smarty/gcs"
 	"github.com/smarty/gunit"
+	"github.com/smarty/satisfy/v2/internal/model"
 )
 
 func TestRefreshingCredentialsFixture(t *testing.T) {
@@ -55,16 +56,51 @@ func (this *RefreshingCredentialsFixture) TestStaleCredentialsAreReadAgain() {
 	this.So(credentials.BearerToken, should.Equal, "Bearer 2")
 }
 
-func (this *RefreshingCredentialsFixture) TestReadFailureIsReturnedAndRetriedNextTime() {
+func (this *RefreshingCredentialsFixture) TestFirstReadFailureIsReturnedAndRetriedNextTime() {
 	failure := errors.New("vault unavailable")
 	this.reader.err = failure
 	_, err := this.source.Credentials(this.ctx)
-	this.So(err, should.Equal, failure)
+	this.So(err, should.Equal, failure) // not retryable: the source may not be configured at all
 
 	this.reader.err = nil
 	credentials, err := this.source.Credentials(this.ctx)
 	this.So(err, should.BeNil)
 	this.So(credentials.BearerToken, should.Equal, "Bearer 2")
+}
+
+func (this *RefreshingCredentialsFixture) TestRefreshFailureKeepsUsingYoungEnoughCredentials() {
+	_, _ = this.source.Credentials(this.ctx)
+	this.reader.err = errors.New("vault unavailable")
+	this.now = this.now.Add(this.maxAge*3/2 - time.Second)
+
+	credentials, err := this.source.Credentials(this.ctx)
+	this.So(err, should.BeNil)
+	this.So(credentials.BearerToken, should.Equal, "Bearer 1")
+
+	this.reader.err = nil
+	credentials, _ = this.source.Credentials(this.ctx)
+	this.So(credentials.BearerToken, should.Equal, "Bearer 3") // a read is attempted every time
+}
+
+func (this *RefreshingCredentialsFixture) TestRefreshFailureOfOldCredentialsIsRetryable() {
+	_, _ = this.source.Credentials(this.ctx)
+	failure := errors.New("vault unavailable")
+	this.reader.err = failure
+	this.now = this.now.Add(this.maxAge * 3 / 2)
+
+	_, err := this.source.Credentials(this.ctx)
+	this.So(errors.Is(err, failure), should.BeTrue)
+	this.So(errors.Is(err, model.ErrRetryable), should.BeTrue)
+}
+
+func (this *RefreshingCredentialsFixture) TestInvalidatedCredentialsAreNeverReused() {
+	_, _ = this.source.Credentials(this.ctx)
+	this.source.Invalidate()
+	this.reader.err = errors.New("vault unavailable")
+
+	credentials, err := this.source.Credentials(this.ctx)
+	this.So(errors.Is(err, model.ErrRetryable), should.BeTrue)
+	this.So(credentials, should.Resemble, gcs.Credentials{})
 }
 
 func (this *RefreshingCredentialsFixture) TestStaticCredentials() {

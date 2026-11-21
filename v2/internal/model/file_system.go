@@ -34,6 +34,22 @@ type Deleter interface {
 	Delete(path string) error
 }
 
+// Rooter opens a directory so that files can be changed within it, and only
+// within it.
+type Rooter interface {
+	OpenRoot(dir string) (RootedFileSystem, error)
+}
+
+// RootedFileSystem changes files within one directory. Names are relative to
+// that directory; a name, or a symlink, that would lead outside it is refused.
+type RootedFileSystem interface {
+	FileCreator
+	SymlinkCreator
+	Chmod
+	Deleter
+	io.Closer
+}
+
 type FileChecker interface {
 	Stat(path string) (FileInfo, error)
 }

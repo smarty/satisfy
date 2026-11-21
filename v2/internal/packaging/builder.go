@@ -8,15 +8,11 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/smarty/satisfy/v2/internal/archive"
 	"github.com/smarty/satisfy/v2/internal/model"
 )
-
-type PackageBuilder interface {
-	Build(ctx context.Context) error
-	Contents() []model.ArchiveItem
-}
 
 type DirectoryPackageBuilderFileSystem interface {
 	model.PathLister
@@ -32,6 +28,7 @@ type DirectoryPackageBuilder struct {
 	listing  []model.FileInfo
 	logger   *slog.Logger
 	progress model.ProgressFunc
+	exclude  func(relativePath string) bool
 }
 
 func NewDirectoryPackageBuilder(
@@ -40,7 +37,7 @@ func NewDirectoryPackageBuilder(
 	hasher hash.Hash,
 	logger *slog.Logger,
 	progress model.ProgressFunc,
-) PackageBuilder {
+) *DirectoryPackageBuilder {
 	return &DirectoryPackageBuilder{
 		storage:  storage,
 		archive:  archive,
@@ -50,8 +47,18 @@ func NewDirectoryPackageBuilder(
 	}
 }
 
+// WithExclusion leaves out of a directory's archive every file for which
+// exclude returns true, given the file's path relative to the directory. It
+// has no effect when the source is a single file.
+func (this *DirectoryPackageBuilder) WithExclusion(exclude func(relativePath string) bool) *DirectoryPackageBuilder {
+	this.exclude = exclude
+	return this
+}
+
 // Build archives the listing. It stops with ctx's error once ctx is done,
-// checking between files and while copying each file.
+// checking between files and while copying each file. A file name that is not
+// valid UTF-8 (which the JSON manifest cannot hold) fails the build before
+// anything is archived.
 func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	listing, err := this.storage.Listing()
 	if err != nil {
@@ -59,12 +66,19 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	}
 	this.listing = listing
 	if fileInfo, ok := this.fileOnly(); ok {
+		if err = checkName(filepath.Base(fileInfo.Path()), fileInfo.Path()); err != nil {
+			return err
+		}
 		err = this.add(ctx, fileInfo, true)
 		if err != nil {
 			return err
 		}
 	} else {
-		for _, file := range listing {
+		included, err := this.included()
+		if err != nil {
+			return err
+		}
+		for _, file := range included {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -77,8 +91,36 @@ func (this *DirectoryPackageBuilder) Build(ctx context.Context) error {
 	return this.archive.Close()
 }
 
+// included returns the files of the listing that are not excluded, checking
+// that their names can be recorded in the manifest.
+func (this *DirectoryPackageBuilder) included() (included []model.FileInfo, err error) {
+	for _, file := range this.listing {
+		relativePath := this.relativePath(file)
+		if this.exclude != nil && this.exclude(relativePath) {
+			this.logger.Info("excluding file from archive", "path", file.Path())
+			continue
+		}
+		if err = checkName(relativePath, file.Path()); err != nil {
+			return nil, err
+		}
+		included = append(included, file)
+	}
+	return included, nil
+}
+
+func checkName(name, fullPath string) error {
+	if utf8.ValidString(name) {
+		return nil
+	}
+	return fmt.Errorf("the file %q cannot be archived: its name is not valid UTF-8", fullPath)
+}
+
+func (this *DirectoryPackageBuilder) relativePath(file model.FileInfo) string {
+	return strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+}
+
 func (this *DirectoryPackageBuilder) add(ctx context.Context, file model.FileInfo, fileOnly bool) error {
-	this.logger.Info("adding file to archive", "path", file.Path())
+	this.logger.Debug("adding file to archive", "path", file.Path())
 	header, err := this.buildHeader(file, fileOnly)
 	if err != nil {
 		return err
@@ -100,23 +142,22 @@ func (this *DirectoryPackageBuilder) archiveContents(ctx context.Context, file m
 		_, _ = io.WriteString(this.hasher, symlinkSourcePath)
 		return nil
 	}
-	progressWriter := archive.NewArchiveProgressCounter(file.Size(), func(written, total int64, done bool) {
-		this.progress.Report(model.Progress{
-			Phase: model.ProgressArchiving, Name: file.Path(), Written: written, Total: total, Done: done,
-		})
-	})
+	progressWriter := archive.NewProgressCounter(this.progress, model.ProgressArchiving, file.Path(), file.Size())
 	defer closeResource(progressWriter)
 	reader, err := this.storage.Open(file.Path())
 	if err != nil {
 		return err
 	}
 	defer closeResource(reader)
-	// Hashing runs on its own goroutine so it overlaps with archiving and
-	// compression. It starts only after Open succeeds, and the
-	// deferred Close both stops the goroutine and finishes hashing before
-	// buildManifestEntry reads the sum.
-	hasher := NewAsyncHashWriter(this.hasher)
-	defer closeResource(hasher)
+	hasher := io.Writer(this.hasher)
+	if file.Size() >= asyncHashThreshold {
+		// For large files, hashing on its own goroutine overlaps with archiving
+		// and compression. The deferred Close both stops the goroutine and
+		// finishes hashing before buildManifestEntry reads the sum.
+		async := NewAsyncHashWriter(this.hasher)
+		defer closeResource(async)
+		hasher = async
+	}
 	writer := io.MultiWriter(hasher, this.archive, progressWriter)
 	_, err = io.Copy(writer, contextReader{ctx: ctx, reader: reader})
 	return err
@@ -136,11 +177,18 @@ func (this contextReader) Read(buffer []byte) (int, error) {
 	return this.reader.Read(buffer)
 }
 
+// asyncHashThreshold is the file size from which hashing on a separate
+// goroutine pays off. Below it, handing each write to the hashing goroutine
+// costs more than it saves (measured with gzip and zstd at their default
+// levels: up to ~40% slower for small files; ~50% faster for 32 MiB files
+// with gzip, which compresses on the calling goroutine).
+const asyncHashThreshold = 16 << 20
+
 func (this *DirectoryPackageBuilder) buildHeader(file model.FileInfo, fileOnly bool) (header model.ArchiveHeader, err error) {
 	if fileOnly {
 		header.Name = filepath.Base(file.Path())
 	} else {
-		header.Name = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+		header.Name = this.relativePath(file)
 	}
 	header.Size = file.Size()
 	header.ModTime = file.ModTime()
@@ -180,7 +228,7 @@ func (this *DirectoryPackageBuilder) buildManifestEntry(file model.FileInfo, sym
 	if _, ok := this.fileOnly(); ok {
 		path = filepath.Base(file.Path())
 	} else {
-		path = strings.TrimPrefix(file.Path(), this.storage.RootPath()+"/")
+		path = this.relativePath(file)
 	}
 	return model.ArchiveItem{
 		Path:        path,
@@ -200,12 +248,15 @@ func (this *DirectoryPackageBuilder) Contents() []model.ArchiveItem {
 	return this.contents
 }
 
+// outOfBounds reports whether a symlink points outside the root directory. A
+// bare prefix comparison would accept "/root-other/x" for root "/root".
 func (this *DirectoryPackageBuilder) outOfBounds(info model.FileInfo) bool {
-	if this.isAbsolute(info.Symlink()) {
-		return !strings.HasPrefix(info.Symlink(), this.storage.RootPath())
+	target := info.Symlink()
+	if !this.isAbsolute(target) {
+		target = filepath.Join(filepath.Dir(info.Path()), target)
 	}
-	cleaned := filepath.Clean(filepath.Join(filepath.Dir(info.Path()), info.Symlink()))
-	return !strings.HasPrefix(cleaned, this.storage.RootPath())
+	relative, err := filepath.Rel(this.storage.RootPath(), filepath.Clean(target))
+	return err != nil || !filepath.IsLocal(relative)
 }
 
 func (this *DirectoryPackageBuilder) isAbsolute(path string) bool {

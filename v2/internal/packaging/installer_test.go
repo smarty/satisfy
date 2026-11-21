@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math/rand"
 	"net/url"
 	"strings"
 	"testing"
@@ -187,6 +188,71 @@ func (this *PackageInstallerFixture) TestInstallPackageChecksumMismatch() {
 	this.So(this.filesystem.listing(), should.BeEmpty)
 }
 
+// The tar reader stops at its end-of-archive marker, which can leave the end of
+// the compressed stream (e.g. the gzip trailer) unread; the checksum must still
+// cover every byte of the downloaded archive. These content sizes left the gzip
+// trailer unread before the installer drained the stream.
+func (this *PackageInstallerFixture) TestInstallPackageChecksumCoversEntireCompressedStream() {
+	for _, algorithm := range []string{gzipAlgorithm, zstdAlgorithm} {
+		for _, size := range []int{162183, 293101, 358560} {
+			content := make([]byte, size)
+			_, _ = rand.New(rand.NewSource(int64(size))).Read(content)
+			for i := 0; i < len(content); i += 3 {
+				content[i] = 'a' // partly compressible, so it is not stored uncompressed
+			}
+			checksum := this.downloader.prepareSingleFileArchiveDownload(algorithm, content)
+			installer := NewPackageInstaller(this.downloader, newInMemoryFileSystem(), nil, nil)
+
+			err := installer.InstallPackage(context.Background(), this.buildManifest(checksum, algorithm), this.installationRequest(""))
+
+			if !this.So(err, should.BeNil) {
+				this.Printf("algorithm: %s, size: %d", algorithm, size)
+				return
+			}
+		}
+	}
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageRefusesEntryOutsideInstallationDirectory() {
+	checksum := this.downloader.prepareTarArchiveDownload(
+		&tar.Header{Name: "inside", Size: 1, Mode: 0644},
+		&tar.Header{Name: "../outside", Size: 1, Mode: 0644},
+	)
+
+	err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+
+	this.So(err, should.NotBeNil)
+	this.So(this.filesystem.listing(), should.BeEmpty) // "inside" was rolled back
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageRefusesSymlinkPointingOutsideInstallationDirectory() {
+	for _, linkname := range []string{"../outside", "/etc/passwd", "dir/../../outside"} {
+		checksum := this.downloader.prepareTarArchiveDownload(
+			&tar.Header{Typeflag: tar.TypeSymlink, Name: "link", Linkname: linkname},
+		)
+
+		err := this.installer.InstallPackage(context.Background(), this.buildManifest(checksum, gzipAlgorithm), this.installationRequest(""))
+
+		this.So(err, should.NotBeNil)
+		this.So(this.filesystem.listing(), should.BeEmpty)
+	}
+}
+
+func (this *PackageInstallerFixture) TestInstallPackageResumesDroppedDownload() {
+	checksum := this.downloader.prepareArchiveDownload(gzipAlgorithm)
+	archiveBytes, _ := io.ReadAll(this.downloader.Body)
+	flaky := &flakyDownloader{content: archiveBytes, failAfter: len(archiveBytes) / 2}
+	installer := NewPackageInstaller(flaky, this.filesystem, nil, nil)
+	manifest := this.buildManifest(checksum, gzipAlgorithm)
+	manifest.Archive.Size = int64(len(archiveBytes))
+
+	err := installer.InstallPackage(context.Background(), manifest, this.installationRequest(""))
+
+	this.So(err, should.BeNil)
+	this.So(flaky.ranges, should.HaveLength, 1)
+	this.So(this.filesystem.readFile("local/path/Hello/World"), should.Resemble, []byte("Hello World"))
+}
+
 func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionAlgorithm string) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{
@@ -202,7 +268,7 @@ func (this *PackageInstallerFixture) buildManifest(checksum []byte, compressionA
 }
 
 // The zip format serves as both archive and compression, so there is no tar
-// stream inside and symlinks cannot be represented.
+// stream inside.
 func (this *PackageInstallerFixture) buildZipManifest(checksum []byte) model.Manifest {
 	return model.Manifest{
 		Archive: model.Archive{
@@ -283,6 +349,38 @@ func (this *FakeDownloader) prepareArchiveDownload(compressionAlgorithm string) 
 
 	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 
+	return hasher.Sum(nil)
+}
+
+func (this *FakeDownloader) prepareSingleFileArchiveDownload(compressionAlgorithm string, content []byte) []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	compressor := compression[compressionAlgorithm](io.MultiWriter(hasher, writer), 4)
+	archiveWriter := tar.NewWriter(compressor)
+	_ = archiveWriter.WriteHeader(&tar.Header{Name: "file", Size: int64(len(content)), Mode: 0644})
+	_, _ = archiveWriter.Write(content)
+	_ = archiveWriter.Close()
+	_ = compressor.Close()
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
+	return hasher.Sum(nil)
+}
+
+// prepareTarArchiveDownload writes each header (with one byte of content for
+// regular files) into a gzip compressed tar archive.
+func (this *FakeDownloader) prepareTarArchiveDownload(headers ...*tar.Header) []byte {
+	hasher := md5.New()
+	writer := bytes.NewBuffer(nil)
+	compressor := compression[gzipAlgorithm](io.MultiWriter(hasher, writer), 4)
+	archiveWriter := tar.NewWriter(compressor)
+	for _, header := range headers {
+		_ = archiveWriter.WriteHeader(header)
+		if header.Typeflag != tar.TypeSymlink {
+			_, _ = archiveWriter.Write([]byte("x"))
+		}
+	}
+	_ = archiveWriter.Close()
+	_ = compressor.Close()
+	this.Body = io.NopCloser(bytes.NewReader(writer.Bytes()))
 	return hasher.Sum(nil)
 }
 

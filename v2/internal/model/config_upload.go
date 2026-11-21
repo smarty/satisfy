@@ -2,12 +2,11 @@ package model
 
 import (
 	"net/url"
-	"path"
 )
 
 type PackageConfig struct {
 	CompressionAlgorithm string   `json:"compression_algorithm"`
-	CompressionLevel     int      `json:"compression_level"`
+	CompressionLevel     int      `json:"compression_level"` // 0 => algorithm's default level
 	SourceDirectory      string   `json:"source_directory"`
 	SourceFile           string   `json:"source_file"`
 	SourcePath           string   `json:"source_path"`
@@ -22,9 +21,7 @@ func (this PackageConfig) ComposeRemoteAddress(filename string) url.URL {
 }
 
 func (this PackageConfig) ComposeLatestManifestRemoteAddress() url.URL {
-	address := url.URL(this.RemoteAddress)
-	address.Path = path.Join(address.Path, this.PackageName, RemoteManifestFilename)
-	return address
+	return AppendRemotePath(url.URL(this.RemoteAddress), this.PackageName, "latest", RemoteManifestFilename)
 }
 
 // Ref returns the reference to the package being uploaded.

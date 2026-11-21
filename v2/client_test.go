@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -158,12 +160,63 @@ func (this *ClientFixture) TestIncompletePackageRefIsRejected() {
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 }
 
+func (this *ClientFixture) TestUploadCanExcludeInstalledManifests() {
+	this.writeSource("manifest_team___package.json", "{}")
+	this.writeSource("nested/manifest_other.json", "{}")
+	this.writeSource("nested/manifest.json", "kept: not an installed manifest")
+
+	manifest, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0"), ExcludeInstalledManifests: true})
+	this.So(err, should.BeNil)
+	this.So(archivePaths(manifest), should.Resemble, []string{"hello.txt", "nested/goodbye.txt", "nested/manifest.json"})
+
+	manifest, err = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+	this.So(err, should.BeNil)
+	this.So(archivePaths(manifest), should.HaveLength, 5)
+}
+
+func archivePaths(manifest Manifest) (paths []string) {
+	for _, item := range manifest.Archive.Contents {
+		paths = append(paths, item.Path)
+	}
+	return paths
+}
+
 func (this *ClientFixture) TestUploadRequiresExactlyOneSource() {
 	pkg := this.pkg("1.0.0")
 	pkg.SourceFile = filepath.Join(this.source, "hello.txt")
 	_, err := this.client.Upload(this.ctx, UploadRequest{Package: pkg})
 	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 	this.So(err.Error(), should.ContainSubstring, "only one of")
+	this.So(this.storage.objects, should.BeEmpty)
+}
+
+func (this *ClientFixture) TestFailedBuildRemovesItsArchive() {
+	archives := this.tempDir()
+	defer func() { _ = os.RemoveAll(archives) }()
+	client := New(withStorage(this.storage), withTempDirectory(archives), WithMaxRetry(0))
+	this.So(os.Symlink(os.TempDir(), filepath.Join(this.source, "escape")), should.BeNil)
+
+	_, err := client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	this.So(err, should.NotBeNil)
+	entries, err := os.ReadDir(archives)
+	this.So(err, should.BeNil)
+	this.So(entries, should.BeEmpty)
+}
+
+func (this *ClientFixture) TestUnreadableRootManifestFailsUploadBeforeAnythingIsWritten() {
+	root := URL{Scheme: "gcs", Host: "bucket", Path: "/prefix/team/package/manifest.json"}
+	this.storage.objects[root.String()] = []byte("not json")
+
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+
+	this.So(err, should.NotBeNil)
+	this.So(this.storage.objects, should.HaveLength, 1)
+}
+
+func (this *ClientFixture) TestUploadRejectsLatestAsAVersion() {
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("latest")})
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
 	this.So(this.storage.objects, should.BeEmpty)
 }
 
@@ -195,6 +248,32 @@ func (this *ClientFixture) TestInstallByTag() {
 	this.So(this.readTarget("hello.txt"), should.Equal, "Hello, World!")
 }
 
+func (this *ClientFixture) TestInstalledManifestNamesTheResolvedVersion() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+
+	_, err := InstalledManifest(this.target, "team/package")
+	this.So(errors.Is(err, fs.ErrNotExist), should.BeTrue)
+
+	this.So(this.client.Install(this.ctx, this.dependency("stable")), should.BeNil)
+	manifest, err := InstalledManifest(this.target, "team/package")
+	this.So(err, should.BeNil)
+	this.So(manifest.Name, should.Equal, "team/package")
+	this.So(manifest.Version, should.Equal, "1.0.0")
+
+	this.So(this.client.Install(this.ctx, this.dependency("latest")), should.BeNil)
+	manifest, err = InstalledManifest(this.target, "team/package")
+	this.So(err, should.BeNil)
+	this.So(manifest.Version, should.Equal, "2.0.0")
+}
+
+func (this *ClientFixture) TestInstalledManifestRequiresDirectoryAndName() {
+	_, err := InstalledManifest("", "team/package")
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	_, err = InstalledManifest(this.target, "")
+	this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+}
+
 func (this *ClientFixture) TestModifyTags() {
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
 	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
@@ -219,6 +298,67 @@ func (this *ClientFixture) TestModifyTagsRejectsDuplicateAndConflictingTags() {
 		modification.PackageName, modification.RemoteAddress = "team/package", this.remote
 		this.So(errors.Is(this.client.ModifyTags(this.ctx, modification), ErrInvalidConfig), should.BeTrue)
 	}
+}
+
+// Simulates another client changing the root manifest between this client's
+// read and write: the write must not discard the other client's change.
+func (this *ClientFixture) changeRootManifestConcurrentlyOnce(change func()) {
+	var once sync.Once
+	this.storage.beforeUpload = func(request model.UploadRequest) {
+		if path.Base(request.RemoteAddress.Path) == model.RemoteManifestFilename &&
+			path.Base(path.Dir(request.RemoteAddress.Path)) == "package" {
+			once.Do(change)
+		}
+	}
+}
+
+func (this *ClientFixture) TestConcurrentTagModificationIsNotLost() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0", "stable")})
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0")})
+	other := New(withStorage(this.storage), WithMaxRetry(0))
+	this.changeRootManifestConcurrentlyOnce(func() {
+		this.storage.beforeUpload = nil
+		this.So(other.ModifyTags(this.ctx, TagModification{
+			PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "beta", Version: "2.0.0"}},
+		}), should.BeNil)
+	})
+
+	err := this.client.ModifyTags(this.ctx, TagModification{
+		PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "stable", Version: "2.0.0"}},
+	})
+
+	this.So(err, should.BeNil)
+	tags, _ := this.client.Tags(this.ctx, this.ref())
+	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "2.0.0"}})
+}
+
+func (this *ClientFixture) TestTagModificationDuringUploadIsNotLost() {
+	_, _ = this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("1.0.0")})
+	other := New(withStorage(this.storage), WithMaxRetry(0))
+	this.changeRootManifestConcurrentlyOnce(func() {
+		this.storage.beforeUpload = nil
+		this.So(other.ModifyTags(this.ctx, TagModification{
+			PackageName: "team/package", RemoteAddress: this.remote, Add: []Tag{{Name: "stable", Version: "1.0.0"}},
+		}), should.BeNil)
+	})
+
+	_, err := this.client.Upload(this.ctx, UploadRequest{Package: this.pkg("2.0.0", "beta")})
+
+	this.So(err, should.BeNil)
+	tags, _ := this.client.Tags(this.ctx, this.ref())
+	this.So(tags, should.Resemble, []Tag{{Name: "beta", Version: "2.0.0"}, {Name: "stable", Version: "1.0.0"}})
+}
+
+func (this *ClientFixture) TestModifyTagsRejectsInvalidTagNamesToDelete() {
+	for _, name := range []string{"", "latest"} {
+		err := this.client.ModifyTags(this.ctx, TagModification{
+			PackageName:   "team/package",
+			RemoteAddress: this.remote,
+			Delete:        []Tag{{Name: name}},
+		})
+		this.So(errors.Is(err, ErrInvalidConfig), should.BeTrue)
+	}
+	this.So(this.storage.objects, should.BeEmpty)
 }
 
 func (this *ClientFixture) TestModifyTagsRejectsUnknownVersion() {
@@ -255,26 +395,52 @@ func (this *ClientFixture) TestInvalidDependencyIsRejected() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// fakeStorage keeps uploaded objects in memory, keyed by address.
+// fakeStorage keeps uploaded objects in memory, keyed by address, and gives
+// each write a new generation, as Google Cloud Storage does.
 type fakeStorage struct {
-	lock    sync.Mutex
-	objects map[string][]byte
+	lock        sync.Mutex
+	objects     map[string][]byte
+	generations map[string]int64
+	written     int64
+
+	// beforeUpload, when set, runs at the start of each upload.
+	beforeUpload func(request model.UploadRequest)
+
+	// dropArchiveDownloadsAfter, when positive, makes every (non-ranged)
+	// archive download fail after that many bytes, like a dropped connection.
+	dropArchiveDownloadsAfter int
 }
 
 func newFakeStorage() *fakeStorage {
-	return &fakeStorage{objects: make(map[string][]byte)}
+	return &fakeStorage{objects: make(map[string][]byte), generations: make(map[string]int64)}
 }
 
 func (this *fakeStorage) Upload(_ context.Context, request model.UploadRequest) error {
-	raw, err := io.ReadAll(request.Body)
+	if this.beforeUpload != nil {
+		this.beforeUpload(request)
+	}
+	raw, err := io.ReadAll(io.NewSectionReader(request.Body, 0, request.Size))
 	if err != nil {
 		return err
 	}
 	this.lock.Lock()
 	defer this.lock.Unlock()
-	this.objects[request.RemoteAddress.String()] = raw
+	address := request.RemoteAddress.String()
+	if request.IfGenerationMatch != nil && *request.IfGenerationMatch != this.generations[address] {
+		return model.NewStatusCodeError(http.StatusPreconditionFailed, []int{http.StatusOK}, request.RemoteAddress)
+	}
+	this.written++
+	this.objects[address] = raw
+	this.generations[address] = this.written
 	return nil
 }
+
+type generationBody struct {
+	io.ReadCloser
+	generation int64
+}
+
+func (this generationBody) Generation() int64 { return this.generation }
 
 func (this *fakeStorage) object(address url.URL) ([]byte, error) {
 	this.lock.Lock()
@@ -291,8 +457,18 @@ func (this *fakeStorage) Download(_ context.Context, address url.URL) (io.ReadCl
 	if err != nil {
 		return nil, err
 	}
-	return io.NopCloser(bytes.NewReader(raw)), nil
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	var body io.Reader = bytes.NewReader(raw)
+	if this.dropArchiveDownloadsAfter > 0 && path.Base(address.Path) == model.RemoteArchiveFilename {
+		body = io.MultiReader(bytes.NewReader(raw[:this.dropArchiveDownloadsAfter]), droppedConnection{})
+	}
+	return generationBody{ReadCloser: io.NopCloser(body), generation: this.generations[address.String()]}, nil
 }
+
+type droppedConnection struct{}
+
+func (droppedConnection) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 func (this *fakeStorage) Seek(_ context.Context, address url.URL, start, end int64) (io.ReadCloser, error) {
 	raw, err := this.object(address)

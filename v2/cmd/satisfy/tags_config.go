@@ -14,6 +14,7 @@ import (
 // tagsCommandConfig is the configuration for the tags modify command.
 type tagsCommandConfig struct {
 	MaxRetry          int
+	CredentialReader  gcs.CredentialsReader
 	GoogleCredentials gcs.Credentials
 	Modification      satisfy.TagModification
 	JSONPath          string
@@ -58,6 +59,7 @@ func (this *TagsConfigLoader) LoadConfig(ctx context.Context, args []string) (co
 	if err != nil {
 		return tagsCommandConfig{}, fmt.Errorf("google authentication failed: %w", err)
 	}
+	config.CredentialReader = this.reader
 
 	err = this.validate(config)
 	if err != nil {

@@ -72,7 +72,7 @@ type PackageConfig struct {
 	// PackageName is the name of the package, e.g. "my/package".
 	PackageName string `json:"package_name"`
 
-	// PackageVersion is the version being uploaded.
+	// PackageVersion is the version being uploaded. "latest" is reserved.
 	PackageVersion string `json:"package_version"`
 
 	// RemoteAddress is the address under which packages live, e.g.
@@ -127,7 +127,7 @@ type Archive struct {
 	Filename string `json:"filename"`
 
 	// Size is the size of the compressed archive in bytes.
-	Size uint64 `json:"size"`
+	Size int64 `json:"size"`
 
 	// MD5Checksum is the MD5 checksum of the compressed archive.
 	MD5Checksum []byte `json:"md5"`

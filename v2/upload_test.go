@@ -54,6 +54,24 @@ func (this *UploadCompressionFixture) TestZipArchiveInstallsCorrectly() {
 	this.assertArchiveRoundTrip("zip", 9)
 }
 
+// An unset (zero) level must compress at the algorithm's default level, not
+// store the data uncompressed (which is what level 0 means to gzip and zip).
+func (this *UploadCompressionFixture) TestUnsetCompressionLevelCompresses() {
+	content := bytes.Repeat([]byte("satisfy compresses this text. "), 1000)
+	for algorithm := range compression {
+		compressed := new(bytes.Buffer)
+		compressor, err := newCompressor(algorithm, 0, compressed)
+		this.So(err, should.BeNil)
+		if algorithm == "zip" {
+			archiveWriter := compressor.(model.ArchiveWriter)
+			_ = archiveWriter.WriteHeader(model.ArchiveHeader{Name: "file", Size: int64(len(content)), ModTime: time.Now()})
+		}
+		_, _ = compressor.Write(content)
+		this.So(compressor.Close(), should.BeNil)
+		this.So(compressed.Len(), should.BeLessThan, len(content)/10)
+	}
+}
+
 func (this *UploadCompressionFixture) TestEveryCompressionAlgorithmHasAContentType() {
 	this.So(len(contentType), should.Equal, len(compression))
 	for algorithm := range compression {
@@ -62,7 +80,7 @@ func (this *UploadCompressionFixture) TestEveryCompressionAlgorithmHasAContentTy
 }
 
 // The write side mirrors UploadApp.buildArchiveAndManifestContents (archive
-// closed by PackageBuilder.Build, then the compressor closed by the app); the
+// closed by DirectoryPackageBuilder.Build, then the compressor closed by the app); the
 // read side mirrors DownloadApp's installer wiring. Zip cannot represent
 // symlinks or executable modes, so those entries are asserted only for the
 // tar-based algorithms.

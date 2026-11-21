@@ -12,7 +12,7 @@ type InstallationRequest struct {
 }
 
 type IntegrityCheck interface {
-	Verify(manifest Manifest, localPath string) error
+	Verify(ctx context.Context, manifest Manifest, localPath string) error
 }
 
 type PackageInstaller interface {

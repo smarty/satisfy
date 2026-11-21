@@ -59,10 +59,10 @@ func (this *RetryFixture) TestUploadRetryOnError() {
 	})
 }
 
-func (this *RetryFixture) TestUploadBodyIsRewoundBeforeEveryAttempt() {
+func (this *RetryFixture) TestEveryAttemptSendsTheWholeBody() {
 	this.fakeClient.error = aRetryError
 
-	_ = this.client.Upload(context.Background(), model.UploadRequest{Body: strings.NewReader("payload")})
+	_ = this.client.Upload(context.Background(), model.UploadRequest{Body: strings.NewReader("payload"), Size: 7})
 
 	this.So(this.fakeClient.uploadBodies, should.Resemble, []string{"payload", "payload", "payload", "payload", "payload"})
 }
@@ -171,7 +171,7 @@ func (this *FakeClient) Upload(_ context.Context, request model.UploadRequest) e
 	this.uploadRequest = request
 	this.uploadAttempts++
 	if request.Body != nil {
-		raw, _ := io.ReadAll(request.Body)
+		raw, _ := io.ReadAll(io.NewSectionReader(request.Body, 0, request.Size))
 		this.uploadBodies = append(this.uploadBodies, string(raw))
 	}
 	return this.error

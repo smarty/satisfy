@@ -124,6 +124,20 @@ func (this *DependencyResolverFixture) TestIntegrityCheckFailure() {
 	this.So(this.integrityChecker.manifest, should.Resemble, localManifest)
 }
 
+func (this *DependencyResolverFixture) TestCancelledIntegrityCheckStopsWithoutReinstalling() {
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
+	ctx, cancel := context.WithCancel(context.Background())
+	this.integrityChecker.onVerify = cancel
+	this.integrityChecker.err = context.Canceled
+
+	this.resolver = NewDependencyResolver(this.fileSystem, this.integrityChecker, this.packageInstaller, this.dependency, nil)
+	err := this.resolver.Resolve(ctx)
+
+	this.So(err, should.Equal, context.Canceled)
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+}
+
 func (this *DependencyResolverFixture) TestAlreadyInstalledCorrectly() {
 	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
 
@@ -211,20 +225,29 @@ func (this *DependencyResolverFixture) assertLatestPackageInstalled(err error, n
 		PackageName:   "",
 	})
 }
-func (this *DependencyResolverFixture) TestLatestManifestFailsToDownload() {
+func (this *DependencyResolverFixture) TestLatestManifestFailsToDownloadPreservesLocalInstallation() {
+	downloadErr := errors.New("network unavailable")
 	this.prepareLocalPackageAndManifest(this.dependency.PackageName, this.dependency.PackageVersion)
 	this.dependency.PackageVersion = "latest"
-
-	this.packageInstaller.downloadError = errors.New("error")
-	this.packageInstaller.installManifestErr = errors.New("error")
+	this.packageInstaller.downloadError = downloadErr
 
 	err := this.Resolve()
 
-	this.So(err, should.NotBeNil)
-	this.assertPreviouslyInstalledPackageUninstalled()
-	this.So(this.fileSystem.fileSystem, should.NotContainKey, "local/contents1")
-	this.So(this.fileSystem.fileSystem, should.NotContainKey, "local/contents2")
-	this.So(this.fileSystem.fileSystem, should.NotContainKey, "local/contents3")
+	this.So(errors.Is(err, downloadErr), should.BeTrue)
+	this.So(this.packageInstaller.installManifestCounter, should.Equal, 0)
+	this.assertPreviousInstallationPreserved()
+}
+
+func (this *DependencyResolverFixture) TestReinstallManifestFailurePreservesLocalInstallation() {
+	manifestErr := errors.New("network unavailable")
+	this.prepareLocalPackageAndManifest(this.dependency.PackageName, "not"+this.dependency.PackageVersion)
+	this.packageInstaller.installManifestErr = manifestErr
+
+	err := this.Resolve()
+
+	this.So(errors.Is(err, manifestErr), should.BeTrue)
+	this.So(this.packageInstaller.installPackageCounter, should.Equal, 0)
+	this.assertPreviousInstallationPreserved()
 }
 
 func (this *DependencyResolverFixture) TestTagFreshInstallation() {
@@ -390,6 +413,12 @@ func (this *DependencyResolverFixture) prepareLocalPackageAndManifest(
 	var stored model.Manifest // as read back from disk
 	_ = json.Unmarshal(raw, &stored)
 	return stored
+}
+
+func (this *DependencyResolverFixture) assertPreviousInstallationPreserved() {
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents1")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents2")
+	this.So(this.fileSystem.fileSystem, should.ContainKey, "local/contents3")
 }
 
 func (this *DependencyResolverFixture) assertPreviouslyInstalledPackageUninstalled() {

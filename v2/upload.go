@@ -1,6 +1,7 @@
 package satisfy
 
 import (
+	"cmp"
 	"context"
 	"crypto/md5"
 	"encoding/json/jsontext"
@@ -10,7 +11,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
+	"path/filepath"
 
+	"github.com/klauspost/compress/flate"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/smarty/satisfy/v2/internal/archive"
@@ -26,6 +30,12 @@ type UploadRequest struct {
 	// Overwrite replaces the package version when it already exists instead
 	// of failing with ErrPackageExists.
 	Overwrite bool
+
+	// ExcludeInstalledManifests leaves out of a directory's archive the
+	// manifest_*.json files that Install writes (at any depth), so a
+	// directory that packages were installed into can be uploaded as is. It
+	// has no effect when the source is a single file.
+	ExcludeInstalledManifests bool
 }
 
 // Upload archives the package's source, uploads the archive and its manifest,
@@ -37,6 +47,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		return Manifest{}, err
 	}
 	pkg := request.Package.internal()
+	rootAddress := pkg.ComposeLatestManifestRemoteAddress()
 
 	if !request.Overwrite {
 		exists, err := this.Exists(ctx, PackageRef{RemoteAddress: request.Package.RemoteAddress, Name: pkg.PackageName}, pkg.PackageVersion)
@@ -48,7 +59,14 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		}
 	}
 
-	built, err := this.buildArchive(ctx, pkg)
+	// The root manifest is updated last. Reading it now means an unreadable one
+	// fails the upload before the version exists; otherwise a rerun would stop
+	// with ErrPackageExists while latest and the tags were never updated.
+	if _, err := this.downloadManifest(ctx, rootAddress); err != nil && !model.IsNotFound(err) {
+		return Manifest{}, fmt.Errorf("could not read root manifest at [%s]: %w", rootAddress.String(), err)
+	}
+
+	built, err := this.buildArchive(ctx, pkg, request.ExcludeInstalledManifests)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -59,7 +77,7 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 		Version: pkg.PackageVersion,
 		Archive: model.Archive{
 			Filename:             model.RemoteArchiveFilename,
-			Size:                 uint64(built.size),
+			Size:                 built.size,
 			MD5Checksum:          built.checksum,
 			Contents:             built.contents,
 			CompressionAlgorithm: pkg.CompressionAlgorithm,
@@ -76,14 +94,13 @@ func (this *Client) Upload(ctx context.Context, request UploadRequest) (Manifest
 	}
 
 	this.logger.Info("uploading the manifest", "package", pkg.PackageName, "version", pkg.PackageVersion)
-	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename)); err != nil {
+	if err = this.uploadManifest(ctx, manifest, pkg.ComposeRemoteAddress(model.RemoteManifestFilename), nil); err != nil {
 		return Manifest{}, err
 	}
-	rootManifest, err := this.buildRootManifest(ctx, pkg, manifest)
+	err = this.updateRootManifest(ctx, rootAddress, func(existing model.Manifest, _ bool) (model.Manifest, error) {
+		return this.buildRootManifest(pkg, manifest, existing), nil
+	})
 	if err != nil {
-		return Manifest{}, err
-	}
-	if err = this.uploadManifest(ctx, rootManifest, pkg.ComposeLatestManifestRemoteAddress()); err != nil {
 		return Manifest{}, err
 	}
 	return publicManifest(manifest), nil
@@ -97,6 +114,8 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 		return fmt.Errorf("%w: package name is required", ErrInvalidConfig)
 	case pkg.PackageVersion == "":
 		return fmt.Errorf("%w: package version is required", ErrInvalidConfig)
+	case pkg.PackageVersion == "latest":
+		return fmt.Errorf("%w: \"latest\" is reserved and cannot be uploaded as a version", ErrInvalidConfig)
 	case pkg.RemoteAddress.Host == "":
 		return fmt.Errorf("%w: remote address is required", ErrInvalidConfig)
 	}
@@ -115,6 +134,13 @@ func ValidatePackageConfig(pkg PackageConfig) error {
 		}
 	}
 	return nil
+}
+
+// isInstalledManifest reports whether the file at relativePath is named like
+// the manifests Install writes.
+func isInstalledManifest(relativePath string) bool {
+	matched, _ := path.Match("manifest_*.json", path.Base(filepath.ToSlash(relativePath)))
+	return matched
 }
 
 func sourcePath(pkg model.PackageConfig) string {
@@ -144,16 +170,17 @@ type builtArchive struct {
 	contents []model.ArchiveItem
 }
 
-func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (built builtArchive, err error) {
-	file, err := os.CreateTemp("", "satisfy-archive-*")
+func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig, excludeInstalledManifests bool) (built builtArchive, err error) {
+	file, err := os.CreateTemp(this.tempDirectory, "satisfy-archive-*")
 	if err != nil {
 		return builtArchive{}, err
 	}
-	built.path = file.Name()
+	// the error returns below zero built, so remember the path separately
+	path := file.Name()
 	defer func() {
 		err = errors.Join(err, file.Close())
 		if err != nil {
-			_ = os.Remove(built.path)
+			_ = os.Remove(path)
 		}
 	}()
 
@@ -171,6 +198,9 @@ func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (
 		this.logger,
 		this.progress,
 	)
+	if excludeInstalledManifests {
+		builder.WithExclusion(isInstalledManifest)
+	}
 	if err = builder.Build(ctx); err != nil {
 		_ = compressor.Close()
 		return builtArchive{}, err
@@ -178,6 +208,7 @@ func (this *Client) buildArchive(ctx context.Context, pkg model.PackageConfig) (
 	if err = compressor.Close(); err != nil {
 		return builtArchive{}, err
 	}
+	built.path = path
 	built.size = counter.count
 	built.checksum = hasher.Sum(nil)
 	built.contents = builder.Contents()
@@ -193,26 +224,23 @@ func (this *Client) uploadArchive(ctx context.Context, pkg model.PackageConfig, 
 	return this.storage.Upload(ctx, model.UploadRequest{
 		RemoteAddress: pkg.ComposeRemoteAddress(model.RemoteArchiveFilename),
 		Body:          file,
-		Size:          int64(manifest.Archive.Size),
+		Size:          manifest.Archive.Size,
 		ContentType:   contentType[manifest.Archive.CompressionAlgorithm],
 		Checksum:      manifest.Archive.MD5Checksum,
 	})
 }
 
 // buildRootManifest carries the tag listing forward from the existing root
-// manifest and points any tags named in the package config at the version
-// being uploaded. The versioned manifest never includes tags.
-func (this *Client) buildRootManifest(ctx context.Context, pkg model.PackageConfig, manifest model.Manifest) (model.Manifest, error) {
-	existing, err := this.downloadManifest(ctx, pkg.ComposeLatestManifestRemoteAddress())
-	if err != nil && !model.IsNotFound(err) { // not found: first upload of this package
-		return model.Manifest{}, fmt.Errorf("could not read existing root manifest (needed to preserve tags): %w", err)
-	}
+// manifest (empty on the first upload of a package) and points any tags named
+// in the package config at the version being uploaded. The versioned manifest
+// never includes tags.
+func (this *Client) buildRootManifest(pkg model.PackageConfig, manifest, existing model.Manifest) model.Manifest {
 	rootManifest := manifest
 	rootManifest.Tags = model.MergeTags(existing.Tags, pkg.Tags, pkg.PackageVersion)
 	for _, name := range pkg.Tags {
 		this.logger.Info("tagging version", "version", pkg.PackageVersion, "tag", name)
 	}
-	return rootManifest, nil
+	return rootManifest
 }
 
 func newCompressor(algorithm string, level int, writer io.Writer) (io.WriteCloser, error) {
@@ -223,17 +251,23 @@ func newCompressor(algorithm string, level int, writer io.Writer) (io.WriteClose
 	return factory(writer, level)
 }
 
+// compression creates each algorithm's compressor. A level of 0 (unset)
+// selects the algorithm's default level rather than no compression.
 var compression = map[string]func(_ io.Writer, level int) (io.WriteCloser, error){
 	"zstd": func(writer io.Writer, level int) (io.WriteCloser, error) {
+		level = cmp.Or(level, defaultZstdLevel)
 		return archive.NewParallelZstdWriter(writer, zstd.EncoderLevelFromZstd(level), archive.DefaultParallelZstdChunkSize)
 	},
 	"gzip": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return gzip.NewWriterLevel(writer, level)
+		return gzip.NewWriterLevel(writer, cmp.Or(level, gzip.DefaultCompression))
 	},
 	"zip": func(writer io.Writer, level int) (io.WriteCloser, error) {
-		return archive.NewZipArchiveWriter(writer, level), nil
+		return archive.NewZipArchiveWriter(writer, cmp.Or(level, flate.DefaultCompression)), nil
 	},
 }
+
+// defaultZstdLevel is zstd's own default level ("default" speed).
+const defaultZstdLevel = 3
 
 var contentType = map[string]string{
 	"zstd": "application/zstd",
